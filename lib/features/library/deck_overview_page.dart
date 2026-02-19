@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
 
 class DeckOverviewPage extends ConsumerWidget {
@@ -79,9 +80,9 @@ class DeckOverviewPage extends ConsumerWidget {
     final last = settings.lastNewCardStudyDate;
     final bool isSameDay =
         last != null &&
-        last.year == now.year &&
-        last.month == now.month &&
-        last.day == now.day;
+            last.year == now.year &&
+            last.month == now.month &&
+            last.day == now.day;
 
     if (!isSameDay) {
       settings.newCardsSeenToday = 0;
@@ -92,15 +93,50 @@ class DeckOverviewPage extends ConsumerWidget {
       });
     }
 
-    // 2) Calcular CUPO RESTANTE
-    // Si límite es 20 y ya vi 5, me quedan 15. Si ya vi 20, me quedan 0.
-    final int remainingQuota = max(
-      0,
-      settings.newCardsPerDay - settings.newCardsSeenToday,
-    );
-    // --------------------------------
+    // 2) Si existe una sesión guardada DEL MISMO DÍA, reanudarla.
+    final existingSession =
+    await isar.studySessions.filter().packNameEqualTo(packName).findFirst();
 
-    // 3) Obtener REPASOS (Limitados)
+    if (existingSession != null) {
+      if (_isSameDay(existingSession.sessionDay, now)) {
+        final resumedCards =
+        await _loadCardsFromSession(isar, existingSession.queueCardIds);
+
+        // Si la sesión quedó vacía/corrupta, la eliminamos y continuamos con una nueva.
+        if (resumedCards.isNotEmpty) {
+          final safeIndex =
+          _clampIndex(existingSession.currentIndex, resumedCards.length);
+
+          if (!context.mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StudyPage(
+                packName: packName,
+                cards: resumedCards,
+                initialIndex: safeIndex,
+              ),
+            ),
+          );
+          return;
+        }
+
+        await isar.writeTxn(() async {
+          await isar.studySessions.delete(existingSession.id);
+        });
+      } else {
+        // Sesión vieja: eliminar para evitar mezclar días.
+        await isar.writeTxn(() async {
+          await isar.studySessions.delete(existingSession.id);
+        });
+      }
+    }
+
+    // 3) Calcular CUPO RESTANTE de nuevas
+    final int remainingQuota =
+    max(0, settings.newCardsPerDay - settings.newCardsSeenToday);
+
+    // 4) Obtener REPASOS (Limitados)
     final reviews = await isar.flashcards
         .filter()
         .packNameEqualTo(packName)
@@ -113,7 +149,7 @@ class DeckOverviewPage extends ConsumerWidget {
 
     reviews.shuffle();
 
-    // 4) Obtener NUEVAS (Solo si queda cupo)
+    // 5) Obtener NUEVAS (Solo si queda cupo)
     List<Flashcard> newCardsOrdered = [];
 
     if (remainingQuota > 0) {
@@ -122,22 +158,18 @@ class DeckOverviewPage extends ConsumerWidget {
           .packNameEqualTo(packName)
           .stateEqualTo(CardState.newCard)
           .sortByOriginalId()
-          .limit(
-            remainingQuota,
-          ) // Pedimos solo las que faltan para llegar al límite
+          .limit(remainingQuota)
           .findAll();
 
       // Ordenar Recog -> Prod
-      final newRecog = newCardsRaw
-          .where((c) => c.cardType.endsWith('recog'))
-          .toList();
-      final newProd = newCardsRaw
-          .where((c) => c.cardType.endsWith('prod'))
-          .toList();
+      final newRecog =
+      newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
+      final newProd =
+      newCardsRaw.where((c) => c.cardType.endsWith('prod')).toList();
       newCardsOrdered = [...newRecog, ...newProd];
     }
 
-    // 5) Unir sesión
+    // 6) Unir sesión
     final sessionCards = [...reviews, ...newCardsOrdered];
 
     if (!context.mounted) return;
@@ -156,9 +188,61 @@ class DeckOverviewPage extends ConsumerWidget {
       return;
     }
 
+    // 7) Crear StudySession persistida (para poder salir y volver)
+    final session = StudySession()
+      ..packName = packName
+      ..queueCardIds = sessionCards.map((c) => c.id).toList()
+      ..currentIndex = 0
+      ..sessionDay = DateTime(now.year, now.month, now.day)
+      ..lastUpdated = now;
+
+    await isar.writeTxn(() async {
+      await isar.studySessions.put(session);
+    });
+
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => StudyPage(cards: sessionCards)),
+      MaterialPageRoute(
+        builder: (_) => StudyPage(
+          packName: packName,
+          cards: sessionCards,
+          initialIndex: 0,
+        ),
+      ),
     );
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  int _clampIndex(int idx, int len) {
+    if (len <= 0) return 0;
+    if (idx < 0) return 0;
+    if (idx >= len) return len - 1;
+    return idx;
+  }
+
+  Future<List<Flashcard>> _loadCardsFromSession(
+      Isar isar,
+      List<int> queueIds,
+      ) async {
+    if (queueIds.isEmpty) return [];
+
+    final uniqueIds = <int>{...queueIds}.toList();
+    final cards = await isar.flashcards.getAll(uniqueIds);
+
+    final map = <int, Flashcard>{};
+    for (final c in cards) {
+      if (c != null) map[c.id] = c;
+    }
+
+    // Reconstruir en el orden original (permitiendo duplicados)
+    final ordered = <Flashcard>[];
+    for (final id in queueIds) {
+      final c = map[id];
+      if (c != null) ordered.add(c);
+    }
+
+    return ordered;
   }
 }

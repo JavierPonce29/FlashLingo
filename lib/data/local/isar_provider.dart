@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
+import 'package:flashcards_app/data/models/study_session.dart';
 
 part 'isar_provider.g.dart';
 
@@ -18,7 +19,7 @@ Future<Isar> isarDb(IsarDbRef ref) async {
   final dir = await getApplicationDocumentsDirectory();
 
   final isar = await Isar.open(
-    [FlashcardSchema, DeckSettingsSchema, ReviewLogSchema],
+    [FlashcardSchema, DeckSettingsSchema, ReviewLogSchema, StudySessionSchema],
     directory: dir.path,
     inspector: kDebugMode, // ✅ Solo en debug
   );

@@ -21,7 +21,7 @@ final decksStreamProvider =
 );
 
 typedef DecksStreamRef = AutoDisposeStreamProviderRef<List<DeckSummary>>;
-String _$deleteDeckHash() => r'318cdfb31ac87bdd1ff41ed09fd4f7ce0378b0ea';
+String _$deleteDeckHash() => r'43a962692d94fe9216cfddbeffae6fa2b308fa86';
 
 /// Copied from Dart SDK
 class _SystemHash {

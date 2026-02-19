@@ -28,6 +28,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   late final TextEditingController _offsetController;
   late final TextEditingController _initialNtController;
   late final TextEditingController _learningStepsController;
+
+  // --- NUEVAS (mínimo 2 vistas el primer día) ---
+  late final TextEditingController _newMinCorrectRepsController;
+  late final TextEditingController _newIntraDayMinutesController;
+
   late final TextEditingController _lapseToleranceController;
   late final TextEditingController _lapseFixedIntervalController;
   bool _useFixedIntervalOnLapse = true;
@@ -54,6 +59,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _offsetController = TextEditingController();
     _initialNtController = TextEditingController();
     _learningStepsController = TextEditingController();
+
+    _newMinCorrectRepsController = TextEditingController();
+    _newIntraDayMinutesController = TextEditingController();
+
     _lapseToleranceController = TextEditingController();
     _lapseFixedIntervalController = TextEditingController();
 
@@ -73,6 +82,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _offsetController.dispose();
     _initialNtController.dispose();
     _learningStepsController.dispose();
+
+    _newMinCorrectRepsController.dispose();
+    _newIntraDayMinutesController.dispose();
+
     _lapseToleranceController.dispose();
     _lapseFixedIntervalController.dispose();
     _writeThresholdController.dispose();
@@ -115,6 +128,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     // Learning steps en DÍAS (admite fracciones)
     _learningStepsController.text = settings.learningSteps.join(', ');
 
+    // Nuevas: mínimo de aciertos antes de pasar a otro día
+    _newMinCorrectRepsController.text = settings.newCardMinCorrectReps.toString();
+    _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes.toString();
+
     _lapseToleranceController.text = settings.lapseTolerance.toString();
     _lapseFixedIntervalController.text = settings.lapseFixedInterval.toString();
 
@@ -141,8 +158,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final tolerance = int.parse(_lapseToleranceController.text.trim());
     final lapseDays = _useFixedIntervalOnLapse
         ? double.parse(
-            _lapseFixedIntervalController.text.trim().replaceAll(',', '.'),
-          )
+      _lapseFixedIntervalController.text.trim().replaceAll(',', '.'),
+    )
         : 1.0; // valor no usado si switch está apagado
 
     final pMin = double.parse(_pMinController.text.trim().replaceAll(',', '.'));
@@ -158,6 +175,9 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     );
 
     final learningSteps = _parseLearningSteps(_learningStepsController.text);
+
+    final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
+    final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
 
     final writeThres = _enableWriteMode
         ? int.parse(_writeThresholdController.text.trim())
@@ -189,6 +209,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..offset = offset
           ..initialNt = initialNt
           ..learningSteps = learningSteps
+          ..newCardMinCorrectReps = newMinReps
+          ..newCardIntraDayMinutes = newMinutes
           ..enableWriteMode = _enableWriteMode
           ..writeModeThreshold = writeThres
           ..writeModeMaxReps = writeReps;
@@ -249,11 +271,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   }
 
   String? _validateDouble(
-    String? v, {
-    required String label,
-    double? min,
-    double? max,
-  }) {
+      String? v, {
+        required String label,
+        double? min,
+        double? max,
+      }) {
     final s0 = (v ?? '').trim();
     if (s0.isEmpty) return 'Requerido';
     final s = s0.replaceAll(',', '.');
@@ -294,294 +316,307 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- LÍMITES ---
-                    _buildSectionTitle("Límites Diarios"),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _newCardsLimitController,
-                            label: "Nuevas/día",
-                            inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (v) => _validateInt(
-                              v,
-                              label: 'Nuevas/día',
-                              min: 0,
-                              max: 10000,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _reviewsLimitController,
-                            label: "Máx. Repasos/día",
-                            inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (v) => _validateInt(
-                              v,
-                              label: 'Máx. Repasos/día',
-                              min: 0,
-                              max: 100000,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- MODO ESCRITURA ---
-                    _buildSectionTitle("Modo Escritura (Producción)"),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.deepPurple.shade200),
-                      ),
-                      child: Column(
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              "Activar escritura (Rev-Anv)",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: const Text(
-                              "Obliga a escribir la oración en el idioma objetivo.",
-                            ),
-                            value: _enableWriteMode,
-                            activeColor: Colors.deepPurple,
-                            onChanged: (val) =>
-                                setState(() => _enableWriteMode = val),
-                          ),
-                          if (_enableWriteMode) ...[
-                            const SizedBox(height: 10),
-                            _buildTextField(
-                              controller: _writeThresholdController,
-                              label: "Exactitud Mínima (%)",
-                              helper:
-                                  "Si no llegas a este % se bloquea el botón 'Bien'.",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInt(
-                                v,
-                                label: 'Exactitud mínima',
-                                min: 0,
-                                max: 100,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _buildTextField(
-                              controller: _writeMaxRepsController,
-                              label: "Límite de Repasos (0 = Siempre)",
-                              helper:
-                                  "0 = siempre activo. >0 = se desactiva tras N repasos de la carta.",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInt(
-                                v,
-                                label: 'Límite de repaso',
-                                min: 0,
-                                max: 1000000,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- APRENDIZAJE ---
-                    _buildSectionTitle("Fase de Aprendizaje"),
-                    _buildTextField(
-                      controller: _learningStepsController,
-                      label: "Pasos (DÍAS)",
-                      helper:
-                          "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validateLearningSteps,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- ALGORITMO ---
-                    _buildSectionTitle("Algoritmo Ebbinghaus"),
-                    _buildTextField(
-                      controller: _pMinController,
-                      label: "P_min",
-                      helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(
-                        v,
-                        label: 'P_min',
-                        min: 0.000001,
-                        max: 0.999999,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _alphaController,
-                            label: "Alpha",
-                            helper: "Correcta → nt = nt * (1 - alpha)",
-                            inputType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            validator: (v) => _validateDouble(
-                              v,
-                              label: 'Alpha',
-                              min: 0.0,
-                              max: 0.999999,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _betaController,
-                            label: "Beta",
-                            helper: "Incorrecta → nt = nt * (1 + beta)",
-                            inputType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            validator: (v) => _validateDouble(
-                              v,
-                              label: 'Beta',
-                              min: 0.0,
-                              max: 1000.0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _initialNtController,
-                      label: "Nt Inicial",
-                      helper: "Debe ser > 0",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(
-                        v,
-                        label: 'Nt Inicial',
-                        min: 0.000001,
-                        max: 1000.0,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _offsetController,
-                      label: "Offset (días)",
-                      helper:
-                          "Se resta al intervalo calculado. Normalmente 0..10",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(
-                        v,
-                        label: 'Offset',
-                        min: 0.0,
-                        max: 1000000.0,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // --- FALLOS ---
-                    _buildSectionTitle("Gestión de Fallos"),
-                    _buildTextField(
-                      controller: _lapseToleranceController,
-                      label: "Tolerancia (fallos consecutivos)",
-                      helper:
-                          "0 = desactivado. Si llega a N → entra a Relearning.",
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- LÍMITES ---
+              _buildSectionTitle("Límites Diarios"),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _newCardsLimitController,
+                      label: "Nuevas/día",
                       inputType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       validator: (v) => _validateInt(
                         v,
-                        label: 'Tolerancia',
+                        label: 'Nuevas/día',
                         min: 0,
-                        max: 1000000,
+                        max: 10000,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _reviewsLimitController,
+                      label: "Máx. Repasos/día",
+                      inputType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) => _validateInt(
+                        v,
+                        label: 'Máx. Repasos/día',
+                        min: 0,
+                        max: 100000,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // --- MODO ESCRITURA ---
+              _buildSectionTitle("Modo Escritura (Producción)"),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.deepPurple.shade200),
+                ),
+                child: Column(
+                  children: [
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text("Intervalo fijo tras resbalón"),
+                      title: const Text(
+                        "Activar escritura (Rev-Anv)",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       subtitle: const Text(
-                        "Si está desactivado, el algoritmo recalcula el intervalo.",
+                        "Obliga a escribir la oración en el idioma objetivo.",
                       ),
-                      value: _useFixedIntervalOnLapse,
+                      value: _enableWriteMode,
+                      activeColor: Colors.deepPurple,
                       onChanged: (val) =>
-                          setState(() => _useFixedIntervalOnLapse = val),
+                          setState(() => _enableWriteMode = val),
                     ),
-                    if (_useFixedIntervalOnLapse)
+                    if (_enableWriteMode) ...[
+                      const SizedBox(height: 10),
                       _buildTextField(
-                        controller: _lapseFixedIntervalController,
-                        label: "Días tras resbalón",
-                        inputType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: (v) => _validateDouble(
+                        controller: _writeThresholdController,
+                        label: "Exactitud Mínima (%)",
+                        helper:
+                        "Si no llegas a este % se bloquea el botón 'Bien'.",
+                        inputType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) => _validateInt(
                           v,
-                          label: 'Días tras resbalón',
-                          min: 0.000001,
-                          max: 1000000.0,
+                          label: 'Exactitud mínima',
+                          min: 0,
+                          max: 100,
                         ),
                       ),
-
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.save),
-                        label: const Text("GUARDAR CONFIGURACIÓN"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
+                      const SizedBox(height: 10),
+                      _buildTextField(
+                        controller: _writeMaxRepsController,
+                        label: "Límite de Repasos (0 = Siempre)",
+                        helper:
+                        "0 = siempre activo. >0 = se desactiva tras N repasos de la carta.",
+                        inputType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) => _validateInt(
+                          v,
+                          label: 'Límite de repaso',
+                          min: 0,
+                          max: 1000000,
                         ),
-                        onPressed: _saveSettings,
                       ),
-                    ),
-                    const SizedBox(height: 50),
+                    ],
                   ],
                 ),
               ),
-            ),
+              const SizedBox(height: 20),
+
+              // --- APRENDIZAJE ---
+              _buildSectionTitle("Fase de Aprendizaje"),
+              _buildTextField(
+                controller: _learningStepsController,
+                label: "Pasos (DÍAS)",
+                helper:
+                "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: _validateLearningSteps,
+              ),
+
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  "Nuevas: mínimo 2 vistas (primer día)",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _newMinCorrectRepsController,
+                      label: "Aciertos mínimos",
+                      helper:
+                      "Ej: 2 = una tarjeta nueva debe acertarse 2 veces antes de pasar a otro día.",
+                      inputType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) => _validateInt(
+                        v,
+                        label: 'Aciertos mínimos',
+                        min: 1,
+                        max: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _newIntraDayMinutesController,
+                      label: "Minutos intra-día",
+                      helper:
+                      "Intervalo guardado en nextReview tras el 1er \"Bien\" (no fuerza espera).",
+                      inputType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) => _validateInt(
+                        v,
+                        label: 'Minutos intra-día',
+                        min: 1,
+                        max: 1440,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // --- ALGORITMO ---
+              _buildSectionTitle("Algoritmo Ebbinghaus"),
+              _buildTextField(
+                controller: _pMinController,
+                label: "P_min",
+                helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => _validateDouble(
+                  v,
+                  label: 'P_min',
+                  min: 0.000001,
+                  max: 0.999999,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildTextField(
+                controller: _alphaController,
+                label: "Alpha",
+                helper: "Correcto: nt = nt * (1 - alpha).",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => _validateDouble(v, label: 'Alpha', min: 0),
+              ),
+              const SizedBox(height: 10),
+              _buildTextField(
+                controller: _betaController,
+                label: "Beta",
+                helper: "Incorrecto: nt = nt * (1 + beta).",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => _validateDouble(v, label: 'Beta', min: 0),
+              ),
+              const SizedBox(height: 10),
+              _buildTextField(
+                controller: _offsetController,
+                label: "Offset (días)",
+                helper: "Se resta al intervalo final.",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => _validateDouble(v, label: 'Offset'),
+              ),
+              const SizedBox(height: 10),
+              _buildTextField(
+                controller: _initialNtController,
+                label: "Nt inicial",
+                helper: "Decaimiento inicial.",
+                inputType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => _validateDouble(v, label: 'Nt inicial', min: 0.000001),
+              ),
+              const SizedBox(height: 20),
+
+              // --- LAPSES ---
+              _buildSectionTitle("Lapses"),
+              _buildTextField(
+                controller: _lapseToleranceController,
+                label: "Tolerancia (lapses)",
+                helper: "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
+                inputType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                validator: (v) => _validateInt(
+                  v,
+                  label: 'Tolerancia',
+                  min: 0,
+                  max: 1000,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                title: const Text("Usar intervalo fijo en lapse"),
+                subtitle: const Text("Si está activo, un lapse programa un intervalo fijo."),
+                value: _useFixedIntervalOnLapse,
+                onChanged: (v) => setState(() => _useFixedIntervalOnLapse = v),
+              ),
+              if (_useFixedIntervalOnLapse) ...[
+                _buildTextField(
+                  controller: _lapseFixedIntervalController,
+                  label: "Intervalo fijo (días)",
+                  helper: "Ej: 1.0",
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) => _validateDouble(v, label: 'Intervalo fijo', min: 0.000001),
+                ),
+              ],
+
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.save),
+                  label: const Text("Guardar"),
+                  onPressed: _saveSettings,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
+  // =========================
+  // Helpers UI
+  // =========================
+
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).primaryColor,
-        ),
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -599,15 +634,13 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       controller: controller,
       keyboardType: inputType,
       inputFormatters: inputFormatters,
+      validator: validator,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         helperText: helper,
         border: const OutlineInputBorder(),
       ),
-      validator:
-          validator ??
-          (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
     );
   }
 }

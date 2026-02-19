@@ -6,83 +6,59 @@ part 'deck_settings.g.dart';
 class DeckSettings {
   Id id = Isar.autoIncrement;
 
-  /// Identificador del mazo (debe ser único).
   @Index(unique: true, replace: true)
   late String packName;
 
   // =========================
   // Límites diarios
   // =========================
+  int newCardsPerDay = 40;
+  int maxReviewsPerDay = 500;
 
-  /// Máximo de cartas nuevas por día (solo cuenta cuando realmente se "ve" una nueva).
-  int newCardsPerDay = 20;
-
-  /// Máximo de repasos por día (cartas no nuevas que estén due).
-  int maxReviewsPerDay = 200;
-
-  /// Cuántas cartas nuevas se marcaron como vistas HOY (persistente).
+  // Tracking diario (para cupo)
   int newCardsSeenToday = 0;
-
-  /// Fecha (timestamp) de la última sesión donde se contaron nuevas.
-  /// Se usa para resetear newCardsSeenToday cuando cambia el día.
   DateTime? lastNewCardStudyDate;
+
+  // =========================
+  // Nuevas (mínimo de aciertos el primer día)
+  // =========================
+
+  /// Aciertos mínimos antes de permitir que una tarjeta NUEVA pase a un día futuro.
+  /// Ejemplo: 2 => la primera vez que respondes "Bien" una nueva, se reprograma intra-día
+  /// y solo tras el segundo "Bien" pasa al siguiente día (según learningSteps).
+  int newCardMinCorrectReps = 2;
+
+  /// Minutos del paso intra-día usado para nuevas cuando newCardMinCorrectReps > 1.
+  /// Nota: en la app actual no se fuerza esperar estos minutos; la carta se re-encola
+  /// "más adelante" en la sesión, pero este valor se guarda en nextReview y sirve si
+  /// el usuario sale y vuelve más tarde (o al día siguiente).
+  int newCardIntraDayMinutes = 10;
 
   // =========================
   // Aprendizaje (pasos fijos)
   // =========================
-
-  /// Pasos en **DÍAS**. Admite fracciones para intra-día:
-  /// - 10 minutos = 10/1440 ≈ 0.00694
-  /// - 1 hora = 1/24 ≈ 0.04167
-  ///
-  /// Ejemplo típico (días): [1, 4]
-  List<double> learningSteps = [1.0, 4.0];
+  List<double> learningSteps = [1.0, 4.0]; // en días (admite fracciones)
 
   // =========================
-  // Algoritmo (Ebbinghaus)
+  // Parámetros SRS (Ebbinghaus)
   // =========================
-
-  /// Probabilidad mínima deseada (0 < pMin < 1).
-  double pMin = 0.90;
-
-  /// Correcta: nt = nt * (1 - alpha)
-  double alpha = 0.10;
-
-  /// Incorrecta: nt = nt * (1 + beta)
-  double beta = 0.50;
-
-  /// Offset (días) que se resta al intervalo calculado.
-  double offset = 0.0;
-
-  /// Nt inicial para cartas nuevas.
-  double initialNt = 0.015;
+  double pMin = 0.9;
+  double alpha = 0.0372;
+  double beta = 0.0572;
+  double offset = 2.0;
+  double initialNt = 0.01;
 
   // =========================
-  // Manejo de fallos (lapses)
+  // Lapses
   // =========================
-
-  /// Cantidad de fallos consecutivos para mandar a "relearning".
-  /// 0 = desactivado.
   int lapseTolerance = 0;
-
-  /// Si está activo, tras un fallo se programa un intervalo fijo (lapseFixedInterval).
-  /// Si está desactivado, el algoritmo recalcula usando el nt actualizado.
   bool useFixedIntervalOnLapse = true;
-
-  /// Intervalo fijo (en días) tras un fallo cuando useFixedIntervalOnLapse = true.
   double lapseFixedInterval = 1.0;
 
   // =========================
-  // Modo escritura (producción)
+  // Modo escritura
   // =========================
-
-  /// Si true, las cartas *_prod activan el modo escritura en el WebView.
   bool enableWriteMode = false;
-
-  /// Porcentaje mínimo para permitir "Bien" en modo escritura.
   int writeModeThreshold = 80;
-
-  /// Límite de repeticiones para escritura.
-  /// 0 = siempre activo.
   int writeModeMaxReps = 0;
 }

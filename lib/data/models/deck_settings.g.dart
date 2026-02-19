@@ -62,43 +62,53 @@ const DeckSettingsSchema = CollectionSchema(
       name: r'maxReviewsPerDay',
       type: IsarType.long,
     ),
-    r'newCardsPerDay': PropertySchema(
+    r'newCardIntraDayMinutes': PropertySchema(
       id: 9,
+      name: r'newCardIntraDayMinutes',
+      type: IsarType.long,
+    ),
+    r'newCardMinCorrectReps': PropertySchema(
+      id: 10,
+      name: r'newCardMinCorrectReps',
+      type: IsarType.long,
+    ),
+    r'newCardsPerDay': PropertySchema(
+      id: 11,
       name: r'newCardsPerDay',
       type: IsarType.long,
     ),
     r'newCardsSeenToday': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'newCardsSeenToday',
       type: IsarType.long,
     ),
     r'offset': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'offset',
       type: IsarType.double,
     ),
     r'pMin': PropertySchema(
-      id: 12,
+      id: 14,
       name: r'pMin',
       type: IsarType.double,
     ),
     r'packName': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'packName',
       type: IsarType.string,
     ),
     r'useFixedIntervalOnLapse': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'useFixedIntervalOnLapse',
       type: IsarType.bool,
     ),
     r'writeModeMaxReps': PropertySchema(
-      id: 15,
+      id: 17,
       name: r'writeModeMaxReps',
       type: IsarType.long,
     ),
     r'writeModeThreshold': PropertySchema(
-      id: 16,
+      id: 18,
       name: r'writeModeThreshold',
       type: IsarType.long,
     )
@@ -157,14 +167,16 @@ void _deckSettingsSerialize(
   writer.writeDateTime(offsets[6], object.lastNewCardStudyDate);
   writer.writeDoubleList(offsets[7], object.learningSteps);
   writer.writeLong(offsets[8], object.maxReviewsPerDay);
-  writer.writeLong(offsets[9], object.newCardsPerDay);
-  writer.writeLong(offsets[10], object.newCardsSeenToday);
-  writer.writeDouble(offsets[11], object.offset);
-  writer.writeDouble(offsets[12], object.pMin);
-  writer.writeString(offsets[13], object.packName);
-  writer.writeBool(offsets[14], object.useFixedIntervalOnLapse);
-  writer.writeLong(offsets[15], object.writeModeMaxReps);
-  writer.writeLong(offsets[16], object.writeModeThreshold);
+  writer.writeLong(offsets[9], object.newCardIntraDayMinutes);
+  writer.writeLong(offsets[10], object.newCardMinCorrectReps);
+  writer.writeLong(offsets[11], object.newCardsPerDay);
+  writer.writeLong(offsets[12], object.newCardsSeenToday);
+  writer.writeDouble(offsets[13], object.offset);
+  writer.writeDouble(offsets[14], object.pMin);
+  writer.writeString(offsets[15], object.packName);
+  writer.writeBool(offsets[16], object.useFixedIntervalOnLapse);
+  writer.writeLong(offsets[17], object.writeModeMaxReps);
+  writer.writeLong(offsets[18], object.writeModeThreshold);
 }
 
 DeckSettings _deckSettingsDeserialize(
@@ -184,14 +196,16 @@ DeckSettings _deckSettingsDeserialize(
   object.lastNewCardStudyDate = reader.readDateTimeOrNull(offsets[6]);
   object.learningSteps = reader.readDoubleList(offsets[7]) ?? [];
   object.maxReviewsPerDay = reader.readLong(offsets[8]);
-  object.newCardsPerDay = reader.readLong(offsets[9]);
-  object.newCardsSeenToday = reader.readLong(offsets[10]);
-  object.offset = reader.readDouble(offsets[11]);
-  object.pMin = reader.readDouble(offsets[12]);
-  object.packName = reader.readString(offsets[13]);
-  object.useFixedIntervalOnLapse = reader.readBool(offsets[14]);
-  object.writeModeMaxReps = reader.readLong(offsets[15]);
-  object.writeModeThreshold = reader.readLong(offsets[16]);
+  object.newCardIntraDayMinutes = reader.readLong(offsets[9]);
+  object.newCardMinCorrectReps = reader.readLong(offsets[10]);
+  object.newCardsPerDay = reader.readLong(offsets[11]);
+  object.newCardsSeenToday = reader.readLong(offsets[12]);
+  object.offset = reader.readDouble(offsets[13]);
+  object.pMin = reader.readDouble(offsets[14]);
+  object.packName = reader.readString(offsets[15]);
+  object.useFixedIntervalOnLapse = reader.readBool(offsets[16]);
+  object.writeModeMaxReps = reader.readLong(offsets[17]);
+  object.writeModeThreshold = reader.readLong(offsets[18]);
   return object;
 }
 
@@ -225,16 +239,20 @@ P _deckSettingsDeserializeProp<P>(
     case 10:
       return (reader.readLong(offset)) as P;
     case 11:
-      return (reader.readDouble(offset)) as P;
-    case 12:
-      return (reader.readDouble(offset)) as P;
-    case 13:
-      return (reader.readString(offset)) as P;
-    case 14:
-      return (reader.readBool(offset)) as P;
-    case 15:
       return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readLong(offset)) as P;
+    case 13:
+      return (reader.readDouble(offset)) as P;
+    case 14:
+      return (reader.readDouble(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
     case 16:
+      return (reader.readBool(offset)) as P;
+    case 17:
+      return (reader.readLong(offset)) as P;
+    case 18:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1098,6 +1116,118 @@ extension DeckSettingsQueryFilter
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardIntraDayMinutesEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'newCardIntraDayMinutes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardIntraDayMinutesGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'newCardIntraDayMinutes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardIntraDayMinutesLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'newCardIntraDayMinutes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardIntraDayMinutesBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'newCardIntraDayMinutes',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardMinCorrectRepsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'newCardMinCorrectReps',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardMinCorrectRepsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'newCardMinCorrectReps',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardMinCorrectRepsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'newCardMinCorrectReps',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      newCardMinCorrectRepsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'newCardMinCorrectReps',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
       newCardsPerDayEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1710,6 +1840,34 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByNewCardIntraDayMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardIntraDayMinutes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByNewCardIntraDayMinutesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardIntraDayMinutes', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByNewCardMinCorrectReps() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardMinCorrectReps', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByNewCardMinCorrectRepsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardMinCorrectReps', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       sortByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.asc);
@@ -1937,6 +2095,34 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByNewCardIntraDayMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardIntraDayMinutes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByNewCardIntraDayMinutesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardIntraDayMinutes', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByNewCardMinCorrectReps() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardMinCorrectReps', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByNewCardMinCorrectRepsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'newCardMinCorrectReps', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       thenByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.asc);
@@ -2106,6 +2292,20 @@ extension DeckSettingsQueryWhereDistinct
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
+      distinctByNewCardIntraDayMinutes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'newCardIntraDayMinutes');
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct>
+      distinctByNewCardMinCorrectReps() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'newCardMinCorrectReps');
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct>
       distinctByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'newCardsPerDay');
@@ -2222,6 +2422,20 @@ extension DeckSettingsQueryProperty
   QueryBuilder<DeckSettings, int, QQueryOperations> maxReviewsPerDayProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'maxReviewsPerDay');
+    });
+  }
+
+  QueryBuilder<DeckSettings, int, QQueryOperations>
+      newCardIntraDayMinutesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'newCardIntraDayMinutes');
+    });
+  }
+
+  QueryBuilder<DeckSettings, int, QQueryOperations>
+      newCardMinCorrectRepsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'newCardMinCorrectReps');
     });
   }
 

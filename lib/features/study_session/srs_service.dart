@@ -4,139 +4,123 @@ import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 
 class SrsService {
-  // Retorna 'true' si la carta debe repetirse HOY mismo (p. ej. por castigo intra-día).
-  //
-  // Convención usada aquí:
-  // - settings.learningSteps (y card.fixedPhaseQueue) están en **DÍAS**.
-  //   Puedes usar fracciones para pasos intra-día (ej. 10 min = 10/1440).
-  // - Para intervalos >= 1 día, la próxima revisión se normaliza a las 04:00 (estilo Anki).
+  /// Retorna `true` si la carta debe repetirse hoy dentro de la misma sesión
+  /// (es decir, se re-encola al final).
   bool reviewCard(Flashcard card, bool isCorrect, DeckSettings settings) {
     final now = DateTime.now();
-    card.lastReview = now;
 
-    // --- FASE 1: NUEVA ---
+    // ✅ Contador para desactivar write-mode:
+    // Contamos SOLO cuando acierta y SOLO para tarjetas "prod".
+    // Importante: en fase REVIEW el contador se incrementa en _applyEbbinghausSuccess
+    // (para evitar doble conteo).
+    final bool isProd = card.cardType.endsWith('prod');
+    if (isCorrect && isProd && card.state != CardState.review) {
+      card.repetitionCount++;
+    }
+
     if (card.state == CardState.newCard) {
+      // NUEVA: si acierta, entra en learning con pasos fijos.
       if (isCorrect) {
-        card.consecutiveLapses = 0;
-
-        // Preparar cola fija (si está vacía) para este mazo/carta.
-        _ensureFixedQueueInitialized(card, settings);
-
-        // Si no hay pasos de aprendizaje configurados, gradúa directo a Review.
-        if (card.fixedPhaseQueue.isEmpty) {
-          _graduateToReview(card, settings, now);
-          return false;
-        }
-
-        // Entrar a Learning y programar el primer paso (índice 0).
         card.state = CardState.learning;
-        card.learningStep = -1; // -1 => el próximo acierto programa el paso 0
+        card.learningStep = -1;
+
+        // Para nuevas: preprendemos pasos intra-día según configuración.
+        _ensureFixedQueueInitialized(card, settings, forNewCard: true);
+
+        // Éxito en learning: avanza un paso (puede ser intra-día).
         return _handleLearningSuccess(card, settings, now);
       } else {
-        // Fallo en Nueva -> penalización intra-día y permanece como newCard
+        // Si falla, se queda como new y vuelve a aparecer pronto (intra-día).
         card.learningStep = 0;
         _scheduleNextReview(card, _minutesToDays(1), now); // 1 minuto
         return true;
       }
     }
 
-    // --- FASE 2: APRENDIZAJE (Learning / Relearning) ---
-    if (card.state == CardState.learning ||
-        card.state == CardState.relearning) {
+    if (card.state == CardState.learning || card.state == CardState.relearning) {
       if (isCorrect) {
         return _handleLearningSuccess(card, settings, now);
       } else {
-        // Fallo en Learning/Relearning -> reinicia pasos y penaliza intra-día
-        card.learningStep = -1;
-        _scheduleNextReview(card, _minutesToDays(1), now); // 1 minuto
-        return true;
+        return _handleLearningFailure(card, settings, now);
       }
     }
 
-    // --- FASE 3: REPASO (Review - Ebbinghaus) ---
-    if (card.state == CardState.review) {
-      if (isCorrect) {
-        card.consecutiveLapses = 0;
-        _applyEbbinghausSuccess(card, settings, now);
-        return false;
-      } else {
-        return _handleReviewFailure(card, settings, now);
-      }
+    // REVIEW
+    if (isCorrect) {
+      _applyEbbinghausSuccess(card, settings, now);
+      return false;
+    } else {
+      return _applyEbbinghausFailure(card, settings, now);
     }
-
-    return false; // Fallback
   }
 
   // =========================
   // Learning / Relearning
   // =========================
 
-  bool _handleLearningSuccess(
-    Flashcard card,
-    DeckSettings settings,
-    DateTime now,
-  ) {
-    _ensureFixedQueueInitialized(card, settings);
-
+  bool _handleLearningSuccess(Flashcard card, DeckSettings settings, DateTime now) {
+    // Si no hay pasos, por seguridad calculamos con algoritmo.
     if (card.fixedPhaseQueue.isEmpty) {
-      _graduateToReview(card, settings, now);
+      card.state = CardState.review;
+      card.learningStep = 0;
+      _calculateAndSchedule(card, settings, now); // <- algoritmo
       return false;
     }
 
-    // learningStep representa "último paso completado" (o -1 si ninguno).
     final nextIndex = card.learningStep + 1;
 
-    // ¿Se completaron todos los pasos? -> Graduación.
-    if (nextIndex >= card.fixedPhaseQueue.length) {
-      _graduateToReview(card, settings, now);
-      return false;
+    // Si aún hay pasos por hacer
+    if (nextIndex < card.fixedPhaseQueue.length) {
+      card.learningStep = nextIndex;
+
+      final intervalDays = card.fixedPhaseQueue[nextIndex];
+      _scheduleNextReview(card, intervalDays, now);
+
+      // Repetir hoy si es un intervalo intra-día (< 1 día)
+      return intervalDays < 1.0;
     }
 
-    // Programar el siguiente paso fijo.
-    card.learningStep = nextIndex;
-
-    final intervalDays = card.fixedPhaseQueue[nextIndex];
-    _scheduleNextReview(card, intervalDays, now);
-
-    // Repetir "hoy" solo si el intervalo es intra-día (< 1 día).
-    return intervalDays < 1.0;
-  }
-
-  void _graduateToReview(Flashcard card, DeckSettings settings, DateTime now) {
+    // ✅ Termina aprendizaje -> pasa a review
     card.state = CardState.review;
     card.learningStep = 0;
 
-    // Al graduar, puedes limpiar la cola fija si quieres ahorrar espacio.
-    // (No es obligatorio; dejarla también está bien.)
-    // card.fixedPhaseQueue = [];
+    // ✅ EN VEZ DE FORZAR +1 DÍA, usar el algoritmo desde aquí
+    _calculateAndSchedule(card, settings, now);
 
-    _applyEbbinghausSuccess(card, settings, now);
+    return false;
   }
 
-  void _ensureFixedQueueInitialized(Flashcard card, DeckSettings settings) {
-    if (card.fixedPhaseQueue.isEmpty) {
-      // Copiamos para evitar referencias compartidas.
-      card.fixedPhaseQueue = List<double>.from(settings.learningSteps);
-    }
-  }
-
-  // =========================
-  // Review (Ebbinghaus)
-  // =========================
-
-  bool _handleReviewFailure(
-    Flashcard card,
-    DeckSettings settings,
-    DateTime now,
-  ) {
-    // --- FALLO (Lapse) ---
+  bool _handleLearningFailure(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     card.consecutiveLapses++;
-    card.repetitionCount++;
+    card.learningStep = -1;
 
-    // Castigo al decayRate (olvidas más rápido ahora).
-    // Aumentamos nt, pero lo limitamos para no explotar.
-    final bumped = card.decayRate * (1.0 + settings.beta);
-    final maxAllowed = settings.initialNt * 2;
+    // Reiniciar cola de pasos (no la reescribimos si ya existía, solo si está vacía)
+    _ensureFixedQueueInitialized(card, settings);
+
+    // Castigo intra-día: 10 min
+    _scheduleNextReview(card, _minutesToDays(10), now);
+    return true;
+  }
+
+  // =========================
+  // Review
+  // =========================
+
+  bool _applyEbbinghausFailure(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
+    // Fallo: el olvido se hace más rápido (nt sube).
+    card.decayRate = card.decayRate * (1.0 + settings.beta);
+
+    // Cap para evitar que se dispare.
+    final maxAllowed = 1.0;
+    final bumped = card.decayRate;
     card.decayRate = min(maxAllowed, bumped);
 
     // A) CASTIGO DURO: leech / reset a relearning
@@ -164,10 +148,10 @@ class SrsService {
   }
 
   void _applyEbbinghausSuccess(
-    Flashcard card,
-    DeckSettings settings,
-    DateTime now,
-  ) {
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     // Éxito: el olvido se hace más lento (nt baja).
     card.decayRate = card.decayRate * (1.0 - settings.alpha);
 
@@ -177,14 +161,19 @@ class SrsService {
     }
 
     _calculateAndSchedule(card, settings, now);
-    card.repetitionCount++;
+
+    // ✅ Contador para write-mode:
+    // En REVIEW incrementamos aquí (solo si es "prod") para evitar doble conteo.
+    if (card.cardType.endsWith('prod')) {
+      card.repetitionCount++;
+    }
   }
 
   void _calculateAndSchedule(
-    Flashcard card,
-    DeckSettings settings,
-    DateTime now,
-  ) {
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     // Fórmula: Intervalo = (-ln(P_min) / nt) - Offset
     final pMinSafe = settings.pMin.clamp(1e-6, 0.999999).toDouble();
     final numerator = -log(pMinSafe);
@@ -202,6 +191,44 @@ class SrsService {
     }
 
     _scheduleNextReview(card, intervalDays.toDouble(), now);
+  }
+
+  // =========================
+  // Helpers: fixed queue init
+  // =========================
+
+  void _ensureFixedQueueInitialized(
+      Flashcard card,
+      DeckSettings settings, {
+        bool forNewCard = false,
+      }) {
+    if (card.fixedPhaseQueue.isNotEmpty) return;
+
+    if (forNewCard) {
+      final minReps = max(1, settings.newCardMinCorrectReps);
+      final minutes = max(1, settings.newCardIntraDayMinutes);
+
+      final List<double> queue = [];
+
+      // Si minReps=2 => 1 paso intra-día antes de los learningSteps normales.
+      // Si minReps=3 => 2 pasos intra-día, etc.
+      if (minReps > 1) {
+        final step = _minutesToDays(minutes);
+        for (int i = 0; i < minReps - 1; i++) {
+          queue.add(step);
+        }
+      }
+
+      // Luego vienen los pasos normales del mazo (en días).
+      queue.addAll(settings.learningSteps);
+
+      // Copiamos para evitar referencias compartidas.
+      card.fixedPhaseQueue = List<double>.from(queue);
+      return;
+    }
+
+    // Default: solo usar learningSteps.
+    card.fixedPhaseQueue = List<double>.from(settings.learningSteps);
   }
 
   // =========================

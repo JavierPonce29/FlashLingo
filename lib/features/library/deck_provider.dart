@@ -8,6 +8,7 @@ import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
+import 'package:flashcards_app/data/models/study_session.dart';
 
 part 'deck_provider.g.dart';
 
@@ -37,7 +38,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
   });
 
   final subSettings = isar.deckSettings.watchLazy(fireImmediately: true).listen(
-    (_) {
+        (_) {
       if (!controller.isClosed) controller.add(null);
     },
   );
@@ -83,13 +84,11 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
       final settings = settingsMap[name] ?? (DeckSettings()..packName = name);
 
       // --- LÓGICA DE NUEVAS (verde) ---
-      final availableNewInDb = deckCards
-          .where((c) => c.state == CardState.newCard)
-          .length;
+      final availableNewInDb =
+          deckCards.where((c) => c.state == CardState.newCard).length;
 
       final last = settings.lastNewCardStudyDate;
-      final isSameDay =
-          last != null &&
+      final isSameDay = last != null &&
           last.year == now.year &&
           last.month == now.month &&
           last.day == now.day;
@@ -103,9 +102,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
       // --- LÓGICA DE REPASOS (azul) ---
       // Incluye nextReview == now como "due"
       final reviewCount = deckCards
-          .where(
-            (c) => c.state != CardState.newCard && !c.nextReview.isAfter(now),
-          )
+          .where((c) => c.state != CardState.newCard && !c.nextReview.isAfter(now))
           .length;
 
       final limitedReviewCount = min(reviewCount, settings.maxReviewsPerDay);
@@ -132,5 +129,7 @@ Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
     await isar.flashcards.filter().packNameEqualTo(packName).deleteAll();
     await isar.reviewLogs.filter().packNameEqualTo(packName).deleteAll();
     await isar.deckSettings.filter().packNameEqualTo(packName).deleteAll();
+    // ✅ MUY IMPORTANTE: limpiar sesión persistida del mazo
+    await isar.studySessions.filter().packNameEqualTo(packName).deleteAll();
   });
 }

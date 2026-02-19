@@ -416,6 +416,10 @@ class ImporterService {
       ..offset = 0.0
       ..initialNt = 0.015
       ..learningSteps = [1.0, 4.0]
+      ..newCardMinCorrectReps =
+          int.tryParse((manifestData['new_card_min_correct_reps'] ?? '2').toString()) ?? 2
+      ..newCardIntraDayMinutes =
+          int.tryParse((manifestData['new_card_intra_day_minutes'] ?? '10').toString()) ?? 10
       ..enableWriteMode = false
       ..writeModeThreshold = 80
       ..writeModeMaxReps = 0;
