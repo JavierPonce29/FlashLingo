@@ -48,10 +48,6 @@ class _StudyPageState extends State<StudyPage> {
 
   bool _sessionCleared = false;
 
-  // Para asegurar que el primer render respete write-mode (tras cargar settings).
-  bool _webReady = false;
-  bool _pendingReloadAfterSettings = false;
-
   @override
   void initState() {
     super.initState();
@@ -68,7 +64,7 @@ class _StudyPageState extends State<StudyPage> {
     // Persistir el estado inicial de la sesión (por si el usuario sale sin responder nada).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _persistStudySession();
-      _checkCardComplexity(); // con settings tal vez aún null, no pasa nada
+      _checkCardComplexity();
     });
   }
 
@@ -85,41 +81,18 @@ class _StudyPageState extends State<StudyPage> {
 
     setState(() {
       _currentDeckSettings = settings;
+      _checkCardComplexity();
     });
-
-    // Recalcular (ahora con settings) y forzar recarga del HTML si corresponde
-    _checkCardComplexity(reloadHtml: true);
   }
 
-  void _reloadCurrentHtml() {
-    if (!_webReady || webViewController == null) {
-      _pendingReloadAfterSettings = true;
-      return;
-    }
-    if (currentIndex >= studyQueue.length) return;
-
-    final card = studyQueue[currentIndex];
-    webViewController!.loadData(
-      data: HtmlGenerator.generateContent(
-        card,
-        writeMode: isWriteModeActive,
-      ),
-    );
-  }
-
-  void _checkCardComplexity({bool reloadHtml = false}) {
+  void _checkCardComplexity() {
     if (currentIndex >= studyQueue.length) return;
 
     final card = studyQueue[currentIndex];
     Map<String, dynamic> extra = {};
     if (card.extraDataJson != null) {
       try {
-        final decoded = jsonDecode(card.extraDataJson!);
-        if (decoded is Map<String, dynamic>) {
-          extra = decoded;
-        } else if (decoded is Map) {
-          extra = decoded.map((k, v) => MapEntry(k.toString(), v));
-        }
+        extra = jsonDecode(card.extraDataJson!);
       } catch (_) {}
     }
 
@@ -130,34 +103,36 @@ class _StudyPageState extends State<StudyPage> {
     final bool hasReading =
         readingStr.isNotEmpty && readingStr != card.question.trim();
 
-    // Escritura (solo prod, y respetando writeModeMaxReps)
+    // Escritura
     final bool writeEnabled = _currentDeckSettings?.enableWriteMode ?? false;
     final bool isProd = card.cardType.endsWith('prod');
-    final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
-
-    // ✅ Desactivar write-mode si ya alcanzó el máximo de aciertos (repetitionCount).
-    final bool withinMax = (maxReps <= 0) || (card.repetitionCount < maxReps);
-    final bool writeActive = writeEnabled && isProd && withinMax;
 
     setState(() {
       isComplexCard = (isRecog && hasReading);
 
-      isWriteModeActive = writeActive;
+      isWriteModeActive = writeEnabled && isProd;
       if (isWriteModeActive) {
         minScoreRequired = _currentDeckSettings?.writeModeThreshold ?? 80;
         currentWriteScore = 0;
       } else {
         minScoreRequired = 0;
-        currentWriteScore = 0;
       }
     });
-
-    if (reloadHtml) {
-      _reloadCurrentHtml();
-    }
   }
 
   bool get _isFinished => currentIndex >= studyQueue.length;
+
+  // Barra superior de color según tipo de tarjeta.
+  // - Nueva: azul
+  // - Primer paso (learningStep==0): naranja
+  // - Todo lo demás (learningStep>0, review, relearning): verde
+  Color _cardTypeColor(Flashcard card) {
+    if (card.state == CardState.newCard) return Colors.blue;
+    if (card.state == CardState.learning && card.learningStep == 0) {
+      return Colors.orange;
+    }
+    return Colors.green;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +186,13 @@ class _StudyPageState extends State<StudyPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Estudiando (${currentIndex + 1}/${studyQueue.length})"),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: Container(
+            height: 4,
+            color: _cardTypeColor(card),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -230,33 +212,22 @@ class _StudyPageState extends State<StudyPage> {
               ),
               onWebViewCreated: (controller) {
                 webViewController = controller;
-                _webReady = true;
 
                 controller.addJavaScriptHandler(
                   handlerName: 'submitScore',
                   callback: (args) {
                     if (args.isNotEmpty) {
-                      final raw = args[0];
-                      final score = (raw is int)
-                          ? raw
-                          : int.tryParse(raw.toString()) ?? 0;
-
+                      final score = args[0] as int;
                       setState(() {
                         currentWriteScore = score;
                       });
-
                       // ignore: avoid_print
-                      print("📝 Score escritura: $score% (Min: $minScoreRequired%)");
+                      print(
+                        "📝 Score escritura: $score% (Min: $minScoreRequired%)",
+                      );
                     }
-                    return null;
                   },
                 );
-
-                // ✅ Si settings llegaron después del primer render, recargamos el HTML
-                if (_pendingReloadAfterSettings) {
-                  _pendingReloadAfterSettings = false;
-                  _reloadCurrentHtml();
-                }
               },
             ),
           ),
@@ -386,20 +357,26 @@ class _StudyPageState extends State<StudyPage> {
   Future<void> _submitAnswer(Flashcard card, bool isCorrect) async {
     if (_currentDeckSettings == null) return;
 
-    // Contar "nueva vista" solo al primer intento real de una carta new (1 sola vez).
-    if (card.state == CardState.newCard && card.learningStep == 0) {
+    final now = DateTime.now();
+
+    // ✅ Contar "nueva vista" solo UNA vez: en el primer momento en que el usuario califica esta carta.
+    final bool isFirstRating = card.lastReview.millisecondsSinceEpoch == 0;
+    if (card.state == CardState.newCard && isFirstRating) {
       await _incrementNewCardCounter();
     }
+
+    // Guardar lastReview para evitar dobles conteos y para tener trazabilidad.
+    card.lastReview = now;
 
     final bool repeatToday =
     _srsService.reviewCard(card, isCorrect, _currentDeckSettings!);
 
-    int daysInterval = card.nextReview.difference(DateTime.now()).inDays;
+    int daysInterval = card.nextReview.difference(now).inDays;
     if (daysInterval < 0) daysInterval = 0;
 
     final reviewLog = ReviewLog()
       ..packName = card.packName
-      ..timestamp = DateTime.now()
+      ..timestamp = now
       ..cardOriginalId = card.originalId
       ..rating = isCorrect ? 3 : 1
       ..scheduledDays = daysInterval;
@@ -428,7 +405,8 @@ class _StudyPageState extends State<StudyPage> {
     final isar = Isar.getInstance();
     if (isar != null && _currentDeckSettings != null) {
       await isar.writeTxn(() async {
-        final latestSettings = await isar.deckSettings.get(_currentDeckSettings!.id);
+        final latestSettings =
+        await isar.deckSettings.get(_currentDeckSettings!.id);
         if (latestSettings != null) {
           latestSettings.newCardsSeenToday += 1;
           latestSettings.lastNewCardStudyDate = DateTime.now();

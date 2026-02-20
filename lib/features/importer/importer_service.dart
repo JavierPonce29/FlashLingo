@@ -36,7 +36,8 @@ class ImporterService {
           .where((f) => f.isFile && !f.name.contains('__MACOSX'))
           .length;
 
-      print("📊 Entradas detectadas en ZIP: ${archive.length} (archivos reales: $zipFileEntries)");
+      print(
+          "📊 Entradas detectadas en ZIP: ${archive.length} (archivos reales: $zipFileEntries)");
 
       // 2) EXTRAER (ROBUSTO: sin overwrite silencioso)
       print("⏳ Descomprimiendo...");
@@ -68,7 +69,8 @@ class ImporterService {
       try {
         allEntities = await extractDir.list(recursive: true).toList();
       } catch (e) {
-        print("⚠️ Error en listado recursivo nativo: $e. Intentando método manual...");
+        print(
+            "⚠️ Error en listado recursivo nativo: $e. Intentando método manual...");
         allEntities = await _manualRecursiveList(extractDir);
       }
 
@@ -102,7 +104,7 @@ class ImporterService {
       final String packName = (manifestData['pack_name'] ?? 'Importado').toString();
       final String dbFilename = (manifestData['db_filename'] ?? 'data.db').toString();
 
-      // 6) COPIAR MULTIMEDIA + CREAR ÍNDICE (CON RUTAS RELATIVAS Y file://)
+      // 6) COPIAR MULTIMEDIA + CREAR ÍNDICE
       final MediaIndex mediaIndex = await _processAllMedia(
         allEntities,
         packageRoot: packageRoot!,
@@ -279,15 +281,29 @@ class ImporterService {
     if (!await destDir.exists()) await destDir.create(recursive: true);
 
     const allowedExt = {
-      '.mp3', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.flac',
-      '.png', '.jpg', '.jpeg', '.webp', '.gif',
+      '.mp3',
+      '.wav',
+      '.m4a',
+      '.aac',
+      '.ogg',
+      '.opus',
+      '.flac',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.webp',
+      '.gif',
     };
 
     print("📂 Copiando multimedia a: ${destDir.path}");
 
     int count = 0;
     int skipped = 0;
-    int dupKeys = 0;
+
+    // Métricas útiles (colisiones reales)
+    int dupExactKeys = 0;
+    int dupLowerKeys = 0;
+    int dupStemKeys = 0;
 
     for (final entity in allEntities) {
       if (entity is! File) continue;
@@ -316,7 +332,7 @@ class ImporterService {
         continue;
       }
 
-      // copiar con nombre único
+      // copiar con nombre único (evita colisiones en media_assets)
       final uniqueName = "${_uuid.v4()}$ext";
       final destFile = File(p.join(destDir.path, uniqueName));
       await entity.copy(destFile.path);
@@ -325,20 +341,27 @@ class ImporterService {
 
       count++;
 
-      // Keys para match (basename + relativo a packageRoot + relativo a extractRoot)
       final relFromPackage = _safeRelative(entity.path, packageRoot.path);
       final relFromExtract = _safeRelative(entity.path, extractRoot.path);
+
+      String safeDecode(String s) {
+        try {
+          return Uri.decodeFull(s);
+        } catch (_) {
+          return s;
+        }
+      }
 
       final keys = <String>{
         fileName,
         fileName.toLowerCase(),
-        Uri.decodeFull(fileName).toLowerCase(),
+        safeDecode(fileName).toLowerCase(),
         relFromPackage,
         relFromPackage.toLowerCase(),
-        Uri.decodeFull(relFromPackage).toLowerCase(),
+        safeDecode(relFromPackage).toLowerCase(),
         relFromExtract,
         relFromExtract.toLowerCase(),
-        Uri.decodeFull(relFromExtract).toLowerCase(),
+        safeDecode(relFromExtract).toLowerCase(),
       };
 
       // Stem keys (para wav vs mp3, etc)
@@ -348,36 +371,46 @@ class ImporterService {
 
       // Registrar en mapas (sin pisar si ya existe => más estable)
       for (final k in keys) {
-        if (k.trim().isEmpty) continue;
-        if (exactMap.containsKey(k)) {
-          dupKeys++;
+        final kk = k.trim();
+        if (kk.isEmpty) continue;
+
+        if (exactMap.containsKey(kk)) {
+          dupExactKeys++;
           continue;
         }
-        exactMap[k] = destUri;
+        exactMap[kk] = destUri;
       }
 
-      // lowerCaseMap mantiene compatibilidad con tu MediaIndex.find()
       for (final k in keys) {
         final lk = k.toLowerCase().trim();
         if (lk.isEmpty) continue;
+
         if (lowerCaseMap.containsKey(lk)) {
-          dupKeys++;
+          dupLowerKeys++;
           continue;
         }
         lowerCaseMap[lk] = destUri;
       }
 
       for (final s in {stem1, stem2, stem3}) {
-        if (s.trim().isEmpty) continue;
-        if (!stemMap.containsKey(s)) {
-          stemMap[s] = destUri;
+        final ss = s.trim();
+        if (ss.isEmpty) continue;
+        if (!stemMap.containsKey(ss)) {
+          stemMap[ss] = destUri;
         } else {
-          dupKeys++;
+          // Colisiones por stem son esperables (mismo nombre con otra extensión).
+          // No rompen el match exacto; solo afectan el fallback.
+          dupStemKeys++;
         }
       }
     }
 
-    print("✅ Multimedia procesada: $count archivos copiados. (omitidos: $skipped, claves duplicadas: $dupKeys)");
+    print(
+      "✅ Multimedia procesada: $count archivos copiados. "
+          "(omitidos: $skipped, colisiones exactas: $dupExactKeys, "
+          "colisiones lowercase: $dupLowerKeys, colisiones stem: $dupStemKeys)",
+    );
+
     return MediaIndex(exactMap, lowerCaseMap, stemMap);
   }
 
@@ -389,6 +422,13 @@ class ImporterService {
       // Fallback: basename
       return p.basename(fullPath);
     }
+  }
+
+  String? _normalizeDbRef(dynamic value) {
+    if (value == null) return null;
+    final s = value.toString().trim();
+    if (s.isEmpty) return null;
+    return s;
   }
 
   // ============================================================
@@ -434,8 +474,12 @@ class ImporterService {
       if (custom['max_reviews_per_day'] != null) settings.maxReviewsPerDay = custom['max_reviews_per_day'];
 
       if (custom['lapse_tolerance'] != null) settings.lapseTolerance = custom['lapse_tolerance'];
-      if (custom['use_fixed_interval_on_lapse'] != null) settings.useFixedIntervalOnLapse = custom['use_fixed_interval_on_lapse'];
-      if (custom['lapse_fixed_interval'] != null) settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
+      if (custom['use_fixed_interval_on_lapse'] != null) {
+        settings.useFixedIntervalOnLapse = custom['use_fixed_interval_on_lapse'];
+      }
+      if (custom['lapse_fixed_interval'] != null) {
+        settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
+      }
 
       if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
       if (custom['alpha'] != null) settings.alpha = (custom['alpha'] as num).toDouble();
@@ -444,7 +488,8 @@ class ImporterService {
       if (custom['initial_nt'] != null) settings.initialNt = (custom['initial_nt'] as num).toDouble();
 
       if (custom['learning_steps'] != null) {
-        settings.learningSteps = (custom['learning_steps'] as List).map((e) => (e as num).toDouble()).toList();
+        settings.learningSteps =
+            (custom['learning_steps'] as List).map((e) => (e as num).toDouble()).toList();
       }
 
       if (custom['enable_write_mode'] != null) settings.enableWriteMode = custom['enable_write_mode'];
@@ -472,22 +517,27 @@ class ImporterService {
     for (int i = 0; i < rows.length; i++) {
       final row = rows[i];
 
-      final String? audioPath = mediaIndex.find(row['AUDIO_PALABRA']?.toString());
-      final String? sentenceAudioPath = mediaIndex.find(row['AUDIO_ORACION']?.toString());
-      final String? imagePath = mediaIndex.find(row['IMAGEN']?.toString());
+      final wordAudioRef = _normalizeDbRef(row['AUDIO_PALABRA']);
+      final sentenceAudioRef = _normalizeDbRef(row['AUDIO_ORACION']);
+      final imageRef = _normalizeDbRef(row['IMAGEN']);
 
-      if (row['AUDIO_PALABRA'] != null && audioPath == null) {
+      final String? audioPath = mediaIndex.find(wordAudioRef);
+      final String? sentenceAudioPath = mediaIndex.find(sentenceAudioRef);
+      final String? imagePath = mediaIndex.find(imageRef);
+
+      if (wordAudioRef != null && audioPath == null) {
         missingWordAudio++;
-        print("⚠️ Audio palabra faltante fila ${i + 1}: '${row['AUDIO_PALABRA']}'");
-      }
-      if (row['AUDIO_ORACION'] != null && sentenceAudioPath == null) {
-        missingSentenceAudio++;
-        // no spamear demasiado
-        if (missingSentenceAudio <= 20) {
-          print("⚠️ Audio oración faltante fila ${i + 1}: '${row['AUDIO_ORACION']}'");
+        if (missingWordAudio <= 20) {
+          print("⚠️ Audio palabra faltante fila ${i + 1}: '$wordAudioRef'");
         }
       }
-      if (row['IMAGEN'] != null && imagePath == null) {
+      if (sentenceAudioRef != null && sentenceAudioPath == null) {
+        missingSentenceAudio++;
+        if (missingSentenceAudio <= 20) {
+          print("⚠️ Audio oración faltante fila ${i + 1}: '$sentenceAudioRef'");
+        }
+      }
+      if (imageRef != null && imagePath == null) {
         missingImages++;
       }
 
@@ -515,8 +565,7 @@ class ImporterService {
         ..decayRate = initialNtValue
         ..fixedPhaseQueue = List.from(initialQueueValue)
         ..learningStep = 0
-        ..consecutiveLapses = 0
-        ..lastReview = DateTime.now();
+        ..consecutiveLapses = 0;
 
       final cardProd = Flashcard()
         ..originalId = originalId
@@ -539,8 +588,7 @@ class ImporterService {
         ..decayRate = initialNtValue
         ..fixedPhaseQueue = List.from(initialQueueValue)
         ..learningStep = 0
-        ..consecutiveLapses = 0
-        ..lastReview = DateTime.now();
+        ..consecutiveLapses = 0;
 
       batchToSave.add(cardRecog);
       batchToSave.add(cardProd);

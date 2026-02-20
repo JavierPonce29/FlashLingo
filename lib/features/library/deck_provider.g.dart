@@ -6,12 +6,11 @@ part of 'deck_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$decksStreamHash() => r'1dfcdd7343b83362e0bdfc14fe83fefbe4b46d99';
+String _$decksStreamHash() => r'5f75ffdcac934d0517e7da95f199cac215bbf190';
 
 /// See also [decksStream].
 @ProviderFor(decksStream)
-final decksStreamProvider =
-    AutoDisposeStreamProvider<List<DeckSummary>>.internal(
+final decksStreamProvider = StreamProvider<List<DeckSummary>>.internal(
   decksStream,
   name: r'decksStreamProvider',
   debugGetCreateSourceHash:
@@ -20,8 +19,8 @@ final decksStreamProvider =
   allTransitiveDependencies: null,
 );
 
-typedef DecksStreamRef = AutoDisposeStreamProviderRef<List<DeckSummary>>;
-String _$deleteDeckHash() => r'43a962692d94fe9216cfddbeffae6fa2b308fa86';
+typedef DecksStreamRef = StreamProviderRef<List<DeckSummary>>;
+String _$deleteDeckHash() => r'3388e1f02063f9346f35b70eae0e395eed770590';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -87,7 +86,7 @@ class DeleteDeckFamily extends Family<AsyncValue<void>> {
 }
 
 /// See also [deleteDeck].
-class DeleteDeckProvider extends AutoDisposeFutureProvider<void> {
+class DeleteDeckProvider extends FutureProvider<void> {
   /// See also [deleteDeck].
   DeleteDeckProvider(
     String packName,
@@ -139,7 +138,7 @@ class DeleteDeckProvider extends AutoDisposeFutureProvider<void> {
   }
 
   @override
-  AutoDisposeFutureProviderElement<void> createElement() {
+  FutureProviderElement<void> createElement() {
     return _DeleteDeckProviderElement(this);
   }
 
@@ -157,12 +156,12 @@ class DeleteDeckProvider extends AutoDisposeFutureProvider<void> {
   }
 }
 
-mixin DeleteDeckRef on AutoDisposeFutureProviderRef<void> {
+mixin DeleteDeckRef on FutureProviderRef<void> {
   /// The parameter `packName` of this provider.
   String get packName;
 }
 
-class _DeleteDeckProviderElement extends AutoDisposeFutureProviderElement<void>
+class _DeleteDeckProviderElement extends FutureProviderElement<void>
     with DeleteDeckRef {
   _DeleteDeckProviderElement(super.provider);
 

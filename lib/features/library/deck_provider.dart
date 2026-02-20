@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -13,115 +12,140 @@ import 'package:flashcards_app/data/models/study_session.dart';
 part 'deck_provider.g.dart';
 
 class DeckSummary {
-  final String name;
-  final int totalCards;
+  final String packName;
+
+  /// Nuevas que aún pueden entrar hoy (limitadas por cuota restante).
   final int newCardsDue;
+
+  /// Cartas en “primer paso” (learningStep==0), aunque aún no estén vencidas.
+  /// Esto es exactamente lo que quieres mostrar en naranja.
+  final int firstStepDue;
+
+  /// Repasos vencidos (no-new) excluyendo las del primer paso vencidas,
+  /// respetando maxReviewsPerDay.
   final int reviewCardsDue;
 
   DeckSummary({
-    required this.name,
-    required this.totalCards,
+    required this.packName,
     required this.newCardsDue,
+    required this.firstStepDue,
     required this.reviewCardsDue,
   });
+
+  // Compatibilidad con HomePage (usa deck.name)
+  String get name => packName;
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
   final isar = await ref.watch(isarDbProvider.future);
 
-  // Escuchar cambios en Cartas y Configuración a la vez
-  final controller = StreamController<void>();
-
-  final subCards = isar.flashcards.watchLazy(fireImmediately: true).listen((_) {
-    if (!controller.isClosed) controller.add(null);
-  });
-
-  final subSettings = isar.deckSettings.watchLazy(fireImmediately: true).listen(
-        (_) {
-      if (!controller.isClosed) controller.add(null);
-    },
-  );
-
-  ref.onDispose(() async {
-    await subCards.cancel();
-    await subSettings.cancel();
-    await controller.close();
-  });
-
-  await for (final _ in controller.stream) {
+  Future<List<DeckSummary>> compute() async {
     final now = DateTime.now();
 
-    // Cargar todo (simple y fiable). Si luego quieres optimizar, lo hacemos.
-    final cards = await isar.flashcards.where().findAll();
-    final settingsList = await isar.deckSettings.where().findAll();
+    final decks = await isar.deckSettings.where().findAll();
+    final summaries = <DeckSummary>[];
 
-    final settingsMap = <String, DeckSettings>{
-      for (final s in settingsList) s.packName: s,
-    };
-
-    // Agrupar por packName
-    final Map<String, List<Flashcard>> grouped = {};
-    for (final card in cards) {
-      final name = card.packName;
-      if (name.trim().isEmpty) continue;
-      grouped.putIfAbsent(name, () => <Flashcard>[]);
-      grouped[name]!.add(card);
-    }
-
-    // Incluir decks que tengan settings pero 0 cartas (por si existieran)
-    for (final s in settingsList) {
-      final name = s.packName;
-      if (name.trim().isEmpty) continue;
-      grouped.putIfAbsent(name, () => <Flashcard>[]);
-    }
-
-    final List<DeckSummary> summaries = grouped.entries.map((entry) {
-      final name = entry.key;
-      final deckCards = entry.value;
-
-      // Settings por deck (si no existe, usamos defaults, pero con packName correcto)
-      final settings = settingsMap[name] ?? (DeckSettings()..packName = name);
-
-      // --- LÓGICA DE NUEVAS (verde) ---
-      final availableNewInDb =
-          deckCards.where((c) => c.state == CardState.newCard).length;
-
-      final last = settings.lastNewCardStudyDate;
-      final isSameDay = last != null &&
+    for (final s in decks) {
+      // Reset diario newCardsSeenToday
+      final last = s.lastNewCardStudyDate;
+      final bool sameDay = last != null &&
           last.year == now.year &&
           last.month == now.month &&
           last.day == now.day;
 
-      final seenToday = isSameDay ? settings.newCardsSeenToday : 0;
-      final remainingLimit = max(0, settings.newCardsPerDay - seenToday);
+      if (!sameDay) {
+        s.newCardsSeenToday = 0;
+        s.lastNewCardStudyDate = now;
+        await isar.writeTxn(() async {
+          await isar.deckSettings.put(s);
+        });
+      }
 
-      final finalNewCount = min(availableNewInDb, remainingLimit);
-      // --------------------------------
+      // ========== AZUL (nuevas que pueden entrar hoy) ==========
+      final remainingQuota =
+      (s.newCardsPerDay - s.newCardsSeenToday).clamp(0, 999999);
 
-      // --- LÓGICA DE REPASOS (azul) ---
-      // Incluye nextReview == now como "due"
-      final reviewCount = deckCards
-          .where((c) => c.state != CardState.newCard && !c.nextReview.isAfter(now))
-          .length;
+      final newCount = remainingQuota > 0
+          ? await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .stateEqualTo(CardState.newCard)
+          .limit(remainingQuota)
+          .count()
+          : 0;
 
-      final limitedReviewCount = min(reviewCount, settings.maxReviewsPerDay);
-      // --------------------------------
+      // ========== NARANJA (primer paso TOTAL, aunque no esté vencido) ==========
+      // Cartas en learning con learningStep==0 (ya tuvieron el primer "Bien")
+      final firstStepTotal = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .stateEqualTo(CardState.learning)
+          .and()
+          .learningStepEqualTo(0)
+          .count();
 
-      return DeckSummary(
-        name: name,
-        totalCards: deckCards.length,
-        newCardsDue: finalNewCount,
-        reviewCardsDue: limitedReviewCount,
+      // ========== VERDE (repasos vencidos, excluyendo primer paso vencido) ==========
+      // Primero traemos lo vencido “no-new” con límite.
+      final dueNonNew = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .not()
+          .stateEqualTo(CardState.newCard)
+          .and()
+      // lessThan(now) deja fuera igualdad exacta. Para ser inclusivos:
+          .nextReviewLessThan(now.add(const Duration(seconds: 1)))
+          .limit(s.maxReviewsPerDay)
+          .findAll();
+
+      // Cuántas de esas vencidas pertenecen al primer paso (para no contarlas también en verde)
+      int firstStepDueNow = 0;
+      for (final c in dueNonNew) {
+        if (c.state == CardState.learning && c.learningStep == 0) {
+          firstStepDueNow++;
+        }
+      }
+
+      final reviewDue = dueNonNew.length - firstStepDueNow;
+
+      summaries.add(
+        DeckSummary(
+          packName: s.packName,
+          newCardsDue: newCount,
+          firstStepDue: firstStepTotal, // <- naranja (total)
+          reviewCardsDue: reviewDue, // <- verde (due sin primer paso)
+        ),
       );
-    }).toList();
+    }
 
-    summaries.sort((a, b) => a.name.compareTo(b.name));
-    yield summaries;
+    return summaries;
+  }
+
+  // Emitir una primera vez
+  yield await compute();
+
+  // Watchers sin StreamGroup
+  final controller = StreamController<void>(sync: true);
+
+  final sub1 = isar.flashcards.watchLazy().listen((_) {
+    if (!controller.isClosed) controller.add(null);
+  });
+  final sub2 = isar.deckSettings.watchLazy().listen((_) {
+    if (!controller.isClosed) controller.add(null);
+  });
+
+  ref.onDispose(() async {
+    await sub1.cancel();
+    await sub2.cancel();
+    await controller.close();
+  });
+
+  await for (final _ in controller.stream) {
+    yield await compute();
   }
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
   final isar = await ref.watch(isarDbProvider.future);
 
@@ -129,7 +153,6 @@ Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
     await isar.flashcards.filter().packNameEqualTo(packName).deleteAll();
     await isar.reviewLogs.filter().packNameEqualTo(packName).deleteAll();
     await isar.deckSettings.filter().packNameEqualTo(packName).deleteAll();
-    // ✅ MUY IMPORTANTE: limpiar sesión persistida del mazo
     await isar.studySessions.filter().packNameEqualTo(packName).deleteAll();
   });
 }

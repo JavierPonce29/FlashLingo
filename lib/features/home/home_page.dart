@@ -99,6 +99,16 @@ class HomePage extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
+            if (deck.firstStepDue > 0)
+              Text(
+                "Paso 1: ${deck.firstStepDue}  ",
+                style: const TextStyle(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
             if (deck.reviewCardsDue > 0)
               Text(
                 "Repaso: ${deck.reviewCardsDue}",
@@ -107,7 +117,10 @@ class HomePage extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            if (deck.newCardsDue == 0 && deck.reviewCardsDue == 0)
+
+            if (deck.newCardsDue == 0 &&
+                deck.firstStepDue == 0 &&
+                deck.reviewCardsDue == 0)
               const Text("¡Al día!", style: TextStyle(color: Colors.grey)),
           ],
         ),
