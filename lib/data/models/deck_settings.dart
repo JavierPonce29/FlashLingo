@@ -2,6 +2,22 @@ import 'package:isar/isar.dart';
 
 part 'deck_settings.g.dart';
 
+/// Modos de orden/mezcla de tarjetas al iniciar una sesión nueva.
+/// Se guarda como String en Isar para evitar problemas de compatibilidad.
+class DeckStudyMixMode {
+  static const String newFirst = 'new_first';
+  static const String reviewsFirst = 'reviews_first';
+  static const String interleaveReviewsThenNew = 'interleave_reviews_then_new';
+  static const String interleaveNewThenReviews = 'interleave_new_then_reviews';
+
+  static const List<String> values = [
+    newFirst,
+    reviewsFirst,
+    interleaveReviewsThenNew,
+    interleaveNewThenReviews,
+  ];
+}
+
 @collection
 class DeckSettings {
   Id id = Isar.autoIncrement;
@@ -61,4 +77,22 @@ class DeckSettings {
   bool enableWriteMode = false;
   int writeModeThreshold = 80;
   int writeModeMaxReps = 0;
+
+  // =========================
+  // Undo (Deshacer)
+  // =========================
+  bool enableUndo = true;
+
+  // =========================
+  // Orden / Mezcla de estudio
+  // =========================
+
+  /// Ver [DeckStudyMixMode]
+  String studyMixMode = DeckStudyMixMode.reviewsFirst;
+
+  /// Para modos intercalados: cuántos repasos seguidos tomar.
+  int interleaveReviewsCount = 1;
+
+  /// Para modos intercalados: cuántas nuevas seguidas tomar.
+  int interleaveNewCardsCount = 1;
 }

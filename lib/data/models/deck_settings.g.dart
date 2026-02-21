@@ -27,88 +27,108 @@ const DeckSettingsSchema = CollectionSchema(
       name: r'beta',
       type: IsarType.double,
     ),
-    r'enableWriteMode': PropertySchema(
+    r'enableUndo': PropertySchema(
       id: 2,
+      name: r'enableUndo',
+      type: IsarType.bool,
+    ),
+    r'enableWriteMode': PropertySchema(
+      id: 3,
       name: r'enableWriteMode',
       type: IsarType.bool,
     ),
     r'initialNt': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'initialNt',
       type: IsarType.double,
     ),
+    r'interleaveNewCardsCount': PropertySchema(
+      id: 5,
+      name: r'interleaveNewCardsCount',
+      type: IsarType.long,
+    ),
+    r'interleaveReviewsCount': PropertySchema(
+      id: 6,
+      name: r'interleaveReviewsCount',
+      type: IsarType.long,
+    ),
     r'lapseFixedInterval': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'lapseFixedInterval',
       type: IsarType.double,
     ),
     r'lapseTolerance': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'lapseTolerance',
       type: IsarType.long,
     ),
     r'lastNewCardStudyDate': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'lastNewCardStudyDate',
       type: IsarType.dateTime,
     ),
     r'learningSteps': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'learningSteps',
       type: IsarType.doubleList,
     ),
     r'maxReviewsPerDay': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'maxReviewsPerDay',
       type: IsarType.long,
     ),
     r'newCardIntraDayMinutes': PropertySchema(
-      id: 9,
+      id: 12,
       name: r'newCardIntraDayMinutes',
       type: IsarType.long,
     ),
     r'newCardMinCorrectReps': PropertySchema(
-      id: 10,
+      id: 13,
       name: r'newCardMinCorrectReps',
       type: IsarType.long,
     ),
     r'newCardsPerDay': PropertySchema(
-      id: 11,
+      id: 14,
       name: r'newCardsPerDay',
       type: IsarType.long,
     ),
     r'newCardsSeenToday': PropertySchema(
-      id: 12,
+      id: 15,
       name: r'newCardsSeenToday',
       type: IsarType.long,
     ),
     r'offset': PropertySchema(
-      id: 13,
+      id: 16,
       name: r'offset',
       type: IsarType.double,
     ),
     r'pMin': PropertySchema(
-      id: 14,
+      id: 17,
       name: r'pMin',
       type: IsarType.double,
     ),
     r'packName': PropertySchema(
-      id: 15,
+      id: 18,
       name: r'packName',
       type: IsarType.string,
     ),
+    r'studyMixMode': PropertySchema(
+      id: 19,
+      name: r'studyMixMode',
+      type: IsarType.string,
+    ),
     r'useFixedIntervalOnLapse': PropertySchema(
-      id: 16,
+      id: 20,
       name: r'useFixedIntervalOnLapse',
       type: IsarType.bool,
     ),
     r'writeModeMaxReps': PropertySchema(
-      id: 17,
+      id: 21,
       name: r'writeModeMaxReps',
       type: IsarType.long,
     ),
     r'writeModeThreshold': PropertySchema(
-      id: 18,
+      id: 22,
       name: r'writeModeThreshold',
       type: IsarType.long,
     )
@@ -149,6 +169,7 @@ int _deckSettingsEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.learningSteps.length * 8;
   bytesCount += 3 + object.packName.length * 3;
+  bytesCount += 3 + object.studyMixMode.length * 3;
   return bytesCount;
 }
 
@@ -160,23 +181,27 @@ void _deckSettingsSerialize(
 ) {
   writer.writeDouble(offsets[0], object.alpha);
   writer.writeDouble(offsets[1], object.beta);
-  writer.writeBool(offsets[2], object.enableWriteMode);
-  writer.writeDouble(offsets[3], object.initialNt);
-  writer.writeDouble(offsets[4], object.lapseFixedInterval);
-  writer.writeLong(offsets[5], object.lapseTolerance);
-  writer.writeDateTime(offsets[6], object.lastNewCardStudyDate);
-  writer.writeDoubleList(offsets[7], object.learningSteps);
-  writer.writeLong(offsets[8], object.maxReviewsPerDay);
-  writer.writeLong(offsets[9], object.newCardIntraDayMinutes);
-  writer.writeLong(offsets[10], object.newCardMinCorrectReps);
-  writer.writeLong(offsets[11], object.newCardsPerDay);
-  writer.writeLong(offsets[12], object.newCardsSeenToday);
-  writer.writeDouble(offsets[13], object.offset);
-  writer.writeDouble(offsets[14], object.pMin);
-  writer.writeString(offsets[15], object.packName);
-  writer.writeBool(offsets[16], object.useFixedIntervalOnLapse);
-  writer.writeLong(offsets[17], object.writeModeMaxReps);
-  writer.writeLong(offsets[18], object.writeModeThreshold);
+  writer.writeBool(offsets[2], object.enableUndo);
+  writer.writeBool(offsets[3], object.enableWriteMode);
+  writer.writeDouble(offsets[4], object.initialNt);
+  writer.writeLong(offsets[5], object.interleaveNewCardsCount);
+  writer.writeLong(offsets[6], object.interleaveReviewsCount);
+  writer.writeDouble(offsets[7], object.lapseFixedInterval);
+  writer.writeLong(offsets[8], object.lapseTolerance);
+  writer.writeDateTime(offsets[9], object.lastNewCardStudyDate);
+  writer.writeDoubleList(offsets[10], object.learningSteps);
+  writer.writeLong(offsets[11], object.maxReviewsPerDay);
+  writer.writeLong(offsets[12], object.newCardIntraDayMinutes);
+  writer.writeLong(offsets[13], object.newCardMinCorrectReps);
+  writer.writeLong(offsets[14], object.newCardsPerDay);
+  writer.writeLong(offsets[15], object.newCardsSeenToday);
+  writer.writeDouble(offsets[16], object.offset);
+  writer.writeDouble(offsets[17], object.pMin);
+  writer.writeString(offsets[18], object.packName);
+  writer.writeString(offsets[19], object.studyMixMode);
+  writer.writeBool(offsets[20], object.useFixedIntervalOnLapse);
+  writer.writeLong(offsets[21], object.writeModeMaxReps);
+  writer.writeLong(offsets[22], object.writeModeThreshold);
 }
 
 DeckSettings _deckSettingsDeserialize(
@@ -188,24 +213,28 @@ DeckSettings _deckSettingsDeserialize(
   final object = DeckSettings();
   object.alpha = reader.readDouble(offsets[0]);
   object.beta = reader.readDouble(offsets[1]);
-  object.enableWriteMode = reader.readBool(offsets[2]);
+  object.enableUndo = reader.readBool(offsets[2]);
+  object.enableWriteMode = reader.readBool(offsets[3]);
   object.id = id;
-  object.initialNt = reader.readDouble(offsets[3]);
-  object.lapseFixedInterval = reader.readDouble(offsets[4]);
-  object.lapseTolerance = reader.readLong(offsets[5]);
-  object.lastNewCardStudyDate = reader.readDateTimeOrNull(offsets[6]);
-  object.learningSteps = reader.readDoubleList(offsets[7]) ?? [];
-  object.maxReviewsPerDay = reader.readLong(offsets[8]);
-  object.newCardIntraDayMinutes = reader.readLong(offsets[9]);
-  object.newCardMinCorrectReps = reader.readLong(offsets[10]);
-  object.newCardsPerDay = reader.readLong(offsets[11]);
-  object.newCardsSeenToday = reader.readLong(offsets[12]);
-  object.offset = reader.readDouble(offsets[13]);
-  object.pMin = reader.readDouble(offsets[14]);
-  object.packName = reader.readString(offsets[15]);
-  object.useFixedIntervalOnLapse = reader.readBool(offsets[16]);
-  object.writeModeMaxReps = reader.readLong(offsets[17]);
-  object.writeModeThreshold = reader.readLong(offsets[18]);
+  object.initialNt = reader.readDouble(offsets[4]);
+  object.interleaveNewCardsCount = reader.readLong(offsets[5]);
+  object.interleaveReviewsCount = reader.readLong(offsets[6]);
+  object.lapseFixedInterval = reader.readDouble(offsets[7]);
+  object.lapseTolerance = reader.readLong(offsets[8]);
+  object.lastNewCardStudyDate = reader.readDateTimeOrNull(offsets[9]);
+  object.learningSteps = reader.readDoubleList(offsets[10]) ?? [];
+  object.maxReviewsPerDay = reader.readLong(offsets[11]);
+  object.newCardIntraDayMinutes = reader.readLong(offsets[12]);
+  object.newCardMinCorrectReps = reader.readLong(offsets[13]);
+  object.newCardsPerDay = reader.readLong(offsets[14]);
+  object.newCardsSeenToday = reader.readLong(offsets[15]);
+  object.offset = reader.readDouble(offsets[16]);
+  object.pMin = reader.readDouble(offsets[17]);
+  object.packName = reader.readString(offsets[18]);
+  object.studyMixMode = reader.readString(offsets[19]);
+  object.useFixedIntervalOnLapse = reader.readBool(offsets[20]);
+  object.writeModeMaxReps = reader.readLong(offsets[21]);
+  object.writeModeThreshold = reader.readLong(offsets[22]);
   return object;
 }
 
@@ -223,36 +252,44 @@ P _deckSettingsDeserializeProp<P>(
     case 2:
       return (reader.readBool(offset)) as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
     case 6:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 7:
-      return (reader.readDoubleList(offset) ?? []) as P;
+      return (reader.readDouble(offset)) as P;
     case 8:
       return (reader.readLong(offset)) as P;
     case 9:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleList(offset) ?? []) as P;
     case 11:
       return (reader.readLong(offset)) as P;
     case 12:
       return (reader.readLong(offset)) as P;
     case 13:
-      return (reader.readDouble(offset)) as P;
-    case 14:
-      return (reader.readDouble(offset)) as P;
-    case 15:
-      return (reader.readString(offset)) as P;
-    case 16:
-      return (reader.readBool(offset)) as P;
-    case 17:
       return (reader.readLong(offset)) as P;
+    case 14:
+      return (reader.readLong(offset)) as P;
+    case 15:
+      return (reader.readLong(offset)) as P;
+    case 16:
+      return (reader.readDouble(offset)) as P;
+    case 17:
+      return (reader.readDouble(offset)) as P;
     case 18:
+      return (reader.readString(offset)) as P;
+    case 19:
+      return (reader.readString(offset)) as P;
+    case 20:
+      return (reader.readBool(offset)) as P;
+    case 21:
+      return (reader.readLong(offset)) as P;
+    case 22:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -580,6 +617,16 @@ extension DeckSettingsQueryFilter
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      enableUndoEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'enableUndo',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
       enableWriteModeEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -704,6 +751,118 @@ extension DeckSettingsQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveNewCardsCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'interleaveNewCardsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveNewCardsCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'interleaveNewCardsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveNewCardsCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'interleaveNewCardsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveNewCardsCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'interleaveNewCardsCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveReviewsCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'interleaveReviewsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveReviewsCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'interleaveReviewsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveReviewsCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'interleaveReviewsCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      interleaveReviewsCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'interleaveReviewsCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1603,6 +1762,142 @@ extension DeckSettingsQueryFilter
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'studyMixMode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'studyMixMode',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'studyMixMode',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'studyMixMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      studyMixModeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'studyMixMode',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
       useFixedIntervalOnLapseEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1757,6 +2052,19 @@ extension DeckSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> sortByEnableUndo() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enableUndo', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByEnableUndoDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enableUndo', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       sortByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
@@ -1780,6 +2088,34 @@ extension DeckSettingsQuerySortBy
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> sortByInitialNtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'initialNt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByInterleaveNewCardsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveNewCardsCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByInterleaveNewCardsCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveNewCardsCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByInterleaveReviewsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveReviewsCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByInterleaveReviewsCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveReviewsCount', Sort.desc);
     });
   }
 
@@ -1931,6 +2267,19 @@ extension DeckSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> sortByStudyMixMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'studyMixMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByStudyMixModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'studyMixMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       sortByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
@@ -2000,6 +2349,19 @@ extension DeckSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> thenByEnableUndo() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enableUndo', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByEnableUndoDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enableUndo', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       thenByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
@@ -2035,6 +2397,34 @@ extension DeckSettingsQuerySortThenBy
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> thenByInitialNtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'initialNt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByInterleaveNewCardsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveNewCardsCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByInterleaveNewCardsCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveNewCardsCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByInterleaveReviewsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveReviewsCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByInterleaveReviewsCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'interleaveReviewsCount', Sort.desc);
     });
   }
 
@@ -2186,6 +2576,19 @@ extension DeckSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> thenByStudyMixMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'studyMixMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByStudyMixModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'studyMixMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
       thenByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
@@ -2243,6 +2646,12 @@ extension DeckSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByEnableUndo() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'enableUndo');
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
       distinctByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
@@ -2253,6 +2662,20 @@ extension DeckSettingsQueryWhereDistinct
   QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByInitialNt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'initialNt');
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct>
+      distinctByInterleaveNewCardsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'interleaveNewCardsCount');
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct>
+      distinctByInterleaveReviewsCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'interleaveReviewsCount');
     });
   }
 
@@ -2338,6 +2761,13 @@ extension DeckSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByStudyMixMode(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'studyMixMode', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
       distinctByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
@@ -2380,6 +2810,12 @@ extension DeckSettingsQueryProperty
     });
   }
 
+  QueryBuilder<DeckSettings, bool, QQueryOperations> enableUndoProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'enableUndo');
+    });
+  }
+
   QueryBuilder<DeckSettings, bool, QQueryOperations> enableWriteModeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'enableWriteMode');
@@ -2389,6 +2825,20 @@ extension DeckSettingsQueryProperty
   QueryBuilder<DeckSettings, double, QQueryOperations> initialNtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'initialNt');
+    });
+  }
+
+  QueryBuilder<DeckSettings, int, QQueryOperations>
+      interleaveNewCardsCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'interleaveNewCardsCount');
+    });
+  }
+
+  QueryBuilder<DeckSettings, int, QQueryOperations>
+      interleaveReviewsCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'interleaveReviewsCount');
     });
   }
 
@@ -2467,6 +2917,12 @@ extension DeckSettingsQueryProperty
   QueryBuilder<DeckSettings, String, QQueryOperations> packNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'packName');
+    });
+  }
+
+  QueryBuilder<DeckSettings, String, QQueryOperations> studyMixModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'studyMixMode');
     });
   }
 

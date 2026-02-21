@@ -33,12 +33,10 @@ class _StudyPageState extends State<StudyPage> {
   late List<Flashcard> studyQueue;
   int currentIndex = 0;
 
-  // Estados UI
   bool isAnswerShown = false;
   bool isReadingShown = false;
   bool isComplexCard = false;
 
-  // Estados Escritura
   bool isWriteModeActive = false;
   int currentWriteScore = 0;
   int minScoreRequired = 0;
@@ -46,27 +44,34 @@ class _StudyPageState extends State<StudyPage> {
   final SrsService _srsService = SrsService();
   DeckSettings? _currentDeckSettings;
 
+  bool _webReady = false;
+  bool _pendingReloadAfterSettings = false;
+
   bool _sessionCleared = false;
+
+  _UndoAction? _lastUndo;
 
   @override
   void initState() {
     super.initState();
 
     studyQueue = List.from(widget.cards);
-
-    // Clamp inicial por seguridad (sesión recuperada / colas cambiadas).
-    currentIndex = widget.initialIndex
-        .clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1)
-        .toInt();
+    currentIndex = widget.initialIndex.clamp(
+      0,
+      studyQueue.isEmpty ? 0 : studyQueue.length - 1,
+    ).toInt();
 
     _loadDeckSettings();
 
-    // Persistir el estado inicial de la sesión (por si el usuario sale sin responder nada).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _persistStudySession();
-      _checkCardComplexity();
+      _recomputeCurrentCardState();
     });
   }
+
+  bool get _isFinished => currentIndex >= studyQueue.length;
+
+  bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
 
   Future<void> _loadDeckSettings() async {
     final isar = Isar.getInstance();
@@ -81,57 +86,72 @@ class _StudyPageState extends State<StudyPage> {
 
     setState(() {
       _currentDeckSettings = settings;
-      _checkCardComplexity();
     });
+
+    _recomputeCurrentCardState(reloadHtml: true);
   }
 
-  void _checkCardComplexity() {
-    if (currentIndex >= studyQueue.length) return;
+  void _reloadCurrentHtml() {
+    if (!_webReady || webViewController == null) {
+      _pendingReloadAfterSettings = true;
+      return;
+    }
+    if (_isFinished) return;
 
     final card = studyQueue[currentIndex];
+    webViewController!.loadData(
+      data: HtmlGenerator.generateContent(
+        card,
+        writeMode: isWriteModeActive,
+      ),
+    );
+  }
+
+  Color _cardTypeColor(Flashcard card) {
+    if (card.state == CardState.newCard) return Colors.blue;
+    if (card.state == CardState.learning && card.learningStep == 0) return Colors.orange;
+    return Colors.green;
+  }
+
+  bool _isEpoch(DateTime dt) => dt.millisecondsSinceEpoch == 0;
+
+  void _recomputeCurrentCardState({bool reloadHtml = false}) {
+    if (_isFinished) return;
+
+    final card = studyQueue[currentIndex];
+
     Map<String, dynamic> extra = {};
-    if (card.extraDataJson != null) {
+    if (card.extraDataJson != null && card.extraDataJson!.isNotEmpty) {
       try {
-        extra = jsonDecode(card.extraDataJson!);
+        final decoded = jsonDecode(card.extraDataJson!);
+        if (decoded is Map<String, dynamic>) {
+          extra = decoded;
+        } else if (decoded is Map) {
+          extra = decoded.map((k, v) => MapEntry(k.toString(), v));
+        }
       } catch (_) {}
     }
 
-    // Complejidad por Lectura (idiomas con reading)
     final readingVal = extra['reading'];
     final readingStr = (readingVal is String) ? readingVal.trim() : '';
     final bool isRecog = card.cardType.endsWith('recog');
-    final bool hasReading =
-        readingStr.isNotEmpty && readingStr != card.question.trim();
+    final bool hasReading = readingStr.isNotEmpty && readingStr != card.question.trim();
 
-    // Escritura
     final bool writeEnabled = _currentDeckSettings?.enableWriteMode ?? false;
     final bool isProd = card.cardType.endsWith('prod');
+    final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
+    final bool withinMax = (maxReps <= 0) || (card.repetitionCount < maxReps);
+    final bool writeActive = writeEnabled && isProd && withinMax;
 
     setState(() {
-      isComplexCard = (isRecog && hasReading);
+      isComplexCard = isRecog && hasReading;
 
-      isWriteModeActive = writeEnabled && isProd;
-      if (isWriteModeActive) {
-        minScoreRequired = _currentDeckSettings?.writeModeThreshold ?? 80;
-        currentWriteScore = 0;
-      } else {
-        minScoreRequired = 0;
-      }
+      isWriteModeActive = writeActive;
+      minScoreRequired = writeActive ? (_currentDeckSettings?.writeModeThreshold ?? 80) : 0;
+      currentWriteScore = 0;
     });
-  }
 
-  bool get _isFinished => currentIndex >= studyQueue.length;
-
-  // Barra superior de color según tipo de tarjeta.
-  // - Nueva: azul
-  // - Primer paso (learningStep==0): naranja
-  // - Todo lo demás (learningStep>0, review, relearning): verde
-  Color _cardTypeColor(Flashcard card) {
-    if (card.state == CardState.newCard) return Colors.blue;
-    if (card.state == CardState.learning && card.learningStep == 0) {
-      return Colors.orange;
-    }
-    return Colors.green;
+    if (reloadHtml) _reloadCurrentHtml();
   }
 
   @override
@@ -150,7 +170,6 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildFinished() {
-    // Asegurar limpieza (una sola vez).
     if (!_sessionCleared) {
       _sessionCleared = true;
       _clearStudySession();
@@ -162,18 +181,14 @@ class _StudyPageState extends State<StudyPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.check_circle_outline,
-              size: 80,
-              color: Colors.green,
-            ),
+            const Icon(Icons.check_circle_outline, size: 80, color: Colors.green),
             const SizedBox(height: 20),
             const Text("¡Has terminado por ahora!", style: TextStyle(fontSize: 20)),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               child: const Text("Volver"),
-            )
+            ),
           ],
         ),
       ),
@@ -188,17 +203,21 @@ class _StudyPageState extends State<StudyPage> {
         title: Text("Estudiando (${currentIndex + 1}/${studyQueue.length})"),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
-          child: Container(
-            height: 4,
-            color: _cardTypeColor(card),
-          ),
+          child: Container(height: 4, color: _cardTypeColor(card)),
         ),
+        actions: [
+          if (_undoEnabled && _lastUndo != null)
+            IconButton(
+              tooltip: "Deshacer último (Undo)",
+              onPressed: _performUndo,
+              icon: const Icon(Icons.undo),
+            ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: InAppWebView(
-              // ✅ CLAVE: permitir reproducción automática (autoplay)
               initialSettings: InAppWebViewSettings(
                 javaScriptEnabled: true,
                 mediaPlaybackRequiresUserGesture: false,
@@ -212,22 +231,24 @@ class _StudyPageState extends State<StudyPage> {
               ),
               onWebViewCreated: (controller) {
                 webViewController = controller;
+                _webReady = true;
 
                 controller.addJavaScriptHandler(
                   handlerName: 'submitScore',
                   callback: (args) {
                     if (args.isNotEmpty) {
-                      final score = args[0] as int;
-                      setState(() {
-                        currentWriteScore = score;
-                      });
-                      // ignore: avoid_print
-                      print(
-                        "📝 Score escritura: $score% (Min: $minScoreRequired%)",
-                      );
+                      final raw = args[0];
+                      final score = (raw is int) ? raw : int.tryParse(raw.toString()) ?? 0;
+                      setState(() => currentWriteScore = score);
                     }
+                    return null;
                   },
                 );
+
+                if (_pendingReloadAfterSettings) {
+                  _pendingReloadAfterSettings = false;
+                  _reloadCurrentHtml();
+                }
               },
             ),
           ),
@@ -238,104 +259,75 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildControls(Flashcard card) {
-    // PASO 1: Antes de mostrar la respuesta
     if (!isAnswerShown) {
-      // Complejas: primero lectura (SIN audio)
       if (isComplexCard && !isReadingShown) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              onPressed: () {
-                setState(() {
-                  isReadingShown = true;
-                });
-                webViewController?.evaluateJavascript(source: "showReading()");
-                _persistStudySession(); // guardar progreso aunque no haya calificación
-              },
-              child: const Text(
-                "Mostrar Lectura / Notas",
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ),
-          ),
+        return _singleButton(
+          label: "Mostrar Lectura / Notas",
+          color: Colors.orange,
+          onPressed: () {
+            setState(() => isReadingShown = true);
+            webViewController?.evaluateJavascript(source: "showReading()");
+            _persistStudySession();
+          },
         );
       }
 
-      // Simples (o complejas ya con lectura): ahora respuesta (CON audio)
-      return Container(
-        padding: const EdgeInsets.all(20),
-        child: SizedBox(
-          width: double.infinity,
-          height: 60,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            onPressed: () {
-              setState(() {
-                isAnswerShown = true;
-              });
-              webViewController?.evaluateJavascript(source: "showAnswer()");
-              _persistStudySession(); // guardar progreso aunque no haya calificación
-            },
-            child: const Text(
-              "Mostrar Respuesta",
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ),
-        ),
+      return _singleButton(
+        label: "Mostrar Respuesta",
+        color: Colors.blue,
+        onPressed: () {
+          setState(() => isAnswerShown = true);
+          webViewController?.evaluateJavascript(source: "showAnswer()");
+          _persistStudySession();
+        },
       );
     }
 
-    // PASO 2: Seguridad (si algo mostró respuesta sin lectura)
     if (isComplexCard && !isReadingShown) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        child: SizedBox(
-          width: double.infinity,
-          height: 60,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () {
-              setState(() {
-                isReadingShown = true;
-              });
-              webViewController?.evaluateJavascript(source: "showReading()");
-              _persistStudySession(); // guardar progreso aunque no haya calificación
-            },
-            child: const Text(
-              "Mostrar Lectura / Notas",
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ),
-        ),
+      return _singleButton(
+        label: "Mostrar Lectura / Notas",
+        color: Colors.orange,
+        onPressed: () {
+          setState(() => isReadingShown = true);
+          webViewController?.evaluateJavascript(source: "showReading()");
+          _persistStudySession();
+        },
       );
     }
 
-    // PASO 3: Botones Mal/Bien (bloqueo por escritura)
-    final bool writePassed =
-        !isWriteModeActive || (currentWriteScore >= minScoreRequired);
+    final bool writePassed = !isWriteModeActive || (currentWriteScore >= minScoreRequired);
 
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildRatingButton("Mal", Colors.red, () => _submitAnswer(card, false), true),
-          _buildRatingButton("Bien", Colors.green, () => _submitAnswer(card, true), writePassed),
+          _ratingButton("Mal", Colors.red, () => _submitAnswer(card, false), true),
+          _ratingButton("Bien", Colors.green, () => _submitAnswer(card, true), writePassed),
         ],
       ),
     );
   }
 
-  Widget _buildRatingButton(
-      String text,
-      Color color,
-      VoidCallback onPressed,
-      bool enabled,
-      ) {
+  Widget _singleButton({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 60,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: color),
+          onPressed: onPressed,
+          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 18)),
+        ),
+      ),
+    );
+  }
+
+  Widget _ratingButton(String text, Color color, VoidCallback onPressed, bool enabled) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -355,21 +347,29 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Future<void> _submitAnswer(Flashcard card, bool isCorrect) async {
-    if (_currentDeckSettings == null) return;
+    final settings = _currentDeckSettings;
+    final isar = Isar.getInstance();
+    if (settings == null || isar == null) return;
 
     final now = DateTime.now();
+    final prevIndex = currentIndex;
 
-    // ✅ Contar "nueva vista" solo UNA vez: en el primer momento en que el usuario califica esta carta.
-    final bool isFirstRating = card.lastReview.millisecondsSinceEpoch == 0;
-    if (card.state == CardState.newCard && isFirstRating) {
-      await _incrementNewCardCounter();
-    }
+    // Snapshot para Undo antes de mutar
+    final undo = _UndoAction(
+      prevIndex: prevIndex,
+      cardId: card.id,
+      snapshot: _FlashcardSnapshot.fromCard(card),
+    );
 
-    // Guardar lastReview para evitar dobles conteos y para tener trazabilidad.
+    // Contar nueva SOLO en el primer rating real (lastReview == epoch)
+    final bool shouldCountNew =
+        (card.state == CardState.newCard) && _isEpoch(card.lastReview);
+
+    // Aplicar SRS
+    final bool repeatToday = _srsService.reviewCard(card, isCorrect, settings);
+
+    // Marcar lastReview (evita doble conteo + útil para stats)
     card.lastReview = now;
-
-    final bool repeatToday =
-    _srsService.reviewCard(card, isCorrect, _currentDeckSettings!);
 
     int daysInterval = card.nextReview.difference(now).inDays;
     if (daysInterval < 0) daysInterval = 0;
@@ -381,40 +381,114 @@ class _StudyPageState extends State<StudyPage> {
       ..rating = isCorrect ? 3 : 1
       ..scheduledDays = daysInterval;
 
-    final isar = Isar.getInstance();
-    if (isar != null) {
-      await isar.writeTxn(() async {
-        await isar.flashcards.put(card);
-        await isar.reviewLogs.put(reviewLog);
-      });
+    int? logId;
+    int? prevSeen;
+    DateTime? prevLastDate;
+
+    await isar.writeTxn(() async {
+      if (shouldCountNew) {
+        final latest = await isar.deckSettings.get(settings.id);
+        if (latest != null) {
+          prevSeen = latest.newCardsSeenToday;
+          prevLastDate = latest.lastNewCardStudyDate;
+
+          latest.newCardsSeenToday += 1;
+          latest.lastNewCardStudyDate = now;
+          await isar.deckSettings.put(latest);
+          _currentDeckSettings = latest;
+        }
+      }
+
+      await isar.flashcards.put(card);
+      logId = await isar.reviewLogs.put(reviewLog);
+    });
+
+    undo.reviewLogId = logId;
+
+    if (shouldCountNew && prevSeen != null) {
+      undo.didIncrementNewCounter = true;
+      undo.prevNewCardsSeenToday = prevSeen!;
+      undo.prevLastNewCardStudyDate = prevLastDate;
+      undo.deckSettingsId = settings.id;
     }
 
     if (repeatToday) {
-      setState(() {
-        studyQueue.add(card);
-      });
+      setState(() => studyQueue.add(card));
+      undo.didAppendToQueue = true;
     }
 
     _nextCard();
-
-    // Guardar sesión después de avanzar (para que currentIndex quede correcto).
     await _persistStudySession();
+
+    if (_undoEnabled) {
+      setState(() => _lastUndo = undo);
+    } else {
+      _lastUndo = null;
+    }
   }
 
-  Future<void> _incrementNewCardCounter() async {
+  Future<void> _performUndo() async {
+    final action = _lastUndo;
+    final settings = _currentDeckSettings;
     final isar = Isar.getInstance();
-    if (isar != null && _currentDeckSettings != null) {
-      await isar.writeTxn(() async {
-        final latestSettings =
-        await isar.deckSettings.get(_currentDeckSettings!.id);
-        if (latestSettings != null) {
-          latestSettings.newCardsSeenToday += 1;
-          latestSettings.lastNewCardStudyDate = DateTime.now();
-          await isar.deckSettings.put(latestSettings);
-          _currentDeckSettings = latestSettings;
+    if (action == null || settings == null || isar == null) return;
+    if (!_undoEnabled) return;
+
+    // Si se re-encoló por repeatToday, revertir UNA ocurrencia
+    if (action.didAppendToQueue) {
+      for (int i = studyQueue.length - 1; i >= 0; i--) {
+        if (studyQueue[i].id == action.cardId && i != action.prevIndex) {
+          studyQueue.removeAt(i);
+          break;
         }
-      });
+      }
     }
+
+    // Encontrar la carta a restaurar (preferir prevIndex)
+    Flashcard? target;
+    if (action.prevIndex >= 0 && action.prevIndex < studyQueue.length) {
+      final c = studyQueue[action.prevIndex];
+      if (c.id == action.cardId) target = c;
+    }
+    target ??= studyQueue.where((c) => c.id == action.cardId).cast<Flashcard?>().firstWhere(
+          (c) => c != null,
+      orElse: () => null,
+    );
+    if (target == null) return;
+
+    action.snapshot.applyTo(target);
+
+    await isar.writeTxn(() async {
+      await isar.flashcards.put(target!);
+
+      if (action.reviewLogId != null) {
+        await isar.reviewLogs.delete(action.reviewLogId!);
+      }
+
+      if (action.didIncrementNewCounter && action.deckSettingsId != null) {
+        final ds = await isar.deckSettings.get(action.deckSettingsId!);
+        if (ds != null) {
+          ds.newCardsSeenToday = action.prevNewCardsSeenToday;
+          ds.lastNewCardStudyDate = action.prevLastNewCardStudyDate;
+          await isar.deckSettings.put(ds);
+          _currentDeckSettings = ds;
+        }
+      }
+    });
+
+    setState(() {
+      currentIndex = action.prevIndex.clamp(
+        0,
+        studyQueue.isEmpty ? 0 : studyQueue.length - 1,
+      ).toInt();
+      isAnswerShown = false;
+      isReadingShown = false;
+      currentWriteScore = 0;
+      _lastUndo = null; // solo 1 nivel
+    });
+
+    _recomputeCurrentCardState(reloadHtml: true);
+    await _persistStudySession();
   }
 
   void _nextCard() {
@@ -425,19 +499,9 @@ class _StudyPageState extends State<StudyPage> {
         isReadingShown = false;
         currentWriteScore = 0;
       });
-
-      _checkCardComplexity();
-
-      webViewController?.loadData(
-        data: HtmlGenerator.generateContent(
-          studyQueue[currentIndex],
-          writeMode: isWriteModeActive,
-        ),
-      );
+      _recomputeCurrentCardState(reloadHtml: true);
     } else {
-      setState(() {
-        currentIndex++;
-      });
+      setState(() => currentIndex++);
     }
   }
 
@@ -478,4 +542,71 @@ class _StudyPageState extends State<StudyPage> {
           .deleteAll();
     });
   }
+}
+
+class _FlashcardSnapshot {
+  final DateTime nextReview;
+  final DateTime lastReview;
+  final double decayRate;
+  final List<double> fixedPhaseQueue;
+  final int learningStep;
+  final int consecutiveLapses;
+  final int repetitionCount;
+  final CardState state;
+
+  _FlashcardSnapshot({
+    required this.nextReview,
+    required this.lastReview,
+    required this.decayRate,
+    required this.fixedPhaseQueue,
+    required this.learningStep,
+    required this.consecutiveLapses,
+    required this.repetitionCount,
+    required this.state,
+  });
+
+  factory _FlashcardSnapshot.fromCard(Flashcard c) {
+    return _FlashcardSnapshot(
+      nextReview: c.nextReview,
+      lastReview: c.lastReview,
+      decayRate: c.decayRate,
+      fixedPhaseQueue: List<double>.from(c.fixedPhaseQueue),
+      learningStep: c.learningStep,
+      consecutiveLapses: c.consecutiveLapses,
+      repetitionCount: c.repetitionCount,
+      state: c.state,
+    );
+  }
+
+  void applyTo(Flashcard c) {
+    c.nextReview = nextReview;
+    c.lastReview = lastReview;
+    c.decayRate = decayRate;
+    c.fixedPhaseQueue = List<double>.from(fixedPhaseQueue);
+    c.learningStep = learningStep;
+    c.consecutiveLapses = consecutiveLapses;
+    c.repetitionCount = repetitionCount;
+    c.state = state;
+  }
+}
+
+class _UndoAction {
+  final int prevIndex;
+  final int cardId;
+  final _FlashcardSnapshot snapshot;
+
+  int? reviewLogId;
+
+  bool didAppendToQueue = false;
+
+  bool didIncrementNewCounter = false;
+  int? deckSettingsId;
+  late int prevNewCardsSeenToday;
+  DateTime? prevLastNewCardStudyDate;
+
+  _UndoAction({
+    required this.prevIndex,
+    required this.cardId,
+    required this.snapshot,
+  });
 }

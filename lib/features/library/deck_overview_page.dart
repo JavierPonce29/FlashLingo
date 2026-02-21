@@ -78,11 +78,10 @@ class DeckOverviewPage extends ConsumerWidget {
     // --- GESTIÓN DE LÍMITE DIARIO ---
     // Verificar si es un nuevo día para resetear el contador en la DB
     final last = settings.lastNewCardStudyDate;
-    final bool isSameDay =
-        last != null &&
-            last.year == now.year &&
-            last.month == now.month &&
-            last.day == now.day;
+    final bool isSameDay = last != null &&
+        last.year == now.year &&
+        last.month == now.month &&
+        last.day == now.day;
 
     if (!isSameDay) {
       settings.newCardsSeenToday = 0;
@@ -161,7 +160,7 @@ class DeckOverviewPage extends ConsumerWidget {
           .limit(remainingQuota)
           .findAll();
 
-      // Ordenar Recog -> Prod
+      // Ordenar Recog -> Prod (esto se mantiene dentro del bloque de nuevas)
       final newRecog =
       newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
       final newProd =
@@ -169,8 +168,12 @@ class DeckOverviewPage extends ConsumerWidget {
       newCardsOrdered = [...newRecog, ...newProd];
     }
 
-    // 6) Unir sesión
-    final sessionCards = [...reviews, ...newCardsOrdered];
+    // 6) Unir sesión según configuración de mezcla
+    final sessionCards = _buildSessionCards(
+      settings: settings,
+      reviews: reviews,
+      newCards: newCardsOrdered,
+    );
 
     if (!context.mounted) return;
 
@@ -210,6 +213,73 @@ class DeckOverviewPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<Flashcard> _buildSessionCards({
+    required DeckSettings settings,
+    required List<Flashcard> reviews,
+    required List<Flashcard> newCards,
+  }) {
+    final mode = DeckStudyMixMode.values.contains(settings.studyMixMode)
+        ? settings.studyMixMode
+        : DeckStudyMixMode.reviewsFirst;
+
+    switch (mode) {
+      case DeckStudyMixMode.newFirst:
+        return [...newCards, ...reviews];
+
+      case DeckStudyMixMode.reviewsFirst:
+        return [...reviews, ...newCards];
+
+      case DeckStudyMixMode.interleaveReviewsThenNew:
+        return _interleaveChunks(
+          first: reviews,
+          firstChunkSize: settings.interleaveReviewsCount,
+          second: newCards,
+          secondChunkSize: settings.interleaveNewCardsCount,
+        );
+
+      case DeckStudyMixMode.interleaveNewThenReviews:
+        return _interleaveChunks(
+          first: newCards,
+          firstChunkSize: settings.interleaveNewCardsCount,
+          second: reviews,
+          secondChunkSize: settings.interleaveReviewsCount,
+        );
+
+      default:
+        return [...reviews, ...newCards];
+    }
+  }
+
+  List<Flashcard> _interleaveChunks({
+    required List<Flashcard> first,
+    required int firstChunkSize,
+    required List<Flashcard> second,
+    required int secondChunkSize,
+  }) {
+    final aChunk = max(1, firstChunkSize);
+    final bChunk = max(1, secondChunkSize);
+
+    final result = <Flashcard>[];
+    int i = 0;
+    int j = 0;
+
+    while (i < first.length || j < second.length) {
+      if (i < first.length) {
+        final endA = min(i + aChunk, first.length);
+        result.addAll(first.sublist(i, endA));
+        i = endA;
+      }
+
+      if (j < second.length) {
+        final endB = min(j + bChunk, second.length);
+        result.addAll(second.sublist(j, endB));
+        j = endB;
+      }
+    }
+
+    return result;
   }
 
   bool _isSameDay(DateTime a, DateTime b) =>

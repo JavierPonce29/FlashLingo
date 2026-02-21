@@ -42,10 +42,22 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   late final TextEditingController _writeMaxRepsController;
   bool _enableWriteMode = false;
 
+  // --- UNDO ---
+  bool _enableUndo = true;
+
+  // --- ORDEN / MEZCLA ---
+  String _studyMixMode = DeckStudyMixMode.reviewsFirst;
+  late final TextEditingController _interleaveReviewsCountController;
+  late final TextEditingController _interleaveNewCardsCountController;
+
   bool _isLoading = true;
 
   // Guardamos la última config cargada (para editar/guardar de forma segura)
   DeckSettings? _loadedSettings;
+
+  bool get _isInterleaveMode =>
+      _studyMixMode == DeckStudyMixMode.interleaveReviewsThenNew ||
+          _studyMixMode == DeckStudyMixMode.interleaveNewThenReviews;
 
   @override
   void initState() {
@@ -69,6 +81,9 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _writeThresholdController = TextEditingController();
     _writeMaxRepsController = TextEditingController();
 
+    _interleaveReviewsCountController = TextEditingController();
+    _interleaveNewCardsCountController = TextEditingController();
+
     _loadSettings();
   }
 
@@ -88,8 +103,13 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
     _lapseToleranceController.dispose();
     _lapseFixedIntervalController.dispose();
+
     _writeThresholdController.dispose();
     _writeMaxRepsController.dispose();
+
+    _interleaveReviewsCountController.dispose();
+    _interleaveNewCardsCountController.dispose();
+
     super.dispose();
   }
 
@@ -141,6 +161,18 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
     _useFixedIntervalOnLapse = settings.useFixedIntervalOnLapse;
 
+    // Undo
+    _enableUndo = settings.enableUndo;
+
+    // Orden / mezcla
+    _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
+        ? settings.studyMixMode
+        : DeckStudyMixMode.reviewsFirst;
+    _interleaveReviewsCountController.text =
+        settings.interleaveReviewsCount.toString();
+    _interleaveNewCardsCountController.text =
+        settings.interleaveNewCardsCount.toString();
+
     if (!mounted) return;
     setState(() => _isLoading = false);
   }
@@ -186,6 +218,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
         ? int.parse(_writeMaxRepsController.text.trim())
         : 0;
 
+    final interleaveReviewsCount =
+    int.parse(_interleaveReviewsCountController.text.trim());
+    final interleaveNewCount =
+    int.parse(_interleaveNewCardsCountController.text.trim());
+
     try {
       await isar.writeTxn(() async {
         DeckSettings? existing = await isar.deckSettings
@@ -213,7 +250,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..newCardIntraDayMinutes = newMinutes
           ..enableWriteMode = _enableWriteMode
           ..writeModeThreshold = writeThres
-          ..writeModeMaxReps = writeReps;
+          ..writeModeMaxReps = writeReps
+          ..enableUndo = _enableUndo
+          ..studyMixMode = _studyMixMode
+          ..interleaveReviewsCount = interleaveReviewsCount
+          ..interleaveNewCardsCount = interleaveNewCount;
 
         await isar.deckSettings.put(settingsToSave);
         _loadedSettings = settingsToSave;
@@ -297,6 +338,26 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     return null;
   }
 
+  String? _validateInterleaveCount(String? v, {required String label}) {
+    if (!_isInterleaveMode) return null;
+    return _validateInt(v, label: label, min: 1, max: 9999);
+  }
+
+  String _mixModeLabel(String mode) {
+    switch (mode) {
+      case DeckStudyMixMode.newFirst:
+        return 'Nuevas primero, luego repasos';
+      case DeckStudyMixMode.reviewsFirst:
+        return 'Repasos primero, luego nuevas';
+      case DeckStudyMixMode.interleaveReviewsThenNew:
+        return 'Intercalado: X repasos, X nuevas';
+      case DeckStudyMixMode.interleaveNewThenReviews:
+        return 'Intercalado: X nuevas, X repasos';
+      default:
+        return mode;
+    }
+  }
+
   // =========================
   // UI
   // =========================
@@ -363,6 +424,88 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               ),
               const SizedBox(height: 20),
 
+              // --- ORDEN / MEZCLA ---
+              _buildSectionTitle("Orden del Estudio / Mezcla"),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _studyMixMode,
+                      decoration: const InputDecoration(
+                        labelText: "Modo de mezcla",
+                        border: OutlineInputBorder(),
+                      ),
+                      items: DeckStudyMixMode.values
+                          .map(
+                            (mode) => DropdownMenuItem<String>(
+                          value: mode,
+                          child: Text(_mixModeLabel(mode)),
+                        ),
+                      )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _studyMixMode = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Esta configuración se aplica al crear una sesión nueva. "
+                            "Si reanudas una sesión guardada del mismo día, se mantiene el orden ya guardado.",
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ),
+                    if (_isInterleaveMode) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _interleaveReviewsCountController,
+                              label: "Repasos por bloque",
+                              helper: "Ej: 2",
+                              inputType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              validator: (v) => _validateInterleaveCount(
+                                v,
+                                label: 'Repasos por bloque',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _interleaveNewCardsCountController,
+                              label: "Nuevas por bloque",
+                              helper: "Ej: 1",
+                              inputType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              validator: (v) => _validateInterleaveCount(
+                                v,
+                                label: 'Nuevas por bloque',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
               // --- MODO ESCRITURA ---
               _buildSectionTitle("Modo Escritura (Producción)"),
               Container(
@@ -411,7 +554,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         controller: _writeMaxRepsController,
                         label: "Límite de Repasos (0 = Siempre)",
                         helper:
-                        "0 = siempre activo. >0 = se desactiva tras N repasos de la carta.",
+                        "0 = siempre activo. >0 = se desactiva tras N aciertos en esa carta.",
                         inputType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
@@ -425,6 +568,31 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                       ),
                     ],
                   ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // --- UNDO ---
+              _buildSectionTitle("Botón Deshacer"),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    "Permitir deshacer (Undo)",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text(
+                    "Revertir SOLO la última respuesta (Bien/Mal) durante el estudio.",
+                  ),
+                  value: _enableUndo,
+                  activeColor: Colors.orange,
+                  onChanged: (val) => setState(() => _enableUndo = val),
                 ),
               ),
               const SizedBox(height: 20),
@@ -522,7 +690,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 inputType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                validator: (v) => _validateDouble(v, label: 'Alpha', min: 0),
+                validator: (v) =>
+                    _validateDouble(v, label: 'Alpha', min: 0),
               ),
               const SizedBox(height: 10),
               _buildTextField(
@@ -532,7 +701,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 inputType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                validator: (v) => _validateDouble(v, label: 'Beta', min: 0),
+                validator: (v) =>
+                    _validateDouble(v, label: 'Beta', min: 0),
               ),
               const SizedBox(height: 10),
               _buildTextField(
@@ -552,7 +722,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 inputType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                validator: (v) => _validateDouble(v, label: 'Nt inicial', min: 0.000001),
+                validator: (v) => _validateDouble(
+                  v,
+                  label: 'Nt inicial',
+                  min: 0.000001,
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -561,7 +735,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               _buildTextField(
                 controller: _lapseToleranceController,
                 label: "Tolerancia (lapses)",
-                helper: "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
+                helper:
+                "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
                 inputType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
@@ -576,17 +751,25 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               const SizedBox(height: 10),
               SwitchListTile(
                 title: const Text("Usar intervalo fijo en lapse"),
-                subtitle: const Text("Si está activo, un lapse programa un intervalo fijo."),
+                subtitle: const Text(
+                  "Si está activo, un lapse programa un intervalo fijo.",
+                ),
                 value: _useFixedIntervalOnLapse,
-                onChanged: (v) => setState(() => _useFixedIntervalOnLapse = v),
+                onChanged: (v) =>
+                    setState(() => _useFixedIntervalOnLapse = v),
               ),
               if (_useFixedIntervalOnLapse) ...[
                 _buildTextField(
                   controller: _lapseFixedIntervalController,
                   label: "Intervalo fijo (días)",
                   helper: "Ej: 1.0",
-                  inputType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) => _validateDouble(v, label: 'Intervalo fijo', min: 0.000001),
+                  inputType:
+                  const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) => _validateDouble(
+                    v,
+                    label: 'Intervalo fijo',
+                    min: 0.000001,
+                  ),
                 ),
               ],
 

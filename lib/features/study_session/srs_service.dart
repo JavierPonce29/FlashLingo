@@ -202,16 +202,19 @@ class SrsService {
       DeckSettings settings, {
         bool forNewCard = false,
       }) {
-    if (card.fixedPhaseQueue.isNotEmpty) return;
-
+    // IMPORTANTE:
+    // Para tarjetas NUEVAS, SIEMPRE reconstruimos la cola para inyectar
+    // los pasos intra-día (newCardMinCorrectReps / newCardIntraDayMinutes),
+    // incluso si la tarjeta ya trae fixedPhaseQueue desde importación.
     if (forNewCard) {
       final minReps = max(1, settings.newCardMinCorrectReps);
       final minutes = max(1, settings.newCardIntraDayMinutes);
 
       final List<double> queue = [];
 
-      // Si minReps=2 => 1 paso intra-día antes de los learningSteps normales.
-      // Si minReps=3 => 2 pasos intra-día, etc.
+      // Ej:
+      // minReps = 2 -> 1 paso intra-día
+      // minReps = 3 -> 2 pasos intra-día
       if (minReps > 1) {
         final step = _minutesToDays(minutes);
         for (int i = 0; i < minReps - 1; i++) {
@@ -219,15 +222,16 @@ class SrsService {
         }
       }
 
-      // Luego vienen los pasos normales del mazo (en días).
+      // Luego los pasos normales del mazo
       queue.addAll(settings.learningSteps);
 
-      // Copiamos para evitar referencias compartidas.
       card.fixedPhaseQueue = List<double>.from(queue);
       return;
     }
 
-    // Default: solo usar learningSteps.
+    // Para learning/relearning normal: si ya existe, respetarla
+    if (card.fixedPhaseQueue.isNotEmpty) return;
+
     card.fixedPhaseQueue = List<double>.from(settings.learningSteps);
   }
 

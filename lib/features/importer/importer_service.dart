@@ -462,7 +462,8 @@ class ImporterService {
           int.tryParse((manifestData['new_card_intra_day_minutes'] ?? '10').toString()) ?? 10
       ..enableWriteMode = false
       ..writeModeThreshold = 80
-      ..writeModeMaxReps = 0;
+      ..writeModeMaxReps = 0
+      ..enableUndo = true;
 
     // Sobreescribir con manifest.settings si existe
     if (manifestData.containsKey('settings')) {
@@ -495,6 +496,8 @@ class ImporterService {
       if (custom['enable_write_mode'] != null) settings.enableWriteMode = custom['enable_write_mode'];
       if (custom['write_mode_threshold'] != null) settings.writeModeThreshold = custom['write_mode_threshold'];
       if (custom['write_mode_max_reps'] != null) settings.writeModeMaxReps = custom['write_mode_max_reps'];
+
+      if (custom['enable_undo'] != null) settings.enableUndo = custom['enable_undo'];
     }
 
     await isar.writeTxn(() async {
@@ -563,7 +566,7 @@ class ImporterService {
           "type": "recognition"
         })
         ..decayRate = initialNtValue
-        ..fixedPhaseQueue = List.from(initialQueueValue)
+        ..fixedPhaseQueue = <double>[]
         ..learningStep = 0
         ..consecutiveLapses = 0;
 
@@ -586,7 +589,7 @@ class ImporterService {
           "type": "production"
         })
         ..decayRate = initialNtValue
-        ..fixedPhaseQueue = List.from(initialQueueValue)
+        ..fixedPhaseQueue = <double>[]
         ..learningStep = 0
         ..consecutiveLapses = 0;
 
