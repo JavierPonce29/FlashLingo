@@ -21,5 +21,26 @@ final importerServiceProvider = AutoDisposeProvider<ImporterService>.internal(
 );
 
 typedef ImporterServiceRef = AutoDisposeProviderRef<ImporterService>;
+String _$importerControllerHash() =>
+    r'68b180da46e949e7a6d4f44b1e28086912bf5276';
+
+/// Controlador de importación para UI:
+/// - expone loading/error
+/// - permite preview + import normal + import avanzado
+///
+/// Copied from [ImporterController].
+@ProviderFor(ImporterController)
+final importerControllerProvider =
+    AutoDisposeNotifierProvider<ImporterController, AsyncValue<void>>.internal(
+  ImporterController.new,
+  name: r'importerControllerProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$importerControllerHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$ImporterController = AutoDisposeNotifier<AsyncValue<void>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

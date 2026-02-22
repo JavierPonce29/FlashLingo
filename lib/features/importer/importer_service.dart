@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
-import 'package:archive/archive_io.dart';
 import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -12,13 +11,327 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/deck_settings.dart';
 import '../../data/models/flashcard.dart';
 
+enum ImportDeckConflictAction {
+  createNewDeck,
+  updateExistingDeck,
+}
+
+class ImportExecutionOptions {
+  final ImportDeckConflictAction action;
+
+  /// Solo se usa cuando [action] es [ImportDeckConflictAction.createNewDeck].
+  /// Permite renombrar el mazo importado para evitar conflicto.
+  final String? customPackName;
+
+  /// Si se está actualizando un mazo existente:
+  /// - false (recomendado): conserva la configuración del usuario
+  /// - true: reemplaza la configuración del mazo con la del manifest importado
+  final bool updateDeckSettingsFromManifest;
+
+  const ImportExecutionOptions({
+    required this.action,
+    this.customPackName,
+    this.updateDeckSettingsFromManifest = false,
+  });
+
+  const ImportExecutionOptions.createNew({
+    this.customPackName,
+  })  : action = ImportDeckConflictAction.createNewDeck,
+        updateDeckSettingsFromManifest = false;
+
+  const ImportExecutionOptions.updateExisting({
+    this.updateDeckSettingsFromManifest = false,
+  })  : action = ImportDeckConflictAction.updateExistingDeck,
+        customPackName = null;
+}
+
+class ImportPreviewResult {
+  final String zipFilePath;
+  final String zipFileName;
+
+  final String importedPackName;
+  final String isoCode;
+  final String dbFilename;
+
+  final bool deckNameExists;
+  final int sqliteRows;
+  final int estimatedCardsToImport;
+
+  final int zipEntriesTotal;
+  final int zipRealFileEntries;
+
+  const ImportPreviewResult({
+    required this.zipFilePath,
+    required this.zipFileName,
+    required this.importedPackName,
+    required this.isoCode,
+    required this.dbFilename,
+    required this.deckNameExists,
+    required this.sqliteRows,
+    required this.estimatedCardsToImport,
+    required this.zipEntriesTotal,
+    required this.zipRealFileEntries,
+  });
+
+  @override
+  String toString() {
+    return 'ImportPreviewResult(pack="$importedPackName", exists=$deckNameExists, '
+        'rows=$sqliteRows, cards=$estimatedCardsToImport)';
+  }
+}
+
+class ImportSummary {
+  final String zipFilePath;
+  final String zipFileName;
+  final String importedPackName;
+  final String finalPackName;
+  final String isoCode;
+  final ImportDeckConflictAction action;
+
+  final bool targetDeckExistedBeforeImport;
+
+  final int sqliteRowsRead;
+  final int cardsProcessed;
+  final int cardsCreated;
+  final int cardsUpdated;
+  final int cardsUnchanged;
+  final int duplicateLogicalCardsInImport;
+  final int existingCardsNotPresentInImport;
+
+  final bool deckSettingsCreated;
+  final bool deckSettingsUpdated;
+  final bool deckSettingsPreserved;
+
+  final int missingWordAudio;
+  final int missingSentenceAudio;
+  final int missingImages;
+
+  final int zipEntriesTotal;
+  final int zipRealFileEntries;
+  final int extractedFilesWritten;
+  final int extractedDirsCreated;
+  final int extractedCollisions;
+  final int extractedSkipped;
+  final int extractedErrors;
+
+  final int mediaFilesCopied;
+  final int mediaFilesSkipped;
+  final int mediaDuplicateKeys;
+
+  const ImportSummary({
+    required this.zipFilePath,
+    required this.zipFileName,
+    required this.importedPackName,
+    required this.finalPackName,
+    required this.isoCode,
+    required this.action,
+    required this.targetDeckExistedBeforeImport,
+    required this.sqliteRowsRead,
+    required this.cardsProcessed,
+    required this.cardsCreated,
+    required this.cardsUpdated,
+    required this.cardsUnchanged,
+    required this.duplicateLogicalCardsInImport,
+    required this.existingCardsNotPresentInImport,
+    required this.deckSettingsCreated,
+    required this.deckSettingsUpdated,
+    required this.deckSettingsPreserved,
+    required this.missingWordAudio,
+    required this.missingSentenceAudio,
+    required this.missingImages,
+    required this.zipEntriesTotal,
+    required this.zipRealFileEntries,
+    required this.extractedFilesWritten,
+    required this.extractedDirsCreated,
+    required this.extractedCollisions,
+    required this.extractedSkipped,
+    required this.extractedErrors,
+    required this.mediaFilesCopied,
+    required this.mediaFilesSkipped,
+    required this.mediaDuplicateKeys,
+  });
+}
+
+class ImportConflictException implements Exception {
+  final ImportPreviewResult preview;
+
+  ImportConflictException(this.preview);
+
+  @override
+  String toString() {
+    return 'Ya existe un mazo con el nombre "${preview.importedPackName}". '
+        'Debes elegir actualizar el mazo existente o crear uno nuevo con otro nombre.';
+  }
+}
+
 class ImporterService {
   final Isar isar;
   final Uuid _uuid = const Uuid();
 
   ImporterService(this.isar);
 
+  // ---------------------------------------------------------------------------
+  // API pública
+  // ---------------------------------------------------------------------------
+
+  /// Mantiene compatibilidad con la UI actual:
+  /// - Si no hay conflicto de nombre: importa como mazo nuevo
+  /// - Si hay conflicto: lanza [ImportConflictException] (la UI futura decidirá)
   Future<void> importFlashcardPackage(String zipFilePath) async {
+    final preview = await previewFlashcardPackage(zipFilePath);
+    if (preview.deckNameExists) {
+      throw ImportConflictException(preview);
+    }
+
+    await importFlashcardPackageAdvanced(
+      zipFilePath,
+      options: const ImportExecutionOptions.createNew(),
+    );
+  }
+
+  /// Lee el paquete y devuelve metadatos para que la UI pueda decidir:
+  /// actualizar mazo existente o crear uno nuevo con otro nombre.
+  Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
+    final prepared = await _preparePackage(zipFilePath, copyMedia: false);
+
+    try {
+      final sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
+      try {
+        final rows = await sqliteDb.rawQuery('SELECT COUNT(*) AS c FROM flashcards');
+        final sqliteRows = (rows.isNotEmpty ? (rows.first['c'] as int?) : null) ?? 0;
+        final exists = await _deckExistsByName(prepared.packName);
+
+        return ImportPreviewResult(
+          zipFilePath: zipFilePath,
+          zipFileName: p.basename(zipFilePath),
+          importedPackName: prepared.packName,
+          isoCode: prepared.isoCode,
+          dbFilename: prepared.dbFilename,
+          deckNameExists: exists,
+          sqliteRows: sqliteRows,
+          estimatedCardsToImport: sqliteRows * 2,
+          zipEntriesTotal: prepared.archiveEntriesTotal,
+          zipRealFileEntries: prepared.archiveRealFileEntries,
+        );
+      } finally {
+        await sqliteDb.close();
+      }
+    } finally {
+      await _cleanupExtractDir(prepared.extractDir);
+    }
+  }
+
+  /// Importación avanzada con resolución explícita de conflicto.
+  /// Devuelve un resumen para mostrar en pantalla al finalizar.
+  Future<ImportSummary> importFlashcardPackageAdvanced(
+      String zipFilePath, {
+        required ImportExecutionOptions options,
+      }) async {
+    final prepared = await _preparePackage(zipFilePath, copyMedia: true);
+
+    sql.Database? sqliteDb;
+    try {
+      final importedPackName = prepared.packName;
+      final targetPackName = _resolveTargetPackName(importedPackName, options);
+
+      final targetExists = await _deckExistsByName(targetPackName);
+
+      if (options.action == ImportDeckConflictAction.createNewDeck && targetExists) {
+        // Si el usuario intentó crear nuevo con nombre ya existente, detenemos.
+        final preview = ImportPreviewResult(
+          zipFilePath: zipFilePath,
+          zipFileName: p.basename(zipFilePath),
+          importedPackName: importedPackName,
+          isoCode: prepared.isoCode,
+          dbFilename: prepared.dbFilename,
+          deckNameExists: true,
+          sqliteRows: 0,
+          estimatedCardsToImport: 0,
+          zipEntriesTotal: prepared.archiveEntriesTotal,
+          zipRealFileEntries: prepared.archiveRealFileEntries,
+        );
+        throw ImportConflictException(preview);
+      }
+
+      if (options.action == ImportDeckConflictAction.updateExistingDeck && !targetExists) {
+        throw Exception(
+          'No existe un mazo llamado "$targetPackName" para actualizar. '
+              'Importa como mazo nuevo o revisa el nombre.',
+        );
+      }
+
+      sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
+
+      final mergeSummary = await _migrateDataToIsar(
+        sqliteDb,
+        prepared.isoCode,
+        importedPackName,
+        targetPackName,
+        prepared.mediaResult?.index ?? MediaIndex({}, {}, {}),
+        prepared.manifestData,
+        options: options,
+        targetDeckExistedBeforeImport: targetExists,
+      );
+
+      final summary = ImportSummary(
+        zipFilePath: zipFilePath,
+        zipFileName: p.basename(zipFilePath),
+        importedPackName: importedPackName,
+        finalPackName: targetPackName,
+        isoCode: prepared.isoCode,
+        action: options.action,
+        targetDeckExistedBeforeImport: targetExists,
+        sqliteRowsRead: mergeSummary.sqliteRowsRead,
+        cardsProcessed: mergeSummary.cardsProcessed,
+        cardsCreated: mergeSummary.cardsCreated,
+        cardsUpdated: mergeSummary.cardsUpdated,
+        cardsUnchanged: mergeSummary.cardsUnchanged,
+        duplicateLogicalCardsInImport: mergeSummary.duplicateLogicalCardsInImport,
+        existingCardsNotPresentInImport: mergeSummary.existingCardsNotPresentInImport,
+        deckSettingsCreated: mergeSummary.deckSettingsCreated,
+        deckSettingsUpdated: mergeSummary.deckSettingsUpdated,
+        deckSettingsPreserved: mergeSummary.deckSettingsPreserved,
+        missingWordAudio: mergeSummary.missingWordAudio,
+        missingSentenceAudio: mergeSummary.missingSentenceAudio,
+        missingImages: mergeSummary.missingImages,
+        zipEntriesTotal: prepared.archiveEntriesTotal,
+        zipRealFileEntries: prepared.archiveRealFileEntries,
+        extractedFilesWritten: prepared.extractReport.filesWritten,
+        extractedDirsCreated: prepared.extractReport.dirsCreated,
+        extractedCollisions: prepared.extractReport.collisions,
+        extractedSkipped: prepared.extractReport.skipped,
+        extractedErrors: prepared.extractReport.errors,
+        mediaFilesCopied: prepared.mediaResult?.copied ?? 0,
+        mediaFilesSkipped: prepared.mediaResult?.skipped ?? 0,
+        mediaDuplicateKeys: prepared.mediaResult?.duplicateKeys ?? 0,
+      );
+
+      print("🎉 Importación completada con éxito.");
+      print("📌 Resumen: creadas=${summary.cardsCreated}, actualizadas=${summary.cardsUpdated}, "
+          "sin cambios=${summary.cardsUnchanged}");
+
+      return summary;
+    } catch (e, st) {
+      print("🔴 ERROR FATAL EN IMPORTACIÓN: $e");
+      print(st);
+      rethrow;
+    } finally {
+      if (sqliteDb != null) {
+        await sqliteDb.close();
+      }
+      await _cleanupExtractDir(prepared.extractDir);
+      print("🏁 --- PROCESO TERMINADO ---");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Preparación del paquete (ZIP -> extracción -> manifest -> DB -> media opcional)
+  // ---------------------------------------------------------------------------
+
+  Future<_PreparedImportPackage> _preparePackage(
+      String zipFilePath, {
+        required bool copyMedia,
+      }) async {
     print("\n📦 --- INICIANDO IMPORTACIÓN DE MAZO ---");
     print("📂 Archivo: ${p.basename(zipFilePath)}");
 
@@ -27,125 +340,151 @@ class ImporterService {
     final extractPath = p.join(tempDir.path, 'import_$uniqueSessionId');
     final extractDir = Directory(extractPath);
 
-    try {
-      // 1) ANALIZAR ZIP
-      final bytes = await File(zipFilePath).readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
+    // 1) Analizar ZIP
+    final bytes = await File(zipFilePath).readAsBytes();
+    final archive = ZipDecoder().decodeBytes(bytes);
 
-      final zipFileEntries = archive.files
-          .where((f) => f.isFile && !f.name.contains('__MACOSX'))
-          .length;
+    final zipFileEntries = archive.files
+        .where((f) => f.isFile && !f.name.contains('__MACOSX'))
+        .length;
 
+    print("📊 Entradas detectadas en ZIP: ${archive.length} (archivos reales: $zipFileEntries)");
+
+    // 2) Extraer (robusto)
+    print("⏳ Descomprimiendo...");
+    final extractReport = await _extractArchiveSafely(archive, extractPath);
+
+    print(
+      "✅ Extracción: ${extractReport.filesWritten} archivos, "
+          "${extractReport.dirsCreated} carpetas, "
+          "${extractReport.collisions} colisiones renombradas, "
+          "${extractReport.skipped} omitidos, "
+          "${extractReport.errors} errores.",
+    );
+
+    if (extractReport.filesWritten < zipFileEntries) {
       print(
-          "📊 Entradas detectadas en ZIP: ${archive.length} (archivos reales: $zipFileEntries)");
-
-      // 2) EXTRAER (ROBUSTO: sin overwrite silencioso)
-      print("⏳ Descomprimiendo...");
-      final report = await _extractArchiveSafely(archive, extractPath);
-
-      print(
-        "✅ Extracción: ${report.filesWritten} archivos, "
-            "${report.dirsCreated} carpetas, "
-            "${report.collisions} colisiones renombradas, "
-            "${report.skipped} omitidos, "
-            "${report.errors} errores.",
+        "⚠️ AVISO: El ZIP contiene $zipFileEntries archivos, pero solo se escribieron "
+            "${extractReport.filesWritten}. Si el mazo tenía nombres repetidos, se renombraron "
+            "para evitar pérdidas. Si aún faltan, el ZIP puede estar corrupto.",
       );
+    }
 
-      if (report.filesWritten < zipFileEntries) {
-        print(
-          "⚠️ AVISO: El ZIP contiene $zipFileEntries archivos, pero solo se escribieron ${report.filesWritten}. "
-              "Si el mazo fue generado con nombres repetidos, esta versión los renombra para evitar pérdidas. "
-              "Si aún faltan, puede ser que el ZIP esté corrupto o contenga entradas inválidas.",
-        );
-      }
+    // 3) Indexar extraídos
+    print("🔍 Indexando archivos extraídos...");
+    if (!await extractDir.exists()) {
+      throw Exception("Error crítico: No se creó la carpeta temporal.");
+    }
 
-      // 3) INDEXAR EXTRAÍDOS
-      print("🔍 Indexando archivos extraídos...");
-      if (!await extractDir.exists()) {
-        throw Exception("Error crítico: No se creó la carpeta temporal.");
-      }
+    List<FileSystemEntity> allEntities;
+    try {
+      allEntities = await extractDir.list(recursive: true).toList();
+    } catch (e) {
+      print("⚠️ Error en listado recursivo nativo: $e. Intentando método manual...");
+      allEntities = await _manualRecursiveList(extractDir);
+    }
+    print("📄 Total elementos en disco (archivos+carpetas): ${allEntities.length}");
 
-      List<FileSystemEntity> allEntities = [];
-      try {
-        allEntities = await extractDir.list(recursive: true).toList();
-      } catch (e) {
-        print(
-            "⚠️ Error en listado recursivo nativo: $e. Intentando método manual...");
-        allEntities = await _manualRecursiveList(extractDir);
-      }
-
-      print("📄 Total elementos en disco (archivos+carpetas): ${allEntities.length}");
-
-      // 4) ENCONTRAR MANIFEST
-      File? manifestFile;
-      Directory? packageRoot;
-
-      for (final entity in allEntities) {
-        if (entity is File && !entity.path.contains('__MACOSX')) {
-          if (p.basename(entity.path).toLowerCase() == 'manifest.json') {
-            manifestFile = entity;
-            packageRoot = entity.parent;
-            print("✅ Manifest encontrado en: ${entity.path}");
-            break;
-          }
+    // 4) Manifest
+    File? manifestFile;
+    Directory? packageRoot;
+    for (final entity in allEntities) {
+      if (entity is File && !entity.path.contains('__MACOSX')) {
+        if (p.basename(entity.path).toLowerCase() == 'manifest.json') {
+          manifestFile = entity;
+          packageRoot = entity.parent;
+          print("✅ Manifest encontrado en: ${entity.path}");
+          break;
         }
       }
+    }
 
-      if (manifestFile == null) {
-        print("❌ CRÍTICO: No se encontró 'manifest.json'.");
-        throw Exception("El archivo 'manifest.json' no existe en el paquete importado.");
-      }
+    if (manifestFile == null || packageRoot == null) {
+      print("❌ CRÍTICO: No se encontró 'manifest.json'.");
+      throw Exception("El archivo 'manifest.json' no existe en el paquete importado.");
+    }
 
-      // 5) LEER MANIFEST
-      final manifestContent = await manifestFile.readAsString();
-      final Map<String, dynamic> manifestData = jsonDecode(manifestContent);
+    final manifestContent = await manifestFile.readAsString();
+    final Map<String, dynamic> manifestData = jsonDecode(manifestContent);
 
-      final String isoCode = (manifestData['language_id'] ?? 'unknown').toString();
-      final String packName = (manifestData['pack_name'] ?? 'Importado').toString();
-      final String dbFilename = (manifestData['db_filename'] ?? 'data.db').toString();
+    final String isoCode = (manifestData['language_id'] ?? 'unknown').toString();
+    final String packName = (manifestData['pack_name'] ?? 'Importado').toString();
+    final String dbFilename = (manifestData['db_filename'] ?? 'data.db').toString();
 
-      // 6) COPIAR MULTIMEDIA + CREAR ÍNDICE
-      final MediaIndex mediaIndex = await _processAllMedia(
+    // 5) Media opcional
+    _MediaProcessResult? mediaResult;
+    if (copyMedia) {
+      mediaResult = await _processAllMedia(
         allEntities,
-        packageRoot: packageRoot!,
+        packageRoot: packageRoot,
         extractRoot: extractDir,
       );
+    }
 
-      // 7) ENCONTRAR DB SQLITE
-      File? dbFile;
-      try {
-        final dbEntity = allEntities.firstWhere((e) =>
+    // 6) DB SQLite
+    File? dbFile;
+    try {
+      final dbEntity = allEntities.firstWhere(
+            (e) =>
         e is File &&
             p.basename(e.path).toLowerCase() == dbFilename.toLowerCase() &&
-            !e.path.contains('__MACOSX'));
-        dbFile = dbEntity as File;
-        print("✅ Base de datos encontrada: ${dbFile.path}");
-      } catch (_) {
-        throw Exception("Base de datos '$dbFilename' no encontrada en el paquete.");
-      }
-
-      final sqliteDb = await sql.openDatabase(dbFile.path, readOnly: true);
-
-      // 8) MIGRAR SQLITE -> ISAR
-      await _migrateDataToIsar(sqliteDb, isoCode, packName, mediaIndex, manifestData);
-
-      await sqliteDb.close();
-      print("🎉 Importación completada con éxito.");
-    } catch (e, stackTrace) {
-      print("🔴 ERROR FATAL EN IMPORTACIÓN: $e");
-      print(stackTrace);
-      rethrow;
-    } finally {
-      // Limpieza
-      if (await extractDir.exists()) {
-        try {
-          await extractDir.delete(recursive: true);
-        } catch (e) {
-          print("Aviso: No se pudo borrar carpeta temporal: $e");
-        }
-      }
-      print("🏁 --- PROCESO TERMINADO ---");
+            !e.path.contains('__MACOSX'),
+      );
+      dbFile = dbEntity as File;
+      print("✅ Base de datos encontrada: ${dbFile.path}");
+    } catch (_) {
+      throw Exception("Base de datos '$dbFilename' no encontrada en el paquete.");
     }
+
+    return _PreparedImportPackage(
+      zipFilePath: zipFilePath,
+      extractDir: extractDir,
+      archiveEntriesTotal: archive.length,
+      archiveRealFileEntries: zipFileEntries,
+      extractReport: extractReport,
+      allEntities: allEntities,
+      packageRoot: packageRoot,
+      manifestData: manifestData,
+      isoCode: isoCode,
+      packName: packName,
+      dbFilename: dbFilename,
+      dbFile: dbFile,
+      mediaResult: mediaResult,
+    );
+  }
+
+  String _resolveTargetPackName(String importedPackName, ImportExecutionOptions options) {
+    final custom = options.customPackName?.trim();
+
+    if (options.action == ImportDeckConflictAction.createNewDeck) {
+      if (custom != null && custom.isNotEmpty) {
+        return custom;
+      }
+      return importedPackName;
+    }
+
+    // updateExisting siempre actualiza el mazo con el nombre importado
+    return importedPackName;
+  }
+
+  Future<void> _cleanupExtractDir(Directory extractDir) async {
+    if (await extractDir.exists()) {
+      try {
+        await extractDir.delete(recursive: true);
+      } catch (e) {
+        print("Aviso: No se pudo borrar carpeta temporal: $e");
+      }
+    }
+  }
+
+  Future<bool> _deckExistsByName(String packName) async {
+    final deckSettingsCount =
+    await isar.deckSettings.filter().packNameEqualTo(packName).count();
+    if (deckSettingsCount > 0) return true;
+
+    final flashcardCount =
+    await isar.flashcards.filter().packNameEqualTo(packName).count();
+    return flashcardCount > 0;
   }
 
   // ============================================================
@@ -183,7 +522,6 @@ class ImporterService {
 
       try {
         if (!entry.isFile) {
-          // directorio
           final dir = Directory(outPath);
           if (!await dir.exists()) {
             await dir.create(recursive: true);
@@ -192,14 +530,12 @@ class ImporterService {
           continue;
         }
 
-        // asegurar carpeta padre
         final parentDir = Directory(p.dirname(outPath));
         if (!await parentDir.exists()) {
           await parentDir.create(recursive: true);
           dirsCreated++;
         }
 
-        // evitar overwrite: si existe, renombrar
         String finalPath = outPath;
         if (File(finalPath).existsSync()) {
           finalPath = _makeNonCollidingPath(finalPath);
@@ -211,14 +547,12 @@ class ImporterService {
           await File(finalPath).writeAsBytes(content, flush: true);
           filesWritten++;
         } else {
-          // Fallback raro
           final bytes = entry.content as List<int>;
           await File(finalPath).writeAsBytes(bytes, flush: true);
           filesWritten++;
         }
       } catch (e) {
         errors++;
-        // No abortamos: seguimos para rescatar lo posible
         print("⚠️ Error extrayendo '$rawName' -> '$outPath': $e");
       }
     }
@@ -233,17 +567,14 @@ class ImporterService {
   }
 
   String _normalizeZipEntryName(String name) {
-    // normaliza separadores
     var n = name.replaceAll('\\', '/').trim();
 
-    // quitar / iniciales
     while (n.startsWith('/')) {
       n = n.substring(1);
     }
 
     if (n.isEmpty) return '';
 
-    // proteger zip-slip
     final parts = n.split('/').where((s) => s.isNotEmpty && s != '.').toList();
     if (parts.any((s) => s == '..')) return '';
 
@@ -267,7 +598,7 @@ class ImporterService {
   //  MULTIMEDIA: Copia a media_assets + crea índice robusto
   // ============================================================
 
-  Future<MediaIndex> _processAllMedia(
+  Future<_MediaProcessResult> _processAllMedia(
       List<FileSystemEntity> allEntities, {
         required Directory packageRoot,
         required Directory extractRoot,
@@ -299,11 +630,7 @@ class ImporterService {
 
     int count = 0;
     int skipped = 0;
-
-    // Métricas útiles (colisiones reales)
-    int dupExactKeys = 0;
-    int dupLowerKeys = 0;
-    int dupStemKeys = 0;
+    int dupKeys = 0;
 
     for (final entity in allEntities) {
       if (entity is! File) continue;
@@ -332,86 +659,72 @@ class ImporterService {
         continue;
       }
 
-      // copiar con nombre único (evita colisiones en media_assets)
       final uniqueName = "${_uuid.v4()}$ext";
       final destFile = File(p.join(destDir.path, uniqueName));
       await entity.copy(destFile.path);
 
       final destUri = destFile.uri.toString(); // file:///...
-
       count++;
 
       final relFromPackage = _safeRelative(entity.path, packageRoot.path);
       final relFromExtract = _safeRelative(entity.path, extractRoot.path);
 
-      String safeDecode(String s) {
-        try {
-          return Uri.decodeFull(s);
-        } catch (_) {
-          return s;
-        }
-      }
-
       final keys = <String>{
         fileName,
         fileName.toLowerCase(),
-        safeDecode(fileName).toLowerCase(),
+        Uri.decodeFull(fileName).toLowerCase(),
         relFromPackage,
         relFromPackage.toLowerCase(),
-        safeDecode(relFromPackage).toLowerCase(),
+        Uri.decodeFull(relFromPackage).toLowerCase(),
         relFromExtract,
         relFromExtract.toLowerCase(),
-        safeDecode(relFromExtract).toLowerCase(),
+        Uri.decodeFull(relFromExtract).toLowerCase(),
       };
 
-      // Stem keys (para wav vs mp3, etc)
       final stem1 = p.basenameWithoutExtension(fileName).toLowerCase();
       final stem2 = p.basenameWithoutExtension(relFromPackage).toLowerCase();
       final stem3 = p.basenameWithoutExtension(relFromExtract).toLowerCase();
 
-      // Registrar en mapas (sin pisar si ya existe => más estable)
       for (final k in keys) {
-        final kk = k.trim();
-        if (kk.isEmpty) continue;
-
-        if (exactMap.containsKey(kk)) {
-          dupExactKeys++;
+        if (k.trim().isEmpty) continue;
+        if (exactMap.containsKey(k)) {
+          dupKeys++;
           continue;
         }
-        exactMap[kk] = destUri;
+        exactMap[k] = destUri;
       }
 
       for (final k in keys) {
         final lk = k.toLowerCase().trim();
         if (lk.isEmpty) continue;
-
         if (lowerCaseMap.containsKey(lk)) {
-          dupLowerKeys++;
+          dupKeys++;
           continue;
         }
         lowerCaseMap[lk] = destUri;
       }
 
       for (final s in {stem1, stem2, stem3}) {
-        final ss = s.trim();
-        if (ss.isEmpty) continue;
-        if (!stemMap.containsKey(ss)) {
-          stemMap[ss] = destUri;
+        if (s.trim().isEmpty) continue;
+        if (!stemMap.containsKey(s)) {
+          stemMap[s] = destUri;
         } else {
-          // Colisiones por stem son esperables (mismo nombre con otra extensión).
-          // No rompen el match exacto; solo afectan el fallback.
-          dupStemKeys++;
+          dupKeys++;
         }
       }
     }
 
     print(
       "✅ Multimedia procesada: $count archivos copiados. "
-          "(omitidos: $skipped, colisiones exactas: $dupExactKeys, "
-          "colisiones lowercase: $dupLowerKeys, colisiones stem: $dupStemKeys)",
+          "(omitidos: $skipped, claves duplicadas: $dupKeys)",
     );
 
-    return MediaIndex(exactMap, lowerCaseMap, stemMap);
+    return _MediaProcessResult(
+      index: MediaIndex(exactMap, lowerCaseMap, stemMap),
+      copied: count,
+      skipped: skipped,
+      duplicateKeys: dupKeys,
+    );
   }
 
   String _safeRelative(String fullPath, String from) {
@@ -419,7 +732,6 @@ class ImporterService {
       final rel = p.relative(fullPath, from: from);
       return rel.replaceAll('\\', '/');
     } catch (_) {
-      // Fallback: basename
       return p.basename(fullPath);
     }
   }
@@ -432,87 +744,80 @@ class ImporterService {
   }
 
   // ============================================================
-  //  MIGRACIÓN SQLITE -> ISAR
+  //  MIGRACIÓN SQLITE -> ISAR (nuevo / actualización)
   // ============================================================
 
-  Future<void> _migrateDataToIsar(
+  Future<_MergeImportSummary> _migrateDataToIsar(
       sql.Database db,
       String isoCode,
-      String packName,
+      String importedPackName,
+      String targetPackName,
       MediaIndex mediaIndex,
-      Map<String, dynamic> manifestData,
-      ) async {
+      Map<String, dynamic> manifestData, {
+        required ImportExecutionOptions options,
+        required bool targetDeckExistedBeforeImport,
+      }) async {
     // 1) SETTINGS
-    final settings = DeckSettings()
-      ..packName = packName
-      ..newCardsPerDay = 20
-      ..maxReviewsPerDay = 200
-      ..lapseTolerance = 0
-      ..useFixedIntervalOnLapse = true
-      ..lapseFixedInterval = 1.0
-      ..pMin = 0.90
-      ..alpha = 0.10
-      ..beta = 0.50
-      ..offset = 0.0
-      ..initialNt = 0.015
-      ..learningSteps = [1.0, 4.0]
-      ..newCardMinCorrectReps =
-          int.tryParse((manifestData['new_card_min_correct_reps'] ?? '2').toString()) ?? 2
-      ..newCardIntraDayMinutes =
-          int.tryParse((manifestData['new_card_intra_day_minutes'] ?? '10').toString()) ?? 10
-      ..enableWriteMode = false
-      ..writeModeThreshold = 80
-      ..writeModeMaxReps = 0
-      ..enableUndo = true;
+    final importedSettings = _buildDeckSettingsFromManifest(
+      packName: targetPackName,
+      manifestData: manifestData,
+    );
 
-    // Sobreescribir con manifest.settings si existe
-    if (manifestData.containsKey('settings')) {
-      final Map<String, dynamic> custom = Map<String, dynamic>.from(manifestData['settings']);
+    bool deckSettingsCreated = false;
+    bool deckSettingsUpdated = false;
+    bool deckSettingsPreserved = false;
 
-      print("⚙️ Aplicando configuraciones personalizadas del mazo...");
-
-      if (custom['new_cards_per_day'] != null) settings.newCardsPerDay = custom['new_cards_per_day'];
-      if (custom['max_reviews_per_day'] != null) settings.maxReviewsPerDay = custom['max_reviews_per_day'];
-
-      if (custom['lapse_tolerance'] != null) settings.lapseTolerance = custom['lapse_tolerance'];
-      if (custom['use_fixed_interval_on_lapse'] != null) {
-        settings.useFixedIntervalOnLapse = custom['use_fixed_interval_on_lapse'];
-      }
-      if (custom['lapse_fixed_interval'] != null) {
-        settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
-      }
-
-      if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
-      if (custom['alpha'] != null) settings.alpha = (custom['alpha'] as num).toDouble();
-      if (custom['beta'] != null) settings.beta = (custom['beta'] as num).toDouble();
-      if (custom['offset'] != null) settings.offset = (custom['offset'] as num).toDouble();
-      if (custom['initial_nt'] != null) settings.initialNt = (custom['initial_nt'] as num).toDouble();
-
-      if (custom['learning_steps'] != null) {
-        settings.learningSteps =
-            (custom['learning_steps'] as List).map((e) => (e as num).toDouble()).toList();
-      }
-
-      if (custom['enable_write_mode'] != null) settings.enableWriteMode = custom['enable_write_mode'];
-      if (custom['write_mode_threshold'] != null) settings.writeModeThreshold = custom['write_mode_threshold'];
-      if (custom['write_mode_max_reps'] != null) settings.writeModeMaxReps = custom['write_mode_max_reps'];
-
-      if (custom['enable_undo'] != null) settings.enableUndo = custom['enable_undo'];
-    }
+    final existingSettings =
+    await isar.deckSettings.filter().packNameEqualTo(targetPackName).findFirst();
 
     await isar.writeTxn(() async {
-      await isar.deckSettings.putByIndex('packName', settings);
+      if (existingSettings == null) {
+        await isar.deckSettings.putByIndex('packName', importedSettings);
+        deckSettingsCreated = true;
+      } else {
+        if (options.action == ImportDeckConflictAction.updateExistingDeck &&
+            !options.updateDeckSettingsFromManifest) {
+          deckSettingsPreserved = true;
+        } else if (options.action == ImportDeckConflictAction.createNewDeck &&
+            targetDeckExistedBeforeImport) {
+          // En createNewDeck no deberíamos llegar aquí con conflicto, pero por seguridad:
+          deckSettingsPreserved = true;
+        } else {
+          // Reemplazar settings por las importadas, pero conservar tracking diario
+          importedSettings.id = existingSettings.id;
+          importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
+          importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
+          await isar.deckSettings.putByIndex('packName', importedSettings);
+          deckSettingsUpdated = true;
+        }
+      }
     });
 
-    // 2) TARJETAS
+    // 2) Leer filas SQLite
     final rows = await db.query('flashcards');
     print("🗄️ Importando ${rows.length} registros de la base de datos...");
 
-    final double initialNtValue = settings.initialNt;
-    final List<double> initialQueueValue = settings.learningSteps;
+    final double initialNtValue = importedSettings.initialNt;
 
-    final List<Flashcard> batchToSave = [];
+    // 3) Si es actualización, cargar tarjetas existentes del mazo una vez
+    final Map<String, Flashcard> existingByLogicalKey = {};
+    if (options.action == ImportDeckConflictAction.updateExistingDeck) {
+      final existingCards =
+      await isar.flashcards.filter().packNameEqualTo(targetPackName).findAll();
+      for (final c in existingCards) {
+        existingByLogicalKey[_logicalKey(c.originalId, c.cardType)] = c;
+      }
+      print("🔎 Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.");
+    }
 
+    final List<Flashcard> toInsert = [];
+    final List<Flashcard> toUpdate = [];
+
+    final seenImportKeys = <String>{};
+    int duplicateLogicalCardsInImport = 0;
+    int cardsCreated = 0;
+    int cardsUpdated = 0;
+    int cardsUnchanged = 0;
     int missingWordAudio = 0;
     int missingSentenceAudio = 0;
     int missingImages = 0;
@@ -546,68 +851,258 @@ class ImporterService {
 
       final originalId = row['ID']?.toString() ?? _uuid.v4();
 
-      final cardRecog = Flashcard()
-        ..originalId = originalId
-        ..isoCode = isoCode
-        ..packName = packName
-        ..cardType = "${isoCode}_recog"
-        ..question = (row['PALABRA'] ?? '').toString()
-        ..answer = (row['SIGNIFICADO'] ?? '').toString()
-        ..audioPath = audioPath
-        ..imagePath = imagePath
-        ..sentenceAudioPath = sentenceAudioPath
-        ..sentence = row['ORACION']?.toString()
-        ..translation = row['TRADUCCION']?.toString()
-        ..state = CardState.newCard
-        ..extraDataJson = jsonEncode({
-          "reading": row['LECTURA_PALABRA'],
-          "sentence_reading": row['LECTURA_ORACION'],
-          "forms": row['FORMAS'],
-          "type": "recognition"
-        })
-        ..decayRate = initialNtValue
-        ..fixedPhaseQueue = <double>[]
-        ..learningStep = 0
-        ..consecutiveLapses = 0;
+      final importedCards = _buildCardsFromRow(
+        row: row,
+        originalId: originalId,
+        isoCode: isoCode,
+        packName: targetPackName,
+        audioPath: audioPath,
+        sentenceAudioPath: sentenceAudioPath,
+        imagePath: imagePath,
+        initialNtValue: initialNtValue,
+      );
 
-      final cardProd = Flashcard()
-        ..originalId = originalId
-        ..isoCode = isoCode
-        ..packName = packName
-        ..cardType = "${isoCode}_prod"
-        ..question = (row['SIGNIFICADO'] ?? '').toString()
-        ..answer = (row['PALABRA'] ?? '').toString()
-        ..audioPath = audioPath
-        ..imagePath = imagePath
-        ..sentenceAudioPath = sentenceAudioPath
-        ..sentence = row['TRADUCCION']?.toString()
-        ..translation = row['ORACION']?.toString()
-        ..state = CardState.newCard
-        ..extraDataJson = jsonEncode({
-          "target_reading": row['LECTURA_PALABRA'],
-          "forms": row['FORMAS'],
-          "type": "production"
-        })
-        ..decayRate = initialNtValue
-        ..fixedPhaseQueue = <double>[]
-        ..learningStep = 0
-        ..consecutiveLapses = 0;
+      for (final imported in importedCards) {
+        final key = _logicalKey(imported.originalId, imported.cardType);
 
-      batchToSave.add(cardRecog);
-      batchToSave.add(cardProd);
+        if (!seenImportKeys.add(key)) {
+          duplicateLogicalCardsInImport++;
+          // Nos quedamos con la última versión del ZIP si hay duplicados
+        }
+
+        if (options.action == ImportDeckConflictAction.updateExistingDeck) {
+          final existing = existingByLogicalKey[key];
+          if (existing == null) {
+            toInsert.add(imported);
+            cardsCreated++;
+          } else {
+            if (_importedContentDiffers(existing, imported)) {
+              _applyImportedContent(existing, imported);
+              toUpdate.add(existing);
+              cardsUpdated++;
+            } else {
+              cardsUnchanged++;
+            }
+          }
+        } else {
+          toInsert.add(imported);
+          cardsCreated++;
+        }
+      }
     }
 
-    await isar.writeTxn(() async {
-      await isar.flashcards.putAll(batchToSave);
-    });
+    if (toInsert.isNotEmpty || toUpdate.isNotEmpty) {
+      await isar.writeTxn(() async {
+        if (toInsert.isNotEmpty) {
+          await isar.flashcards.putAll(toInsert);
+        }
+        if (toUpdate.isNotEmpty) {
+          await isar.flashcards.putAll(toUpdate);
+        }
+      });
+    }
 
-    print("🎉 Importación de ${batchToSave.length} tarjetas completada con éxito.");
+    final existingCardsNotPresentInImport =
+    options.action == ImportDeckConflictAction.updateExistingDeck
+        ? ((existingByLogicalKey.length - seenImportKeys.length).clamp(0, 1 << 30) as int)
+        : 0;
+
+    final cardsProcessed = cardsCreated + cardsUpdated + cardsUnchanged;
+
+    print("🎉 Importación de $cardsProcessed tarjetas procesadas.");
     print(
       "🔎 Diagnóstico media: "
           "audio palabra faltante=$missingWordAudio, "
           "audio oración faltante=$missingSentenceAudio, "
           "imágenes faltantes=$missingImages",
     );
+
+    return _MergeImportSummary(
+      sqliteRowsRead: rows.length,
+      cardsProcessed: cardsProcessed,
+      cardsCreated: cardsCreated,
+      cardsUpdated: cardsUpdated,
+      cardsUnchanged: cardsUnchanged,
+      duplicateLogicalCardsInImport: duplicateLogicalCardsInImport,
+      existingCardsNotPresentInImport: existingCardsNotPresentInImport,
+      deckSettingsCreated: deckSettingsCreated,
+      deckSettingsUpdated: deckSettingsUpdated,
+      deckSettingsPreserved: deckSettingsPreserved,
+      missingWordAudio: missingWordAudio,
+      missingSentenceAudio: missingSentenceAudio,
+      missingImages: missingImages,
+    );
+  }
+
+  DeckSettings _buildDeckSettingsFromManifest({
+    required String packName,
+    required Map<String, dynamic> manifestData,
+  }) {
+    final settings = DeckSettings()
+      ..packName = packName
+      ..newCardsPerDay = 20
+      ..maxReviewsPerDay = 200
+      ..lapseTolerance = 0
+      ..useFixedIntervalOnLapse = true
+      ..lapseFixedInterval = 1.0
+      ..pMin = 0.90
+      ..alpha = 0.10
+      ..beta = 0.50
+      ..offset = 0.0
+      ..initialNt = 0.015
+      ..learningSteps = [1.0, 4.0]
+      ..newCardMinCorrectReps =
+          int.tryParse((manifestData['new_card_min_correct_reps'] ?? '2').toString()) ?? 2
+      ..newCardIntraDayMinutes =
+          int.tryParse((manifestData['new_card_intra_day_minutes'] ?? '10').toString()) ?? 10
+      ..enableWriteMode = false
+      ..writeModeThreshold = 80
+      ..writeModeMaxReps = 0;
+
+    if (manifestData.containsKey('settings') && manifestData['settings'] is Map) {
+      final Map<String, dynamic> custom =
+      Map<String, dynamic>.from(manifestData['settings'] as Map);
+
+      print("⚙️ Aplicando configuraciones personalizadas del mazo...");
+
+      if (custom['new_cards_per_day'] != null) {
+        settings.newCardsPerDay = (custom['new_cards_per_day'] as num).toInt();
+      }
+      if (custom['max_reviews_per_day'] != null) {
+        settings.maxReviewsPerDay = (custom['max_reviews_per_day'] as num).toInt();
+      }
+
+      if (custom['lapse_tolerance'] != null) {
+        settings.lapseTolerance = (custom['lapse_tolerance'] as num).toInt();
+      }
+      if (custom['use_fixed_interval_on_lapse'] != null) {
+        settings.useFixedIntervalOnLapse =
+        custom['use_fixed_interval_on_lapse'] as bool;
+      }
+      if (custom['lapse_fixed_interval'] != null) {
+        settings.lapseFixedInterval =
+            (custom['lapse_fixed_interval'] as num).toDouble();
+      }
+
+      if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
+      if (custom['alpha'] != null) settings.alpha = (custom['alpha'] as num).toDouble();
+      if (custom['beta'] != null) settings.beta = (custom['beta'] as num).toDouble();
+      if (custom['offset'] != null) settings.offset = (custom['offset'] as num).toDouble();
+      if (custom['initial_nt'] != null) {
+        settings.initialNt = (custom['initial_nt'] as num).toDouble();
+      }
+
+      if (custom['learning_steps'] != null && custom['learning_steps'] is List) {
+        settings.learningSteps = (custom['learning_steps'] as List)
+            .map((e) => (e as num).toDouble())
+            .toList();
+      }
+
+      if (custom['enable_write_mode'] != null) {
+        settings.enableWriteMode = custom['enable_write_mode'] as bool;
+      }
+      if (custom['write_mode_threshold'] != null) {
+        settings.writeModeThreshold =
+            (custom['write_mode_threshold'] as num).toInt();
+      }
+      if (custom['write_mode_max_reps'] != null) {
+        settings.writeModeMaxReps = (custom['write_mode_max_reps'] as num).toInt();
+      }
+    }
+
+    return settings;
+  }
+
+  List<Flashcard> _buildCardsFromRow({
+    required Map<String, Object?> row,
+    required String originalId,
+    required String isoCode,
+    required String packName,
+    required String? audioPath,
+    required String? sentenceAudioPath,
+    required String? imagePath,
+    required double initialNtValue,
+  }) {
+    final cardRecog = Flashcard()
+      ..originalId = originalId
+      ..isoCode = isoCode
+      ..packName = packName
+      ..cardType = "${isoCode}_recog"
+      ..question = (row['PALABRA'] ?? '').toString()
+      ..answer = (row['SIGNIFICADO'] ?? '').toString()
+      ..audioPath = audioPath
+      ..imagePath = imagePath
+      ..sentenceAudioPath = sentenceAudioPath
+      ..sentence = row['ORACION']?.toString()
+      ..translation = row['TRADUCCION']?.toString()
+      ..state = CardState.newCard
+      ..extraDataJson = jsonEncode({
+        "reading": row['LECTURA_PALABRA'],
+        "sentence_reading": row['LECTURA_ORACION'],
+        "forms": row['FORMAS'],
+        "type": "recognition",
+      })
+      ..decayRate = initialNtValue
+      ..fixedPhaseQueue = <double>[]
+      ..learningStep = 0
+      ..consecutiveLapses = 0;
+
+    final cardProd = Flashcard()
+      ..originalId = originalId
+      ..isoCode = isoCode
+      ..packName = packName
+      ..cardType = "${isoCode}_prod"
+      ..question = (row['SIGNIFICADO'] ?? '').toString()
+      ..answer = (row['PALABRA'] ?? '').toString()
+      ..audioPath = audioPath
+      ..imagePath = imagePath
+      ..sentenceAudioPath = sentenceAudioPath
+      ..sentence = row['TRADUCCION']?.toString()
+      ..translation = row['ORACION']?.toString()
+      ..state = CardState.newCard
+      ..extraDataJson = jsonEncode({
+        "target_reading": row['LECTURA_PALABRA'],
+        "forms": row['FORMAS'],
+        "type": "production",
+      })
+      ..decayRate = initialNtValue
+      ..fixedPhaseQueue = <double>[]
+      ..learningStep = 0
+      ..consecutiveLapses = 0;
+
+    return [cardRecog, cardProd];
+  }
+
+  String _logicalKey(String originalId, String cardType) => '$originalId||$cardType';
+
+  bool _importedContentDiffers(Flashcard existing, Flashcard imported) {
+    return existing.isoCode != imported.isoCode ||
+        existing.packName != imported.packName ||
+        existing.cardType != imported.cardType ||
+        existing.question != imported.question ||
+        existing.answer != imported.answer ||
+        existing.audioPath != imported.audioPath ||
+        existing.sentenceAudioPath != imported.sentenceAudioPath ||
+        existing.imagePath != imported.imagePath ||
+        existing.sentence != imported.sentence ||
+        existing.translation != imported.translation ||
+        existing.extraDataJson != imported.extraDataJson;
+  }
+
+  void _applyImportedContent(Flashcard target, Flashcard imported) {
+    // Preservamos todo el progreso SRS/estado del usuario.
+    target
+      ..isoCode = imported.isoCode
+      ..packName = imported.packName
+      ..cardType = imported.cardType
+      ..question = imported.question
+      ..answer = imported.answer
+      ..audioPath = imported.audioPath
+      ..sentenceAudioPath = imported.sentenceAudioPath
+      ..imagePath = imported.imagePath
+      ..sentence = imported.sentence
+      ..translation = imported.translation
+      ..extraDataJson = imported.extraDataJson;
   }
 
   // ============================================================
@@ -626,6 +1121,74 @@ class ImporterService {
   }
 }
 
+class _PreparedImportPackage {
+  final String zipFilePath;
+  final Directory extractDir;
+
+  final int archiveEntriesTotal;
+  final int archiveRealFileEntries;
+  final _ExtractReport extractReport;
+
+  final List<FileSystemEntity> allEntities;
+  final Directory packageRoot;
+  final Map<String, dynamic> manifestData;
+  final String isoCode;
+  final String packName;
+  final String dbFilename;
+  final File dbFile;
+  final _MediaProcessResult? mediaResult;
+
+  const _PreparedImportPackage({
+    required this.zipFilePath,
+    required this.extractDir,
+    required this.archiveEntriesTotal,
+    required this.archiveRealFileEntries,
+    required this.extractReport,
+    required this.allEntities,
+    required this.packageRoot,
+    required this.manifestData,
+    required this.isoCode,
+    required this.packName,
+    required this.dbFilename,
+    required this.dbFile,
+    required this.mediaResult,
+  });
+}
+
+class _MergeImportSummary {
+  final int sqliteRowsRead;
+  final int cardsProcessed;
+  final int cardsCreated;
+  final int cardsUpdated;
+  final int cardsUnchanged;
+  final int duplicateLogicalCardsInImport;
+  final int existingCardsNotPresentInImport;
+
+  final bool deckSettingsCreated;
+  final bool deckSettingsUpdated;
+  final bool deckSettingsPreserved;
+
+  final int missingWordAudio;
+  final int missingSentenceAudio;
+  final int missingImages;
+
+  const _MergeImportSummary({
+    required this.sqliteRowsRead,
+    required this.cardsProcessed,
+    required this.cardsCreated,
+    required this.cardsUpdated,
+    required this.cardsUnchanged,
+    required this.duplicateLogicalCardsInImport,
+    required this.existingCardsNotPresentInImport,
+    required this.deckSettingsCreated,
+    required this.deckSettingsUpdated,
+    required this.deckSettingsPreserved,
+    required this.missingWordAudio,
+    required this.missingSentenceAudio,
+    required this.missingImages,
+  });
+}
+
 class _ExtractReport {
   final int filesWritten;
   final int dirsCreated;
@@ -639,6 +1202,20 @@ class _ExtractReport {
     required this.collisions,
     required this.skipped,
     required this.errors,
+  });
+}
+
+class _MediaProcessResult {
+  final MediaIndex index;
+  final int copied;
+  final int skipped;
+  final int duplicateKeys;
+
+  const _MediaProcessResult({
+    required this.index,
+    required this.copied,
+    required this.skipped,
+    required this.duplicateKeys,
   });
 }
 
