@@ -59,6 +59,8 @@ class SrsService {
   // =========================
 
   bool _handleLearningSuccess(Flashcard card, DeckSettings settings, DateTime now) {
+    // Reset streak de lapses cuando el usuario acierta (evita arrastre desde learning).
+    card.consecutiveLapses = 0;
     // Si no hay pasos, por seguridad calculamos con algoritmo.
     if (card.fixedPhaseQueue.isEmpty) {
       card.state = CardState.review;
@@ -90,12 +92,7 @@ class SrsService {
     return false;
   }
 
-  bool _handleLearningFailure(
-      Flashcard card,
-      DeckSettings settings,
-      DateTime now,
-      ) {
-    card.consecutiveLapses++;
+  bool _handleLearningFailure(Flashcard card, DeckSettings settings, DateTime now,) {
     card.learningStep = -1;
 
     // Reiniciar cola de pasos (no la reescribimos si ya existía, solo si está vacía)
@@ -110,11 +107,9 @@ class SrsService {
   // Review
   // =========================
 
-  bool _applyEbbinghausFailure(
-      Flashcard card,
-      DeckSettings settings,
-      DateTime now,
-      ) {
+  bool _applyEbbinghausFailure(Flashcard card, DeckSettings settings, DateTime now,) {
+    // Fallo en REVIEW: incrementa la racha de lapses para que lapseTolerance funcione.
+    card.consecutiveLapses++;
     // Fallo: el olvido se hace más rápido (nt sube).
     card.decayRate = card.decayRate * (1.0 + settings.beta);
 
@@ -147,11 +142,9 @@ class SrsService {
     }
   }
 
-  void _applyEbbinghausSuccess(
-      Flashcard card,
-      DeckSettings settings,
-      DateTime now,
-      ) {
+  void _applyEbbinghausSuccess(Flashcard card, DeckSettings settings, DateTime now,) {
+    // Éxito en REVIEW: reinicia la racha de lapses.
+    card.consecutiveLapses = 0;
     // Éxito: el olvido se hace más lento (nt baja).
     card.decayRate = card.decayRate * (1.0 - settings.alpha);
 
@@ -169,11 +162,7 @@ class SrsService {
     }
   }
 
-  void _calculateAndSchedule(
-      Flashcard card,
-      DeckSettings settings,
-      DateTime now,
-      ) {
+  void _calculateAndSchedule(Flashcard card, DeckSettings settings, DateTime now,) {
     // Fórmula: Intervalo = (-ln(P_min) / nt) - Offset
     final pMinSafe = settings.pMin.clamp(1e-6, 0.999999).toDouble();
     final numerator = -log(pMinSafe);
@@ -197,11 +186,7 @@ class SrsService {
   // Helpers: fixed queue init
   // =========================
 
-  void _ensureFixedQueueInitialized(
-      Flashcard card,
-      DeckSettings settings, {
-        bool forNewCard = false,
-      }) {
+  void _ensureFixedQueueInitialized(Flashcard card, DeckSettings settings, {bool forNewCard = false,}) {
     // IMPORTANTE:
     // Para tarjetas NUEVAS, SIEMPRE reconstruimos la cola para inyectar
     // los pasos intra-día (newCardMinCorrectReps / newCardIntraDayMinutes),
