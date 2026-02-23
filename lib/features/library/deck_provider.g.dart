@@ -6,7 +6,7 @@ part of 'deck_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$decksStreamHash() => r'2e95a5bb6460fdc74ffd2ffb4936f3b89d05987d';
+String _$decksStreamHash() => r'8b23ea1bedd44d3b6de9913fa6348d43e6e08b8a';
 
 /// See also [decksStream].
 @ProviderFor(decksStream)
@@ -167,6 +167,151 @@ class _DeleteDeckProviderElement extends FutureProviderElement<void>
 
   @override
   String get packName => (origin as DeleteDeckProvider).packName;
+}
+
+String _$renameDeckHash() => r'87656b014d883703c5f235cec9dfe731d8205fdd';
+
+/// See also [renameDeck].
+@ProviderFor(renameDeck)
+const renameDeckProvider = RenameDeckFamily();
+
+/// See also [renameDeck].
+class RenameDeckFamily extends Family<AsyncValue<void>> {
+  /// See also [renameDeck].
+  const RenameDeckFamily();
+
+  /// See also [renameDeck].
+  RenameDeckProvider call(
+    String oldPackName,
+    String newPackName,
+  ) {
+    return RenameDeckProvider(
+      oldPackName,
+      newPackName,
+    );
+  }
+
+  @override
+  RenameDeckProvider getProviderOverride(
+    covariant RenameDeckProvider provider,
+  ) {
+    return call(
+      provider.oldPackName,
+      provider.newPackName,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'renameDeckProvider';
+}
+
+/// See also [renameDeck].
+class RenameDeckProvider extends FutureProvider<void> {
+  /// See also [renameDeck].
+  RenameDeckProvider(
+    String oldPackName,
+    String newPackName,
+  ) : this._internal(
+          (ref) => renameDeck(
+            ref as RenameDeckRef,
+            oldPackName,
+            newPackName,
+          ),
+          from: renameDeckProvider,
+          name: r'renameDeckProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$renameDeckHash,
+          dependencies: RenameDeckFamily._dependencies,
+          allTransitiveDependencies:
+              RenameDeckFamily._allTransitiveDependencies,
+          oldPackName: oldPackName,
+          newPackName: newPackName,
+        );
+
+  RenameDeckProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.oldPackName,
+    required this.newPackName,
+  }) : super.internal();
+
+  final String oldPackName;
+  final String newPackName;
+
+  @override
+  Override overrideWith(
+    FutureOr<void> Function(RenameDeckRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: RenameDeckProvider._internal(
+        (ref) => create(ref as RenameDeckRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        oldPackName: oldPackName,
+        newPackName: newPackName,
+      ),
+    );
+  }
+
+  @override
+  FutureProviderElement<void> createElement() {
+    return _RenameDeckProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RenameDeckProvider &&
+        other.oldPackName == oldPackName &&
+        other.newPackName == newPackName;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, oldPackName.hashCode);
+    hash = _SystemHash.combine(hash, newPackName.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin RenameDeckRef on FutureProviderRef<void> {
+  /// The parameter `oldPackName` of this provider.
+  String get oldPackName;
+
+  /// The parameter `newPackName` of this provider.
+  String get newPackName;
+}
+
+class _RenameDeckProviderElement extends FutureProviderElement<void>
+    with RenameDeckRef {
+  _RenameDeckProviderElement(super.provider);
+
+  @override
+  String get oldPackName => (origin as RenameDeckProvider).oldPackName;
+  @override
+  String get newPackName => (origin as RenameDeckProvider).newPackName;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

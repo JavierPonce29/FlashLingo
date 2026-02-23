@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
@@ -24,7 +26,6 @@ class HomePage extends ConsumerWidget {
         title: const Text("Anki Flutter"),
         elevation: 2,
         actions: [
-          // BOTÓN DEBUG: máquina del tiempo
           IconButton(
             icon: const Icon(Icons.history_toggle_off),
             tooltip: "Simular paso del tiempo (+1 día)",
@@ -47,28 +48,162 @@ class HomePage extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.library_books, size: 64, color: Colors.grey),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   const Text(
-                    "No tienes mazos aún.",
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                    "No hay mazos aún.\nImporta uno para empezar.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () => HomeImportHelper.pickAndImportFile(context, ref),
-                    icon: const Icon(Icons.file_upload),
-                    label: const Text("Importar .flashjp / .zip"),
+                    icon: const Icon(Icons.add),
+                    label: const Text("Importar Mazo"),
+                    onPressed: () =>
+                        HomeImportHelper.pickAndImportFile(context, ref),
                   ),
                 ],
               ),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(10),
+          return ListView.separated(
+            padding: const EdgeInsets.all(12),
             itemCount: decks.length,
+            separatorBuilder: (_, __) => const Divider(height: 2),
             itemBuilder: (context, index) {
               final deck = decks[index];
-              return _buildDeckItem(context, ref, deck);
+              final firstStepDue = deck.firstStepDue;
+
+              return Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  leading: _DeckIcon(iconUri: deck.iconUri),
+                  title: Text(
+                    deck.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      if (deck.newCardsDue > 0)
+                        Text(
+                          "Nuevas: ${deck.newCardsDue}  ",
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      if (firstStepDue > 0)
+                        Text(
+                          "Paso 1: $firstStepDue  ",
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      if (deck.reviewCardsDue > 0)
+                        Text(
+                          "Repaso: ${deck.reviewCardsDue}",
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      if (deck.newCardsDue == 0 &&
+                          firstStepDue == 0 &&
+                          deck.reviewCardsDue == 0)
+                        const Text("¡Al día!", style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DeckOverviewPage(packName: deck.name),
+                      ),
+                    );
+                  },
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'settings') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DeckSettingsPage(packName: deck.name),
+                          ),
+                        );
+                      } else if (value == 'browse') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FlashcardBrowserPage(packName: deck.name),
+                          ),
+                        );
+                      } else if (value == 'stats') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StatsPage(packName: deck.name),
+                          ),
+                        );
+                      } else if (value == 'rename') {
+                        _showRenameDeckDialog(context, ref, deck.name);
+                      } else if (value == 'delete') {
+                        _confirmDelete(context, ref, deck.name);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<String>(
+                        value: 'settings',
+                        child: ListTile(
+                          leading: Icon(Icons.tune),
+                          title: Text('Configuración'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'browse',
+                        child: ListTile(
+                          leading: Icon(Icons.list),
+                          title: Text('Explorar'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'stats',
+                        child: ListTile(
+                          leading: Icon(Icons.bar_chart),
+                          title: Text('Estadísticas'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'rename',
+                        child: ListTile(
+                          leading: Icon(Icons.edit),
+                          title: Text('Renombrar'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(Icons.delete, color: Colors.red),
+                          title: Text('Borrar', style: TextStyle(color: Colors.red)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             },
           );
         },
@@ -76,220 +211,119 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDeckItem(BuildContext context, WidgetRef ref, DeckSummary deck) {
-    // Compatibilidad: si tu DeckSummary aún no tiene firstStepDue en algún punto,
-    // este acceso dinámico evita romper la UI.
-    int firstStepDue = 0;
-    try {
-      final dynamic d = deck;
-      final dynamic v = d.firstStepDue;
-      if (v is int) firstStepDue = v;
-    } catch (_) {
-      firstStepDue = 0;
-    }
-
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 10,
-        ),
-        title: Text(
-          deck.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        subtitle: Row(
-          children: [
-            if (deck.newCardsDue > 0)
-              Text(
-                "Nuevas: ${deck.newCardsDue}  ",
-                style: const TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            if (firstStepDue > 0)
-              Text(
-                "Paso 1: $firstStepDue  ",
-                style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            if (deck.reviewCardsDue > 0)
-              Text(
-                "Repaso: ${deck.reviewCardsDue}",
-                style: const TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            if (deck.newCardsDue == 0 &&
-                firstStepDue == 0 &&
-                deck.reviewCardsDue == 0)
-              const Text("¡Al día!", style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DeckOverviewPage(packName: deck.name),
-            ),
-          );
-        },
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'settings') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DeckSettingsPage(packName: deck.name),
-                ),
-              );
-            } else if (value == 'browse') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => FlashcardBrowserPage(packName: deck.name),
-                ),
-              );
-            } else if (value == 'stats') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => StatsPage(packName: deck.name),
-                ),
-              );
-            } else if (value == 'delete') {
-              _confirmDelete(context, ref, deck.name);
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem<String>(
-              value: 'settings',
-              child: ListTile(
-                leading: Icon(Icons.tune),
-                title: Text('Configuración'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem<String>(
-              value: 'browse',
-              child: ListTile(
-                leading: Icon(Icons.list),
-                title: Text('Explorar Cartas'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem<String>(
-              value: 'stats',
-              child: ListTile(
-                leading: Icon(Icons.bar_chart),
-                title: Text('Estadísticas'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem<String>(
-              value: 'delete',
-              child: ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text(
-                  'Eliminar Mazo',
-                  style: TextStyle(color: Colors.red),
-                ),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-        ),
+  Future<void> _confirmDelete(
+      BuildContext context,
+      WidgetRef ref,
+      String packName,
+      ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Eliminar mazo"),
+        content: Text("¿Seguro que quieres eliminar el mazo '$packName'?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancelar"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Eliminar"),
+          ),
+        ],
       ),
+    );
+
+    if (confirm != true) return;
+
+    await ref.read(deleteDeckProvider(packName).future);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Mazo eliminado")),
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, String packName) {
-    showDialog(
+  Future<void> _showRenameDeckDialog(
+      BuildContext context,
+      WidgetRef ref,
+      String oldName,
+      ) async {
+    final controller = TextEditingController(text: oldName);
+
+    final newName = await showDialog<String?>(
       context: context,
       builder: (ctx) {
-        bool deleting = false;
-
-        return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            title: Text("Eliminar $packName"),
-            content: const Text(
-              "¿Estás seguro? Se borrarán todas las tarjetas y su progreso.",
+        return AlertDialog(
+          title: const Text('Renombrar mazo'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Nuevo nombre',
+              border: OutlineInputBorder(),
             ),
-            actions: [
-              TextButton(
-                onPressed: deleting ? null : () => Navigator.pop(ctx),
-                child: const Text("Cancelar"),
-              ),
-              TextButton(
-                onPressed: deleting
-                    ? null
-                    : () async {
-                  setState(() => deleting = true);
-                  try {
-                    await ref.read(deleteDeckProvider(packName).future);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Mazo eliminado."),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Error al eliminar: $e"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-                child: deleting
-                    ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Text(
-                  "Eliminar",
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final v = controller.text.trim();
+                Navigator.pop(ctx, v);
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
         );
       },
     );
+
+    final trimmed = newName?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed == oldName) return;
+
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await ref.read(renameDeckProvider(oldName, trimmed).future);
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Mazo renombrado a '$trimmed'")),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No se pudo renombrar: $e")),
+      );
+    }
   }
 
-  // --- MÁQUINA DEL TIEMPO (DEBUG) ---
-  Future<void> _showTimeMachineDialog(BuildContext context, WidgetRef ref) async {
+  void _showTimeMachineDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Máquina del Tiempo 🕒"),
+      builder: (_) => AlertDialog(
+        title: const Text("Máquina del Tiempo"),
         content: const Text(
-          "Esto adelantará TODAS las fechas de repaso en 1 día para simular que pasó el tiempo. ¿Continuar?",
+          "Esto mueve todas las tarjetas 1 día hacia atrás (para que queden vencidas).",
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(context),
             child: const Text("Cancelar"),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(ctx);
+              Navigator.pop(context);
               await _applyTimeTravel(ref);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -321,5 +355,51 @@ class HomePage extends ConsumerWidget {
         await isar.deckSettings.put(s);
       }
     });
+  }
+}
+
+class _DeckIcon extends StatelessWidget {
+  final String? iconUri;
+  final double size;
+
+  const _DeckIcon({
+    required this.iconUri,
+    this.size = 52,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.asset(
+        'lib/assets/images/deck_default.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ),
+    );
+
+    final uriStr = iconUri?.trim();
+    if (uriStr == null || uriStr.isEmpty) return fallback;
+
+    try {
+      final uri = Uri.parse(uriStr);
+      final file = uri.scheme == 'file' ? File.fromUri(uri) : File(uriStr);
+
+      if (!file.existsSync()) return fallback;
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.file(
+          file,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    } catch (_) {
+      return fallback;
+    }
   }
 }

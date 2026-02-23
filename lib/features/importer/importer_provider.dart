@@ -26,7 +26,7 @@ ImporterService importerService(ImporterServiceRef ref) {
 
 /// Controlador de importación para UI:
 /// - expone loading/error
-/// - permite preview + import normal + import avanzado
+/// - permite preview + import (legacy wrapper) + import avanzado
 @riverpod
 class ImporterController extends _$ImporterController {
   @override
@@ -49,14 +49,27 @@ class ImporterController extends _$ImporterController {
     }
   }
 
-  /// Importación "legacy" (compatibilidad): si hay conflicto, el service lanza
-  /// [ImportConflictException] y la UI decide qué hacer.
+  /// Importación "legacy" (compatibilidad):
+  /// - Si el ImporterService tiene `importFlashcardPackage()`, la usa.
+  /// - Si no existe (tu caso), usa `importFlashcardPackageAdvanced(createNew)` como fallback.
   Future<void> importFlashcardPackage(String zipFilePath) async {
     final service = ref.read(importerServiceProvider);
 
     state = const AsyncLoading();
     try {
-      await service.importFlashcardPackage(zipFilePath);
+      final dyn = service as dynamic;
+
+      // Intentar el método antiguo si existe
+      try {
+        await dyn.importFlashcardPackage(zipFilePath);
+      } on NoSuchMethodError {
+        // Fallback a la API actual
+        await service.importFlashcardPackageAdvanced(
+          zipFilePath,
+          options: const ImportExecutionOptions.createNew(),
+        );
+      }
+
       state = const AsyncData(null);
     } catch (e, st) {
       state = AsyncError(e, st);

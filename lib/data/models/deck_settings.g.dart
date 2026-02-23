@@ -37,108 +37,113 @@ const DeckSettingsSchema = CollectionSchema(
       name: r'dayCutoffMinute',
       type: IsarType.long,
     ),
-    r'enableUndo': PropertySchema(
+    r'deckIconUri': PropertySchema(
       id: 4,
+      name: r'deckIconUri',
+      type: IsarType.string,
+    ),
+    r'enableUndo': PropertySchema(
+      id: 5,
       name: r'enableUndo',
       type: IsarType.bool,
     ),
     r'enableWriteMode': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'enableWriteMode',
       type: IsarType.bool,
     ),
     r'initialNt': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'initialNt',
       type: IsarType.double,
     ),
     r'interleaveNewCardsCount': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'interleaveNewCardsCount',
       type: IsarType.long,
     ),
     r'interleaveReviewsCount': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'interleaveReviewsCount',
       type: IsarType.long,
     ),
     r'lapseFixedInterval': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'lapseFixedInterval',
       type: IsarType.double,
     ),
     r'lapseTolerance': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'lapseTolerance',
       type: IsarType.long,
     ),
     r'lastNewCardStudyDate': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'lastNewCardStudyDate',
       type: IsarType.dateTime,
     ),
     r'learningSteps': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'learningSteps',
       type: IsarType.doubleList,
     ),
     r'maxReviewsPerDay': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'maxReviewsPerDay',
       type: IsarType.long,
     ),
     r'newCardIntraDayMinutes': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'newCardIntraDayMinutes',
       type: IsarType.long,
     ),
     r'newCardMinCorrectReps': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'newCardMinCorrectReps',
       type: IsarType.long,
     ),
     r'newCardsPerDay': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'newCardsPerDay',
       type: IsarType.long,
     ),
     r'newCardsSeenToday': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'newCardsSeenToday',
       type: IsarType.long,
     ),
     r'offset': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'offset',
       type: IsarType.double,
     ),
     r'pMin': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'pMin',
       type: IsarType.double,
     ),
     r'packName': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'packName',
       type: IsarType.string,
     ),
     r'studyMixMode': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'studyMixMode',
       type: IsarType.string,
     ),
     r'useFixedIntervalOnLapse': PropertySchema(
-      id: 22,
+      id: 23,
       name: r'useFixedIntervalOnLapse',
       type: IsarType.bool,
     ),
     r'writeModeMaxReps': PropertySchema(
-      id: 23,
+      id: 24,
       name: r'writeModeMaxReps',
       type: IsarType.long,
     ),
     r'writeModeThreshold': PropertySchema(
-      id: 24,
+      id: 25,
       name: r'writeModeThreshold',
       type: IsarType.long,
     )
@@ -177,6 +182,12 @@ int _deckSettingsEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.deckIconUri;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.learningSteps.length * 8;
   bytesCount += 3 + object.packName.length * 3;
   bytesCount += 3 + object.studyMixMode.length * 3;
@@ -193,27 +204,28 @@ void _deckSettingsSerialize(
   writer.writeDouble(offsets[1], object.beta);
   writer.writeLong(offsets[2], object.dayCutoffHour);
   writer.writeLong(offsets[3], object.dayCutoffMinute);
-  writer.writeBool(offsets[4], object.enableUndo);
-  writer.writeBool(offsets[5], object.enableWriteMode);
-  writer.writeDouble(offsets[6], object.initialNt);
-  writer.writeLong(offsets[7], object.interleaveNewCardsCount);
-  writer.writeLong(offsets[8], object.interleaveReviewsCount);
-  writer.writeDouble(offsets[9], object.lapseFixedInterval);
-  writer.writeLong(offsets[10], object.lapseTolerance);
-  writer.writeDateTime(offsets[11], object.lastNewCardStudyDate);
-  writer.writeDoubleList(offsets[12], object.learningSteps);
-  writer.writeLong(offsets[13], object.maxReviewsPerDay);
-  writer.writeLong(offsets[14], object.newCardIntraDayMinutes);
-  writer.writeLong(offsets[15], object.newCardMinCorrectReps);
-  writer.writeLong(offsets[16], object.newCardsPerDay);
-  writer.writeLong(offsets[17], object.newCardsSeenToday);
-  writer.writeDouble(offsets[18], object.offset);
-  writer.writeDouble(offsets[19], object.pMin);
-  writer.writeString(offsets[20], object.packName);
-  writer.writeString(offsets[21], object.studyMixMode);
-  writer.writeBool(offsets[22], object.useFixedIntervalOnLapse);
-  writer.writeLong(offsets[23], object.writeModeMaxReps);
-  writer.writeLong(offsets[24], object.writeModeThreshold);
+  writer.writeString(offsets[4], object.deckIconUri);
+  writer.writeBool(offsets[5], object.enableUndo);
+  writer.writeBool(offsets[6], object.enableWriteMode);
+  writer.writeDouble(offsets[7], object.initialNt);
+  writer.writeLong(offsets[8], object.interleaveNewCardsCount);
+  writer.writeLong(offsets[9], object.interleaveReviewsCount);
+  writer.writeDouble(offsets[10], object.lapseFixedInterval);
+  writer.writeLong(offsets[11], object.lapseTolerance);
+  writer.writeDateTime(offsets[12], object.lastNewCardStudyDate);
+  writer.writeDoubleList(offsets[13], object.learningSteps);
+  writer.writeLong(offsets[14], object.maxReviewsPerDay);
+  writer.writeLong(offsets[15], object.newCardIntraDayMinutes);
+  writer.writeLong(offsets[16], object.newCardMinCorrectReps);
+  writer.writeLong(offsets[17], object.newCardsPerDay);
+  writer.writeLong(offsets[18], object.newCardsSeenToday);
+  writer.writeDouble(offsets[19], object.offset);
+  writer.writeDouble(offsets[20], object.pMin);
+  writer.writeString(offsets[21], object.packName);
+  writer.writeString(offsets[22], object.studyMixMode);
+  writer.writeBool(offsets[23], object.useFixedIntervalOnLapse);
+  writer.writeLong(offsets[24], object.writeModeMaxReps);
+  writer.writeLong(offsets[25], object.writeModeThreshold);
 }
 
 DeckSettings _deckSettingsDeserialize(
@@ -227,28 +239,29 @@ DeckSettings _deckSettingsDeserialize(
   object.beta = reader.readDouble(offsets[1]);
   object.dayCutoffHour = reader.readLongOrNull(offsets[2]);
   object.dayCutoffMinute = reader.readLongOrNull(offsets[3]);
-  object.enableUndo = reader.readBool(offsets[4]);
-  object.enableWriteMode = reader.readBool(offsets[5]);
+  object.deckIconUri = reader.readStringOrNull(offsets[4]);
+  object.enableUndo = reader.readBool(offsets[5]);
+  object.enableWriteMode = reader.readBool(offsets[6]);
   object.id = id;
-  object.initialNt = reader.readDouble(offsets[6]);
-  object.interleaveNewCardsCount = reader.readLong(offsets[7]);
-  object.interleaveReviewsCount = reader.readLong(offsets[8]);
-  object.lapseFixedInterval = reader.readDouble(offsets[9]);
-  object.lapseTolerance = reader.readLong(offsets[10]);
-  object.lastNewCardStudyDate = reader.readDateTimeOrNull(offsets[11]);
-  object.learningSteps = reader.readDoubleList(offsets[12]) ?? [];
-  object.maxReviewsPerDay = reader.readLong(offsets[13]);
-  object.newCardIntraDayMinutes = reader.readLong(offsets[14]);
-  object.newCardMinCorrectReps = reader.readLong(offsets[15]);
-  object.newCardsPerDay = reader.readLong(offsets[16]);
-  object.newCardsSeenToday = reader.readLong(offsets[17]);
-  object.offset = reader.readDouble(offsets[18]);
-  object.pMin = reader.readDouble(offsets[19]);
-  object.packName = reader.readString(offsets[20]);
-  object.studyMixMode = reader.readString(offsets[21]);
-  object.useFixedIntervalOnLapse = reader.readBool(offsets[22]);
-  object.writeModeMaxReps = reader.readLong(offsets[23]);
-  object.writeModeThreshold = reader.readLong(offsets[24]);
+  object.initialNt = reader.readDouble(offsets[7]);
+  object.interleaveNewCardsCount = reader.readLong(offsets[8]);
+  object.interleaveReviewsCount = reader.readLong(offsets[9]);
+  object.lapseFixedInterval = reader.readDouble(offsets[10]);
+  object.lapseTolerance = reader.readLong(offsets[11]);
+  object.lastNewCardStudyDate = reader.readDateTimeOrNull(offsets[12]);
+  object.learningSteps = reader.readDoubleList(offsets[13]) ?? [];
+  object.maxReviewsPerDay = reader.readLong(offsets[14]);
+  object.newCardIntraDayMinutes = reader.readLong(offsets[15]);
+  object.newCardMinCorrectReps = reader.readLong(offsets[16]);
+  object.newCardsPerDay = reader.readLong(offsets[17]);
+  object.newCardsSeenToday = reader.readLong(offsets[18]);
+  object.offset = reader.readDouble(offsets[19]);
+  object.pMin = reader.readDouble(offsets[20]);
+  object.packName = reader.readString(offsets[21]);
+  object.studyMixMode = reader.readString(offsets[22]);
+  object.useFixedIntervalOnLapse = reader.readBool(offsets[23]);
+  object.writeModeMaxReps = reader.readLong(offsets[24]);
+  object.writeModeThreshold = reader.readLong(offsets[25]);
   return object;
 }
 
@@ -268,25 +281,25 @@ P _deckSettingsDeserializeProp<P>(
     case 3:
       return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 7:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 8:
       return (reader.readLong(offset)) as P;
     case 9:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 11:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 12:
-      return (reader.readDoubleList(offset) ?? []) as P;
-    case 13:
       return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 13:
+      return (reader.readDoubleList(offset) ?? []) as P;
     case 14:
       return (reader.readLong(offset)) as P;
     case 15:
@@ -296,18 +309,20 @@ P _deckSettingsDeserializeProp<P>(
     case 17:
       return (reader.readLong(offset)) as P;
     case 18:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 19:
       return (reader.readDouble(offset)) as P;
     case 20:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 21:
       return (reader.readString(offset)) as P;
     case 22:
-      return (reader.readBool(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 23:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 24:
+      return (reader.readLong(offset)) as P;
+    case 25:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -778,6 +793,160 @@ extension DeckSettingsQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'deckIconUri',
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'deckIconUri',
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'deckIconUri',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'deckIconUri',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'deckIconUri',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deckIconUri',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+      deckIconUriIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'deckIconUri',
+        value: '',
       ));
     });
   }
@@ -2245,6 +2414,19 @@ extension DeckSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> sortByDeckIconUri() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deckIconUri', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      sortByDeckIconUriDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deckIconUri', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> sortByEnableUndo() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableUndo', Sort.asc);
@@ -2569,6 +2751,19 @@ extension DeckSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> thenByDeckIconUri() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deckIconUri', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
+      thenByDeckIconUriDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deckIconUri', Sort.desc);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy> thenByEnableUndo() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableUndo', Sort.asc);
@@ -2880,6 +3075,13 @@ extension DeckSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByDeckIconUri(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'deckIconUri', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByEnableUndo() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'enableUndo');
@@ -3053,6 +3255,12 @@ extension DeckSettingsQueryProperty
   QueryBuilder<DeckSettings, int?, QQueryOperations> dayCutoffMinuteProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'dayCutoffMinute');
+    });
+  }
+
+  QueryBuilder<DeckSettings, String?, QQueryOperations> deckIconUriProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'deckIconUri');
     });
   }
 

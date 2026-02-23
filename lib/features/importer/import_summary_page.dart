@@ -7,9 +7,88 @@ class ImportSummaryPage extends StatelessWidget {
 
   const ImportSummaryPage({super.key, required this.summary});
 
+  // Helpers para compatibilidad entre versiones distintas de ImportSummary.
+  T? _try<T>(T Function(dynamic s) getter) {
+    try {
+      return getter(summary as dynamic);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _s(String? v, {String fallback = '—'}) {
+    final t = v?.trim();
+    return (t == null || t.isEmpty) ? fallback : t;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isUpdate = summary.action == ImportDeckConflictAction.updateExistingDeck;
+    // -------- Compat: campos básicos --------
+    final action = _try<ImportDeckConflictAction?>((s) => s.action);
+
+    final zipFileName = _s(_try<String?>((s) => s.zipFileName));
+    final importedPackName = _s(_try<String?>((s) => s.importedPackName));
+
+    final finalPackName = _s(
+      _try<String?>((s) => s.finalPackName) ?? _try<String?>((s) => s.targetPackName),
+    );
+
+    final isoCode = _s(_try<String?>((s) => s.isoCode));
+
+    // -------- Compat: settings flags --------
+    final deckSettingsCreated = _try<bool?>((s) => s.deckSettingsCreated) ?? false;
+    final deckSettingsUpdated = _try<bool?>((s) => s.deckSettingsUpdated) ?? false;
+    final deckSettingsPreserved = _try<bool?>((s) => s.deckSettingsPreserved) ?? false;
+
+    // -------- Compat: info “update/new” --------
+    final targetDeckExistedBeforeImport =
+    _try<bool?>((s) => s.targetDeckExistedBeforeImport);
+
+    final bool isUpdate = action == ImportDeckConflictAction.updateExistingDeck ||
+        (action == null && (deckSettingsUpdated || deckSettingsPreserved));
+
+    // -------- Compat: tarjetas --------
+    final cardsCreated = _try<int?>((s) => s.cardsCreated) ?? 0;
+    final cardsUpdated = _try<int?>((s) => s.cardsUpdated) ?? 0;
+    final cardsUnchanged = _try<int?>((s) => s.cardsUnchanged) ?? 0;
+
+    // Algunas versiones tenían cardsProcessed; si no existe, lo calculamos.
+    final cardsProcessed = _try<int?>((s) => s.cardsProcessed) ??
+        (cardsCreated + cardsUpdated + cardsUnchanged);
+
+    final sqliteRowsRead =
+        _try<int?>((s) => s.sqliteRowsRead) ?? _try<int?>((s) => s.sqliteRows);
+
+    final duplicateLogicalCardsInImport =
+    _try<int?>((s) => s.duplicateLogicalCardsInImport);
+
+    final existingCardsNotPresentInImport =
+    _try<int?>((s) => s.existingCardsNotPresentInImport);
+
+    // -------- Compat: extracción/zip --------
+    final zipEntriesTotal =
+        _try<int?>((s) => s.zipEntriesTotal) ?? _try<int?>((s) => s.archiveEntriesTotal);
+
+    final zipRealFileEntries =
+        _try<int?>((s) => s.zipRealFileEntries) ?? _try<int?>((s) => s.archiveRealFileEntries);
+
+    final extractedFilesWritten = _try<int?>((s) => s.extractedFilesWritten);
+    final extractedDirsCreated = _try<int?>((s) => s.extractedDirsCreated);
+    final extractedCollisions = _try<int?>((s) => s.extractedCollisions);
+    final extractedSkipped = _try<int?>((s) => s.extractedSkipped);
+    final extractedErrors = _try<int?>((s) => s.extractedErrors);
+
+    // -------- Compat: media copiada --------
+    final mediaFilesCopied = _try<int?>((s) => s.mediaFilesCopied);
+    final mediaFilesSkipped = _try<int?>((s) => s.mediaFilesSkipped);
+
+    final mediaDuplicateKeys =
+        _try<int?>((s) => s.mediaDuplicateKeys) ?? _try<int?>((s) => s.mediaKeyCollisions);
+
+    // -------- Compat: diagnóstico de media en tarjetas --------
+    final missingWordAudio = _try<int?>((s) => s.missingWordAudio);
+    final missingSentenceAudio = _try<int?>((s) => s.missingSentenceAudio);
+    final missingImages = _try<int?>((s) => s.missingImages);
 
     return Scaffold(
       appBar: AppBar(
@@ -18,6 +97,9 @@ class ImportSummaryPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // =============================
+          // Card 1: info general (igual estética original)
+          // =============================
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -26,9 +108,7 @@ class ImportSummaryPage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        isUpdate ? Icons.system_update_alt : Icons.library_add,
-                      ),
+                      Icon(isUpdate ? Icons.system_update_alt : Icons.library_add),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -39,12 +119,12 @@ class ImportSummaryPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _kv('Archivo', summary.zipFileName),
-                  _kv('Mazo importado', summary.importedPackName),
-                  _kv('Mazo guardado', summary.finalPackName),
-                  _kv('Idioma', summary.isoCode),
+                  _kv('Archivo', zipFileName),
+                  _kv('Mazo importado', importedPackName),
+                  _kv('Mazo guardado', finalPackName),
+                  _kv('Idioma', isoCode),
                   _kv('Modo', isUpdate ? 'Actualizar existente' : 'Crear nuevo'),
-                  if (summary.targetDeckExistedBeforeImport) _kv('Mazo previo', 'Sí'),
+                  if (targetDeckExistedBeforeImport == true) _kv('Mazo previo', 'Sí'),
                 ],
               ),
             ),
@@ -52,17 +132,18 @@ class ImportSummaryPage extends StatelessWidget {
 
           const SizedBox(height: 12),
 
+          // =============================
+          // Card 2: Tarjetas (chips como antes)
+          // =============================
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Tarjetas',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Tarjetas', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
+
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -70,39 +151,45 @@ class ImportSummaryPage extends StatelessWidget {
                       _metricChip(
                         context,
                         label: 'Procesadas',
-                        value: summary.cardsProcessed.toString(),
+                        value: cardsProcessed.toString(),
                         color: Colors.blueGrey,
                       ),
                       _metricChip(
                         context,
                         label: 'Creadas',
-                        value: summary.cardsCreated.toString(),
+                        value: cardsCreated.toString(),
                         color: Colors.blue,
                       ),
                       _metricChip(
                         context,
                         label: 'Actualizadas',
-                        value: summary.cardsUpdated.toString(),
+                        value: cardsUpdated.toString(),
                         color: Colors.orange,
                       ),
                       _metricChip(
                         context,
                         label: 'Sin cambios',
-                        value: summary.cardsUnchanged.toString(),
+                        value: cardsUnchanged.toString(),
                         color: Colors.green,
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 12),
-                  _kv('Registros SQLite leídos', '${summary.sqliteRowsRead}'),
-                  _kv(
-                    'Duplicadas dentro del archivo (lógicas)',
-                    '${summary.duplicateLogicalCardsInImport}',
-                  ),
-                  _kv(
-                    'Tarjetas existentes no presentes en el archivo',
-                    '${summary.existingCardsNotPresentInImport} (no eliminadas)',
-                  ),
+
+                  if (sqliteRowsRead != null) _kv('Registros SQLite leídos', '$sqliteRowsRead'),
+
+                  if (duplicateLogicalCardsInImport != null)
+                    _kv(
+                      'Duplicadas dentro del archivo (lógicas)',
+                      '$duplicateLogicalCardsInImport',
+                    ),
+
+                  if (existingCardsNotPresentInImport != null)
+                    _kv(
+                      'Tarjetas existentes no presentes en el archivo',
+                      '$existingCardsNotPresentInImport (no eliminadas)',
+                    ),
                 ],
               ),
             ),
@@ -110,20 +197,20 @@ class ImportSummaryPage extends StatelessWidget {
 
           const SizedBox(height: 12),
 
+          // =============================
+          // Card 3: Configuración del mazo (igual estética original)
+          // =============================
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Configuración del mazo',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Configuración del mazo', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-                  _kv('DeckSettings creado', summary.deckSettingsCreated ? 'Sí' : 'No'),
-                  _kv('DeckSettings actualizado', summary.deckSettingsUpdated ? 'Sí' : 'No'),
-                  _kv('DeckSettings preservado', summary.deckSettingsPreserved ? 'Sí' : 'No'),
+                  _kv('DeckSettings creado', deckSettingsCreated ? 'Sí' : 'No'),
+                  _kv('DeckSettings actualizado', deckSettingsUpdated ? 'Sí' : 'No'),
+                  _kv('DeckSettings preservado', deckSettingsPreserved ? 'Sí' : 'No'),
                 ],
               ),
             ),
@@ -131,28 +218,41 @@ class ImportSummaryPage extends StatelessWidget {
 
           const SizedBox(height: 12),
 
+          // =============================
+          // Card 4: Multimedia y extracción (igual estética original)
+          // =============================
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Multimedia y extracción',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Multimedia y extracción', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-                  _kv('Entradas ZIP totales', '${summary.zipEntriesTotal}'),
-                  _kv('Archivos reales en ZIP', '${summary.zipRealFileEntries}'),
-                  _kv('Archivos extraídos', '${summary.extractedFilesWritten}'),
-                  _kv('Carpetas creadas', '${summary.extractedDirsCreated}'),
-                  _kv('Colisiones renombradas', '${summary.extractedCollisions}'),
-                  _kv('Omitidos en extracción', '${summary.extractedSkipped}'),
-                  _kv('Errores de extracción', '${summary.extractedErrors}'),
+
+                  if (zipEntriesTotal != null) _kv('Entradas ZIP totales', '$zipEntriesTotal'),
+                  if (zipRealFileEntries != null) _kv('Archivos reales en ZIP', '$zipRealFileEntries'),
+
+                  // Estos campos existen en la versión “larga” (antigua). Si no existen, simplemente no se muestran.
+                  if (extractedFilesWritten != null) _kv('Archivos extraídos', '$extractedFilesWritten'),
+                  if (extractedDirsCreated != null) _kv('Carpetas creadas', '$extractedDirsCreated'),
+                  if (extractedCollisions != null) _kv('Colisiones renombradas', '$extractedCollisions'),
+                  if (extractedSkipped != null) _kv('Omitidos en extracción', '$extractedSkipped'),
+                  if (extractedErrors != null) _kv('Errores de extracción', '$extractedErrors'),
+
                   const Divider(height: 20),
-                  _kv('Media copiada', '${summary.mediaFilesCopied}'),
-                  _kv('Media omitida', '${summary.mediaFilesSkipped}'),
-                  _kv('Claves media duplicadas', '${summary.mediaDuplicateKeys}'),
+
+                  if (mediaFilesCopied != null) _kv('Media copiada', '$mediaFilesCopied'),
+                  if (mediaFilesSkipped != null) _kv('Media omitida', '$mediaFilesSkipped'),
+                  if (mediaDuplicateKeys != null) _kv('Claves media duplicadas', '$mediaDuplicateKeys'),
+
+                  // Si no hay nada de esta sección (por alguna razón), mostrar un dash.
+                  if (zipEntriesTotal == null &&
+                      zipRealFileEntries == null &&
+                      extractedFilesWritten == null &&
+                      mediaFilesCopied == null &&
+                      mediaDuplicateKeys == null)
+                    const Text('—', style: TextStyle(color: Colors.black54)),
                 ],
               ),
             ),
@@ -160,20 +260,23 @@ class ImportSummaryPage extends StatelessWidget {
 
           const SizedBox(height: 12),
 
+          // =============================
+          // Card 5: Diagnóstico de media en tarjetas (igual estética original)
+          // =============================
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Diagnóstico de media en tarjetas',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Diagnóstico de media en tarjetas', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-                  _kv('Audio de palabra faltante', '${summary.missingWordAudio}'),
-                  _kv('Audio de oración faltante', '${summary.missingSentenceAudio}'),
-                  _kv('Imágenes faltantes', '${summary.missingImages}'),
+                  if (missingWordAudio != null) _kv('Audio de palabra faltante', '$missingWordAudio'),
+                  if (missingSentenceAudio != null) _kv('Audio de oración faltante', '$missingSentenceAudio'),
+                  if (missingImages != null) _kv('Imágenes faltantes', '$missingImages'),
+
+                  if (missingWordAudio == null && missingSentenceAudio == null && missingImages == null)
+                    const Text('—', style: TextStyle(color: Colors.black54)),
                 ],
               ),
             ),
@@ -181,6 +284,9 @@ class ImportSummaryPage extends StatelessWidget {
 
           const SizedBox(height: 18),
 
+          // =============================
+          // Botón Volver (igual estética original)
+          // =============================
           Row(
             children: [
               Expanded(

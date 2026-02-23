@@ -26,6 +26,12 @@ class DeckSettings {
   late String packName;
 
   // =========================
+  // Icono del mazo
+  // =========================
+  /// URI (file:///) del icono del mazo (copiado a media_assets). Si es null, se usa un icono por defecto.
+  String? deckIconUri;
+
+  // =========================
   // Límites diarios
   // =========================
   int newCardsPerDay = 40;

@@ -72,96 +72,129 @@ class ImportPreviewResult {
     required this.zipEntriesTotal,
     required this.zipRealFileEntries,
   });
+}
+
+class ImportConflictException implements Exception {
+  final ImportPreviewResult preview;
+  const ImportConflictException(this.preview);
 
   @override
-  String toString() {
-    return 'ImportPreviewResult(pack="$importedPackName", exists=$deckNameExists, '
-        'rows=$sqliteRows, cards=$estimatedCardsToImport)';
-  }
+  String toString() =>
+      'Conflicto: el mazo "${preview.importedPackName}" ya existe.';
 }
 
 class ImportSummary {
   final String zipFilePath;
   final String zipFileName;
+
   final String importedPackName;
-  final String finalPackName;
+  final String targetPackName;
   final String isoCode;
-  final ImportDeckConflictAction action;
-
-  final bool targetDeckExistedBeforeImport;
-
-  final int sqliteRowsRead;
-  final int cardsProcessed;
-  final int cardsCreated;
-  final int cardsUpdated;
-  final int cardsUnchanged;
-  final int duplicateLogicalCardsInImport;
-  final int existingCardsNotPresentInImport;
 
   final bool deckSettingsCreated;
   final bool deckSettingsUpdated;
   final bool deckSettingsPreserved;
 
+  final int sqliteRows;
+  final int cardsCreated;
+  final int cardsUpdated;
+  final int cardsUnchanged;
+
+  final int duplicateLogicalCardsInImport;
+
   final int missingWordAudio;
   final int missingSentenceAudio;
   final int missingImages;
 
-  final int zipEntriesTotal;
-  final int zipRealFileEntries;
-  final int extractedFilesWritten;
-  final int extractedDirsCreated;
-  final int extractedCollisions;
-  final int extractedSkipped;
-  final int extractedErrors;
+  final int archiveEntriesTotal;
+  final int archiveRealFileEntries;
 
   final int mediaFilesCopied;
   final int mediaFilesSkipped;
-  final int mediaDuplicateKeys;
+  final int mediaKeyCollisions;
 
   const ImportSummary({
     required this.zipFilePath,
     required this.zipFileName,
     required this.importedPackName,
-    required this.finalPackName,
+    required this.targetPackName,
     required this.isoCode,
-    required this.action,
-    required this.targetDeckExistedBeforeImport,
-    required this.sqliteRowsRead,
-    required this.cardsProcessed,
+    required this.deckSettingsCreated,
+    required this.deckSettingsUpdated,
+    required this.deckSettingsPreserved,
+    required this.sqliteRows,
     required this.cardsCreated,
     required this.cardsUpdated,
     required this.cardsUnchanged,
     required this.duplicateLogicalCardsInImport,
-    required this.existingCardsNotPresentInImport,
-    required this.deckSettingsCreated,
-    required this.deckSettingsUpdated,
-    required this.deckSettingsPreserved,
     required this.missingWordAudio,
     required this.missingSentenceAudio,
     required this.missingImages,
-    required this.zipEntriesTotal,
-    required this.zipRealFileEntries,
-    required this.extractedFilesWritten,
-    required this.extractedDirsCreated,
-    required this.extractedCollisions,
-    required this.extractedSkipped,
-    required this.extractedErrors,
+    required this.archiveEntriesTotal,
+    required this.archiveRealFileEntries,
     required this.mediaFilesCopied,
     required this.mediaFilesSkipped,
-    required this.mediaDuplicateKeys,
+    required this.mediaKeyCollisions,
   });
 }
 
-class ImportConflictException implements Exception {
-  final ImportPreviewResult preview;
+class _PreparedPackage {
+  final Directory extractDir;
+  final Directory packageRoot;
+  final File dbFile;
+  final String packName;
+  final String isoCode;
+  final String dbFilename;
+  final Map<String, dynamic> manifestData;
 
-  ImportConflictException(this.preview);
+  final int archiveEntriesTotal;
+  final int archiveRealFileEntries;
 
-  @override
-  String toString() {
-    return 'Ya existe un mazo con el nombre "${preview.importedPackName}". '
-        'Debes elegir actualizar el mazo existente o crear uno nuevo con otro nombre.';
-  }
+  final MediaIndex? mediaIndex;
+
+  const _PreparedPackage({
+    required this.extractDir,
+    required this.packageRoot,
+    required this.dbFile,
+    required this.packName,
+    required this.isoCode,
+    required this.dbFilename,
+    required this.manifestData,
+    required this.archiveEntriesTotal,
+    required this.archiveRealFileEntries,
+    required this.mediaIndex,
+  });
+}
+
+class _MergeImportSummary {
+  final bool deckSettingsCreated;
+  final bool deckSettingsUpdated;
+  final bool deckSettingsPreserved;
+
+  final int sqliteRows;
+  final int cardsCreated;
+  final int cardsUpdated;
+  final int cardsUnchanged;
+
+  final int duplicateLogicalCardsInImport;
+
+  final int missingWordAudio;
+  final int missingSentenceAudio;
+  final int missingImages;
+
+  const _MergeImportSummary({
+    required this.deckSettingsCreated,
+    required this.deckSettingsUpdated,
+    required this.deckSettingsPreserved,
+    required this.sqliteRows,
+    required this.cardsCreated,
+    required this.cardsUpdated,
+    required this.cardsUnchanged,
+    required this.duplicateLogicalCardsInImport,
+    required this.missingWordAudio,
+    required this.missingSentenceAudio,
+    required this.missingImages,
+  });
 }
 
 class ImporterService {
@@ -170,27 +203,6 @@ class ImporterService {
 
   ImporterService(this.isar);
 
-  // ---------------------------------------------------------------------------
-  // API pública
-  // ---------------------------------------------------------------------------
-
-  /// Mantiene compatibilidad con la UI actual:
-  /// - Si no hay conflicto de nombre: importa como mazo nuevo
-  /// - Si hay conflicto: lanza [ImportConflictException] (la UI futura decidirá)
-  Future<void> importFlashcardPackage(String zipFilePath) async {
-    final preview = await previewFlashcardPackage(zipFilePath);
-    if (preview.deckNameExists) {
-      throw ImportConflictException(preview);
-    }
-
-    await importFlashcardPackageAdvanced(
-      zipFilePath,
-      options: const ImportExecutionOptions.createNew(),
-    );
-  }
-
-  /// Lee el paquete y devuelve metadatos para que la UI pueda decidir:
-  /// actualizar mazo existente o crear uno nuevo con otro nombre.
   Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
     final prepared = await _preparePackage(zipFilePath, copyMedia: false);
 
@@ -237,7 +249,6 @@ class ImporterService {
       final targetExists = await _deckExistsByName(targetPackName);
 
       if (options.action == ImportDeckConflictAction.createNewDeck && targetExists) {
-        // Si el usuario intentó crear nuevo con nombre ya existente, detenemos.
         final preview = ImportPreviewResult(
           zipFilePath: zipFilePath,
           zipFileName: p.basename(zipFilePath),
@@ -254,407 +265,213 @@ class ImporterService {
       }
 
       if (options.action == ImportDeckConflictAction.updateExistingDeck && !targetExists) {
-        throw Exception(
-          'No existe un mazo llamado "$targetPackName" para actualizar. '
-              'Importa como mazo nuevo o revisa el nombre.',
+        throw StateError(
+          "No existe el mazo '$targetPackName' para actualizar. "
+              "Selecciona crear nuevo mazo.",
         );
       }
 
       sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
 
-      final mergeSummary = await _migrateDataToIsar(
+      final mediaIndex = prepared.mediaIndex!;
+      final merge = await _migrateDataToIsar(
         sqliteDb,
         prepared.isoCode,
         importedPackName,
         targetPackName,
-        prepared.mediaResult?.index ?? MediaIndex({}, {}, {}),
+        mediaIndex,
         prepared.manifestData,
         options: options,
         targetDeckExistedBeforeImport: targetExists,
       );
 
-      final summary = ImportSummary(
+      return ImportSummary(
         zipFilePath: zipFilePath,
         zipFileName: p.basename(zipFilePath),
         importedPackName: importedPackName,
-        finalPackName: targetPackName,
+        targetPackName: targetPackName,
         isoCode: prepared.isoCode,
-        action: options.action,
-        targetDeckExistedBeforeImport: targetExists,
-        sqliteRowsRead: mergeSummary.sqliteRowsRead,
-        cardsProcessed: mergeSummary.cardsProcessed,
-        cardsCreated: mergeSummary.cardsCreated,
-        cardsUpdated: mergeSummary.cardsUpdated,
-        cardsUnchanged: mergeSummary.cardsUnchanged,
-        duplicateLogicalCardsInImport: mergeSummary.duplicateLogicalCardsInImport,
-        existingCardsNotPresentInImport: mergeSummary.existingCardsNotPresentInImport,
-        deckSettingsCreated: mergeSummary.deckSettingsCreated,
-        deckSettingsUpdated: mergeSummary.deckSettingsUpdated,
-        deckSettingsPreserved: mergeSummary.deckSettingsPreserved,
-        missingWordAudio: mergeSummary.missingWordAudio,
-        missingSentenceAudio: mergeSummary.missingSentenceAudio,
-        missingImages: mergeSummary.missingImages,
-        zipEntriesTotal: prepared.archiveEntriesTotal,
-        zipRealFileEntries: prepared.archiveRealFileEntries,
-        extractedFilesWritten: prepared.extractReport.filesWritten,
-        extractedDirsCreated: prepared.extractReport.dirsCreated,
-        extractedCollisions: prepared.extractReport.collisions,
-        extractedSkipped: prepared.extractReport.skipped,
-        extractedErrors: prepared.extractReport.errors,
-        mediaFilesCopied: prepared.mediaResult?.copied ?? 0,
-        mediaFilesSkipped: prepared.mediaResult?.skipped ?? 0,
-        mediaDuplicateKeys: prepared.mediaResult?.duplicateKeys ?? 0,
+        deckSettingsCreated: merge.deckSettingsCreated,
+        deckSettingsUpdated: merge.deckSettingsUpdated,
+        deckSettingsPreserved: merge.deckSettingsPreserved,
+        sqliteRows: merge.sqliteRows,
+        cardsCreated: merge.cardsCreated,
+        cardsUpdated: merge.cardsUpdated,
+        cardsUnchanged: merge.cardsUnchanged,
+        duplicateLogicalCardsInImport: merge.duplicateLogicalCardsInImport,
+        missingWordAudio: merge.missingWordAudio,
+        missingSentenceAudio: merge.missingSentenceAudio,
+        missingImages: merge.missingImages,
+        archiveEntriesTotal: prepared.archiveEntriesTotal,
+        archiveRealFileEntries: prepared.archiveRealFileEntries,
+        mediaFilesCopied: mediaIndex.filesCopied,
+        mediaFilesSkipped: mediaIndex.filesSkipped,
+        mediaKeyCollisions: mediaIndex.keyCollisions,
       );
-
-      print("🎉 Importación completada con éxito.");
-      print("📌 Resumen: creadas=${summary.cardsCreated}, actualizadas=${summary.cardsUpdated}, "
-          "sin cambios=${summary.cardsUnchanged}");
-
-      return summary;
-    } catch (e, st) {
-      print("🔴 ERROR FATAL EN IMPORTACIÓN: $e");
-      print(st);
-      rethrow;
     } finally {
-      if (sqliteDb != null) {
-        await sqliteDb.close();
-      }
+      try {
+        await sqliteDb?.close();
+      } catch (_) {}
       await _cleanupExtractDir(prepared.extractDir);
-      print("🏁 --- PROCESO TERMINADO ---");
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Preparación del paquete (ZIP -> extracción -> manifest -> DB -> media opcional)
-  // ---------------------------------------------------------------------------
-
-  Future<_PreparedImportPackage> _preparePackage(
-      String zipFilePath, {
-        required bool copyMedia,
-      }) async {
-    print("\n📦 --- INICIANDO IMPORTACIÓN DE MAZO ---");
-    print("📂 Archivo: ${p.basename(zipFilePath)}");
-
-    final tempDir = await getTemporaryDirectory();
-    final uniqueSessionId = _uuid.v4();
-    final extractPath = p.join(tempDir.path, 'import_$uniqueSessionId');
-    final extractDir = Directory(extractPath);
-
-    // 1) Analizar ZIP
-    final bytes = await File(zipFilePath).readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes);
-
-    final zipFileEntries = archive.files
-        .where((f) => f.isFile && !f.name.contains('__MACOSX'))
-        .length;
-
-    print("📊 Entradas detectadas en ZIP: ${archive.length} (archivos reales: $zipFileEntries)");
-
-    // 2) Extraer (robusto)
-    print("⏳ Descomprimiendo...");
-    final extractReport = await _extractArchiveSafely(archive, extractPath);
-
-    print(
-      "✅ Extracción: ${extractReport.filesWritten} archivos, "
-          "${extractReport.dirsCreated} carpetas, "
-          "${extractReport.collisions} colisiones renombradas, "
-          "${extractReport.skipped} omitidos, "
-          "${extractReport.errors} errores.",
-    );
-
-    if (extractReport.filesWritten < zipFileEntries) {
-      print(
-        "⚠️ AVISO: El ZIP contiene $zipFileEntries archivos, pero solo se escribieron "
-            "${extractReport.filesWritten}. Si el mazo tenía nombres repetidos, se renombraron "
-            "para evitar pérdidas. Si aún faltan, el ZIP puede estar corrupto.",
-      );
-    }
-
-    // 3) Indexar extraídos
-    print("🔍 Indexando archivos extraídos...");
-    if (!await extractDir.exists()) {
-      throw Exception("Error crítico: No se creó la carpeta temporal.");
-    }
-
-    List<FileSystemEntity> allEntities;
-    try {
-      allEntities = await extractDir.list(recursive: true).toList();
-    } catch (e) {
-      print("⚠️ Error en listado recursivo nativo: $e. Intentando método manual...");
-      allEntities = await _manualRecursiveList(extractDir);
-    }
-    print("📄 Total elementos en disco (archivos+carpetas): ${allEntities.length}");
-
-    // 4) Manifest
-    File? manifestFile;
-    Directory? packageRoot;
-    for (final entity in allEntities) {
-      if (entity is File && !entity.path.contains('__MACOSX')) {
-        if (p.basename(entity.path).toLowerCase() == 'manifest.json') {
-          manifestFile = entity;
-          packageRoot = entity.parent;
-          print("✅ Manifest encontrado en: ${entity.path}");
-          break;
-        }
-      }
-    }
-
-    if (manifestFile == null || packageRoot == null) {
-      print("❌ CRÍTICO: No se encontró 'manifest.json'.");
-      throw Exception("El archivo 'manifest.json' no existe en el paquete importado.");
-    }
-
-    final manifestContent = await manifestFile.readAsString();
-    final Map<String, dynamic> manifestData = jsonDecode(manifestContent);
-
-    final String isoCode = (manifestData['language_id'] ?? 'unknown').toString();
-    final String packName = (manifestData['pack_name'] ?? 'Importado').toString();
-    final String dbFilename = (manifestData['db_filename'] ?? 'data.db').toString();
-
-    // 5) Media opcional
-    _MediaProcessResult? mediaResult;
-    if (copyMedia) {
-      mediaResult = await _processAllMedia(
-        allEntities,
-        packageRoot: packageRoot,
-        extractRoot: extractDir,
-      );
-    }
-
-    // 6) DB SQLite
-    File? dbFile;
-    try {
-      final dbEntity = allEntities.firstWhere(
-            (e) =>
-        e is File &&
-            p.basename(e.path).toLowerCase() == dbFilename.toLowerCase() &&
-            !e.path.contains('__MACOSX'),
-      );
-      dbFile = dbEntity as File;
-      print("✅ Base de datos encontrada: ${dbFile.path}");
-    } catch (_) {
-      throw Exception("Base de datos '$dbFilename' no encontrada en el paquete.");
-    }
-
-    return _PreparedImportPackage(
-      zipFilePath: zipFilePath,
-      extractDir: extractDir,
-      archiveEntriesTotal: archive.length,
-      archiveRealFileEntries: zipFileEntries,
-      extractReport: extractReport,
-      allEntities: allEntities,
-      packageRoot: packageRoot,
-      manifestData: manifestData,
-      isoCode: isoCode,
-      packName: packName,
-      dbFilename: dbFilename,
-      dbFile: dbFile,
-      mediaResult: mediaResult,
-    );
   }
 
   String _resolveTargetPackName(String importedPackName, ImportExecutionOptions options) {
-    final custom = options.customPackName?.trim();
-
     if (options.action == ImportDeckConflictAction.createNewDeck) {
-      if (custom != null && custom.isNotEmpty) {
-        return custom;
-      }
+      final custom = options.customPackName?.trim();
+      if (custom != null && custom.isNotEmpty) return custom;
       return importedPackName;
     }
-
-    // updateExisting siempre actualiza el mazo con el nombre importado
     return importedPackName;
   }
 
-  Future<void> _cleanupExtractDir(Directory extractDir) async {
-    if (await extractDir.exists()) {
-      try {
-        await extractDir.delete(recursive: true);
-      } catch (e) {
-        print("Aviso: No se pudo borrar carpeta temporal: $e");
-      }
-    }
-  }
-
   Future<bool> _deckExistsByName(String packName) async {
-    final deckSettingsCount =
-    await isar.deckSettings.filter().packNameEqualTo(packName).count();
-    if (deckSettingsCount > 0) return true;
+    final settings =
+    await isar.deckSettings.filter().packNameEqualTo(packName).findFirst();
+    if (settings != null) return true;
 
-    final flashcardCount =
-    await isar.flashcards.filter().packNameEqualTo(packName).count();
-    return flashcardCount > 0;
+    final anyCards = await isar.flashcards
+        .filter()
+        .packNameEqualTo(packName)
+        .limit(1)
+        .count();
+    return anyCards > 0;
   }
 
-  // ============================================================
-  //  EXTRACTION ROBUSTA (sin overwrite silencioso)
-  // ============================================================
+  Future<_PreparedPackage> _preparePackage(
+      String zipFilePath, {
+        required bool copyMedia,
+      }) async {
+    final extractDir = await _createTempExtractDir(zipFilePath);
 
-  Future<_ExtractReport> _extractArchiveSafely(Archive archive, String destPath) async {
-    final destDir = Directory(destPath);
-    if (!await destDir.exists()) {
-      await destDir.create(recursive: true);
-    }
+    final fileBytes = await File(zipFilePath).readAsBytes();
+    final archive = ZipDecoder().decodeBytes(fileBytes);
 
-    int filesWritten = 0;
-    int dirsCreated = 0;
-    int collisions = 0;
-    int skipped = 0;
-    int errors = 0;
+    int totalEntries = archive.length;
+    int realFileEntries = 0;
 
-    for (final entry in archive.files) {
-      final rawName = entry.name;
+    // Extraer ZIP de forma segura (anti zip-slip)
+    for (final entry in archive) {
+      if (!entry.isFile) continue;
 
-      // Ignorar basura de macOS
-      if (rawName.contains('__MACOSX')) {
-        skipped++;
+      final name = entry.name.replaceAll('\\', '/');
+      if (name.startsWith('__MACOSX/')) continue;
+
+      realFileEntries++;
+
+      final normalized = p.normalize(name);
+      if (normalized.contains('..')) {
+        print("⚠️ Entrada sospechosa (zip-slip) ignorada: $name");
         continue;
       }
 
-      final normalized = _normalizeZipEntryName(rawName);
-      if (normalized.isEmpty) {
-        skipped++;
-        continue;
+      final outPath = p.join(extractDir.path, normalized);
+
+      final outFile = File(outPath);
+      await outFile.parent.create(recursive: true);
+
+      // Evitar overwrite silencioso: renombrar si ya existe
+      var finalPath = outPath;
+      int counter = 1;
+      while (File(finalPath).existsSync()) {
+        final dir = p.dirname(outPath);
+        final base = p.basenameWithoutExtension(outPath);
+        final ext = p.extension(outPath);
+        finalPath = p.join(dir, "${base}_$counter$ext");
+        counter++;
       }
 
-      final outPath = p.join(destPath, normalized);
-
-      try {
-        if (!entry.isFile) {
-          final dir = Directory(outPath);
-          if (!await dir.exists()) {
-            await dir.create(recursive: true);
-            dirsCreated++;
-          }
-          continue;
-        }
-
-        final parentDir = Directory(p.dirname(outPath));
-        if (!await parentDir.exists()) {
-          await parentDir.create(recursive: true);
-          dirsCreated++;
-        }
-
-        String finalPath = outPath;
-        if (File(finalPath).existsSync()) {
-          finalPath = _makeNonCollidingPath(finalPath);
-          collisions++;
-        }
-
-        final content = entry.content;
-        if (content is List<int>) {
-          await File(finalPath).writeAsBytes(content, flush: true);
-          filesWritten++;
-        } else {
-          final bytes = entry.content as List<int>;
-          await File(finalPath).writeAsBytes(bytes, flush: true);
-          filesWritten++;
-        }
-      } catch (e) {
-        errors++;
-        print("⚠️ Error extrayendo '$rawName' -> '$outPath': $e");
-      }
+      await File(finalPath).writeAsBytes(entry.content as List<int>);
     }
 
-    return _ExtractReport(
-      filesWritten: filesWritten,
-      dirsCreated: dirsCreated,
-      collisions: collisions,
-      skipped: skipped,
-      errors: errors,
+    // Encontrar manifest.json
+    final manifestFile = File(p.join(extractDir.path, 'manifest.json'));
+    if (!manifestFile.existsSync()) {
+      throw StateError("No se encontró manifest.json en el paquete.");
+    }
+
+    final manifestData =
+    jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+
+    final isoCode = (manifestData['language_id'] ?? '').toString().trim();
+    final packName = (manifestData['pack_name'] ?? '').toString().trim();
+    final dbFilename = (manifestData['db_filename'] ?? '').toString().trim();
+
+    if (isoCode.isEmpty || packName.isEmpty || dbFilename.isEmpty) {
+      throw StateError("manifest.json inválido: faltan campos requeridos.");
+    }
+
+    final packageRoot = Directory(extractDir.path);
+    final dbFile = File(p.join(extractDir.path, dbFilename));
+    if (!dbFile.existsSync()) {
+      throw StateError("No se encontró la base de datos '$dbFilename' en el paquete.");
+    }
+
+    MediaIndex? mediaIndex;
+    if (copyMedia) {
+      mediaIndex = await _processAllMedia(packageRoot, extractDir);
+    }
+
+    return _PreparedPackage(
+      extractDir: extractDir,
+      packageRoot: packageRoot,
+      dbFile: dbFile,
+      packName: packName,
+      isoCode: isoCode,
+      dbFilename: dbFilename,
+      manifestData: manifestData,
+      archiveEntriesTotal: totalEntries,
+      archiveRealFileEntries: realFileEntries,
+      mediaIndex: mediaIndex,
     );
   }
 
-  String _normalizeZipEntryName(String name) {
-    var n = name.replaceAll('\\', '/').trim();
+  Future<Directory> _createTempExtractDir(String zipFilePath) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final tempRoot = Directory(p.join(docs.path, 'import_tmp'));
+    await tempRoot.create(recursive: true);
 
-    while (n.startsWith('/')) {
-      n = n.substring(1);
-    }
-
-    if (n.isEmpty) return '';
-
-    final parts = n.split('/').where((s) => s.isNotEmpty && s != '.').toList();
-    if (parts.any((s) => s == '..')) return '';
-
-    return parts.join('/');
+    final name = p.basenameWithoutExtension(zipFilePath);
+    final dir = Directory(p.join(tempRoot.path, "${name}_${DateTime.now().millisecondsSinceEpoch}"));
+    await dir.create(recursive: true);
+    return dir;
   }
 
-  String _makeNonCollidingPath(String path) {
-    final dir = p.dirname(path);
-    final base = p.basenameWithoutExtension(path);
-    final ext = p.extension(path);
-
-    int i = 1;
-    while (true) {
-      final candidate = p.join(dir, "${base}_$i$ext");
-      if (!File(candidate).existsSync()) return candidate;
-      i++;
-    }
+  Future<void> _cleanupExtractDir(Directory extractDir) async {
+    try {
+      if (extractDir.existsSync()) {
+        await extractDir.delete(recursive: true);
+      }
+    } catch (_) {}
   }
 
   // ============================================================
-  //  MULTIMEDIA: Copia a media_assets + crea índice robusto
+  //  Multimedia processing -> media_assets
   // ============================================================
 
-  Future<_MediaProcessResult> _processAllMedia(
-      List<FileSystemEntity> allEntities, {
-        required Directory packageRoot,
-        required Directory extractRoot,
-      }) async {
-    final Map<String, String> exactMap = {};
-    final Map<String, String> lowerCaseMap = {};
-    final Map<String, String> stemMap = {};
+  Future<MediaIndex> _processAllMedia(Directory packageRoot, Directory extractDir) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final destDir = Directory(p.join(docs.path, 'media_assets'));
+    await destDir.create(recursive: true);
 
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final destDir = Directory(p.join(appDocDir.path, 'media_assets'));
-    if (!await destDir.exists()) await destDir.create(recursive: true);
-
-    const allowedExt = {
-      '.mp3',
-      '.wav',
-      '.m4a',
-      '.aac',
-      '.ogg',
-      '.opus',
-      '.flac',
-      '.png',
-      '.jpg',
-      '.jpeg',
-      '.webp',
-      '.gif',
-    };
-
-    print("📂 Copiando multimedia a: ${destDir.path}");
+    final exactMap = <String, String>{};
+    final lowerCaseMap = <String, String>{};
+    final stemMap = <String, String>{};
 
     int count = 0;
     int skipped = 0;
     int dupKeys = 0;
 
-    for (final entity in allEntities) {
-      if (entity is! File) continue;
+    final entities = extractDir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => !p.basename(f.path).toLowerCase().endsWith('.db'))
+        .where((f) => p.basename(f.path).toLowerCase() != 'manifest.json')
+        .toList();
 
-      final filePath = entity.path;
-      if (filePath.contains('__MACOSX')) {
-        skipped++;
-        continue;
-      }
-
-      final fileName = p.basename(filePath);
-      if (fileName.startsWith('.')) {
-        skipped++;
-        continue;
-      }
-
-      final lowerName = fileName.toLowerCase();
-      if (lowerName == 'manifest.json' || lowerName.endsWith('.db')) {
-        skipped++;
-        continue;
-      }
-
-      final ext = p.extension(fileName).toLowerCase();
-      if (!allowedExt.contains(ext)) {
+    for (final entity in entities) {
+      final ext = p.extension(entity.path);
+      if (ext.isEmpty) {
         skipped++;
         continue;
       }
@@ -667,21 +484,20 @@ class ImporterService {
       count++;
 
       final relFromPackage = _safeRelative(entity.path, packageRoot.path);
-      final relFromExtract = _safeRelative(entity.path, extractRoot.path);
+      final relFromExtract = _safeRelative(entity.path, extractDir.path);
 
       final keys = <String>{
-        fileName,
-        fileName.toLowerCase(),
-        Uri.decodeFull(fileName).toLowerCase(),
+        p.basename(entity.path),
         relFromPackage,
-        relFromPackage.toLowerCase(),
-        Uri.decodeFull(relFromPackage).toLowerCase(),
         relFromExtract,
-        relFromExtract.toLowerCase(),
-        Uri.decodeFull(relFromExtract).toLowerCase(),
       };
 
-      final stem1 = p.basenameWithoutExtension(fileName).toLowerCase();
+      // también aceptar basename decodificado
+      try {
+        keys.add(Uri.decodeFull(p.basename(entity.path)));
+      } catch (_) {}
+
+      final stem1 = p.basenameWithoutExtension(p.basename(entity.path)).toLowerCase();
       final stem2 = p.basenameWithoutExtension(relFromPackage).toLowerCase();
       final stem3 = p.basenameWithoutExtension(relFromExtract).toLowerCase();
 
@@ -715,24 +531,25 @@ class ImporterService {
     }
 
     print(
-      "✅ Multimedia procesada: $count archivos copiados. "
-          "(omitidos: $skipped, claves duplicadas: $dupKeys)",
+      "✅ Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)",
     );
 
-    return _MediaProcessResult(
-      index: MediaIndex(exactMap, lowerCaseMap, stemMap),
-      copied: count,
-      skipped: skipped,
-      duplicateKeys: dupKeys,
+    return MediaIndex(
+      exactMap,
+      lowerCaseMap,
+      stemMap,
+      filesCopied: count,
+      filesSkipped: skipped,
+      keyCollisions: dupKeys,
     );
   }
 
-  String _safeRelative(String fullPath, String from) {
+  String _safeRelative(String filePath, String rootPath) {
     try {
-      final rel = p.relative(fullPath, from: from);
+      final rel = p.relative(filePath, from: rootPath);
       return rel.replaceAll('\\', '/');
     } catch (_) {
-      return p.basename(fullPath);
+      return p.basename(filePath);
     }
   }
 
@@ -741,6 +558,37 @@ class ImporterService {
     final s = value.toString().trim();
     if (s.isEmpty) return null;
     return s;
+  }
+
+  /// Extrae referencia de icono del manifest (ruta dentro del zip).
+  /// Acepta varias claves para ser compatible con distintas versiones.
+  String? _extractDeckIconRef(Map<String, dynamic> manifestData) {
+    final candidates = <dynamic>[
+      manifestData['deck_icon'],
+      manifestData['deckIcon'],
+      manifestData['deck_icon_path'],
+      manifestData['deckIconPath'],
+      manifestData['icon'],
+      manifestData['icon_path'],
+      manifestData['iconPath'],
+    ];
+
+    for (final c in candidates) {
+      final s = _normalizeDbRef(c);
+      if (s != null) return s;
+    }
+
+    // También permitir que venga dentro de "settings"
+    final settings = manifestData['settings'];
+    if (settings is Map) {
+      final m = Map<String, dynamic>.from(settings);
+      final inner = _normalizeDbRef(
+        m['deck_icon'] ?? m['deck_icon_path'] ?? m['icon'] ?? m['icon_path'],
+      );
+      if (inner != null) return inner;
+    }
+
+    return null;
   }
 
   // ============================================================
@@ -763,6 +611,10 @@ class ImporterService {
       manifestData: manifestData,
     );
 
+    // Icono del mazo (si existe en manifest)
+    final iconRef = _extractDeckIconRef(manifestData);
+    final iconUri = mediaIndex.find(iconRef);
+
     bool deckSettingsCreated = false;
     bool deckSettingsUpdated = false;
     bool deckSettingsPreserved = false;
@@ -772,21 +624,34 @@ class ImporterService {
 
     await isar.writeTxn(() async {
       if (existingSettings == null) {
+        importedSettings.deckIconUri = iconUri;
         await isar.deckSettings.putByIndex('packName', importedSettings);
         deckSettingsCreated = true;
       } else {
-        if (options.action == ImportDeckConflictAction.updateExistingDeck &&
-            !options.updateDeckSettingsFromManifest) {
+        final bool preserveUserSettings =
+            (options.action == ImportDeckConflictAction.updateExistingDeck &&
+                !options.updateDeckSettingsFromManifest) ||
+                (options.action == ImportDeckConflictAction.createNewDeck &&
+                    targetDeckExistedBeforeImport);
+
+        if (preserveUserSettings) {
           deckSettingsPreserved = true;
-        } else if (options.action == ImportDeckConflictAction.createNewDeck &&
-            targetDeckExistedBeforeImport) {
-          // En createNewDeck no deberíamos llegar aquí con conflicto, pero por seguridad:
-          deckSettingsPreserved = true;
+
+          // Aunque preservemos settings, si el paquete trae icono, lo actualizamos
+          // (se considera "contenido del mazo", no preferencia de usuario).
+          if (iconUri != null && iconUri != existingSettings.deckIconUri) {
+            existingSettings.deckIconUri = iconUri;
+            await isar.deckSettings.put(existingSettings);
+          }
         } else {
           // Reemplazar settings por las importadas, pero conservar tracking diario
           importedSettings.id = existingSettings.id;
           importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
           importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
+
+          // Icono: si el manifest no trae, conservamos el existente
+          importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
+
           await isar.deckSettings.putByIndex('packName', importedSettings);
           deckSettingsUpdated = true;
         }
@@ -847,11 +712,15 @@ class ImporterService {
       }
       if (imageRef != null && imagePath == null) {
         missingImages++;
+        if (missingImages <= 20) {
+          print("⚠️ Imagen faltante fila ${i + 1}: '$imageRef'");
+        }
       }
 
-      final originalId = row['ID']?.toString() ?? _uuid.v4();
+      final originalId = (row['ID'] ?? '').toString().trim();
+      if (originalId.isEmpty) continue;
 
-      final importedCards = _buildCardsFromRow(
+      final cards = _buildCardsFromRow(
         row: row,
         originalId: originalId,
         isoCode: isoCode,
@@ -862,22 +731,22 @@ class ImporterService {
         initialNtValue: initialNtValue,
       );
 
-      for (final imported in importedCards) {
-        final key = _logicalKey(imported.originalId, imported.cardType);
-
-        if (!seenImportKeys.add(key)) {
+      for (final card in cards) {
+        final key = _logicalKey(card.originalId, card.cardType);
+        if (seenImportKeys.contains(key)) {
           duplicateLogicalCardsInImport++;
-          // Nos quedamos con la última versión del ZIP si hay duplicados
+          continue;
         }
+        seenImportKeys.add(key);
 
         if (options.action == ImportDeckConflictAction.updateExistingDeck) {
           final existing = existingByLogicalKey[key];
           if (existing == null) {
-            toInsert.add(imported);
+            toInsert.add(card);
             cardsCreated++;
           } else {
-            if (_importedContentDiffers(existing, imported)) {
-              _applyImportedContent(existing, imported);
+            final changed = _applyImportedContent(existing, card);
+            if (changed) {
               toUpdate.add(existing);
               cardsUpdated++;
             } else {
@@ -885,53 +754,76 @@ class ImporterService {
             }
           }
         } else {
-          toInsert.add(imported);
+          toInsert.add(card);
           cardsCreated++;
         }
       }
     }
 
-    if (toInsert.isNotEmpty || toUpdate.isNotEmpty) {
-      await isar.writeTxn(() async {
-        if (toInsert.isNotEmpty) {
-          await isar.flashcards.putAll(toInsert);
-        }
-        if (toUpdate.isNotEmpty) {
-          await isar.flashcards.putAll(toUpdate);
-        }
-      });
-    }
-
-    final existingCardsNotPresentInImport =
-    options.action == ImportDeckConflictAction.updateExistingDeck
-        ? ((existingByLogicalKey.length - seenImportKeys.length).clamp(0, 1 << 30) as int)
-        : 0;
-
-    final cardsProcessed = cardsCreated + cardsUpdated + cardsUnchanged;
-
-    print("🎉 Importación de $cardsProcessed tarjetas procesadas.");
-    print(
-      "🔎 Diagnóstico media: "
-          "audio palabra faltante=$missingWordAudio, "
-          "audio oración faltante=$missingSentenceAudio, "
-          "imágenes faltantes=$missingImages",
-    );
+    // Persistir cambios
+    await isar.writeTxn(() async {
+      if (toInsert.isNotEmpty) {
+        await isar.flashcards.putAll(toInsert);
+      }
+      if (toUpdate.isNotEmpty) {
+        await isar.flashcards.putAll(toUpdate);
+      }
+    });
 
     return _MergeImportSummary(
-      sqliteRowsRead: rows.length,
-      cardsProcessed: cardsProcessed,
+      deckSettingsCreated: deckSettingsCreated,
+      deckSettingsUpdated: deckSettingsUpdated,
+      deckSettingsPreserved: deckSettingsPreserved,
+      sqliteRows: rows.length,
       cardsCreated: cardsCreated,
       cardsUpdated: cardsUpdated,
       cardsUnchanged: cardsUnchanged,
       duplicateLogicalCardsInImport: duplicateLogicalCardsInImport,
-      existingCardsNotPresentInImport: existingCardsNotPresentInImport,
-      deckSettingsCreated: deckSettingsCreated,
-      deckSettingsUpdated: deckSettingsUpdated,
-      deckSettingsPreserved: deckSettingsPreserved,
       missingWordAudio: missingWordAudio,
       missingSentenceAudio: missingSentenceAudio,
       missingImages: missingImages,
     );
+  }
+
+  String _logicalKey(String originalId, String cardType) => '$originalId::$cardType';
+
+  bool _applyImportedContent(Flashcard existing, Flashcard incoming) {
+    bool changed = false;
+
+    if (existing.question != incoming.question) {
+      existing.question = incoming.question;
+      changed = true;
+    }
+    if (existing.answer != incoming.answer) {
+      existing.answer = incoming.answer;
+      changed = true;
+    }
+    if (existing.sentence != incoming.sentence) {
+      existing.sentence = incoming.sentence;
+      changed = true;
+    }
+    if (existing.translation != incoming.translation) {
+      existing.translation = incoming.translation;
+      changed = true;
+    }
+    if (existing.audioPath != incoming.audioPath) {
+      existing.audioPath = incoming.audioPath;
+      changed = true;
+    }
+    if (existing.sentenceAudioPath != incoming.sentenceAudioPath) {
+      existing.sentenceAudioPath = incoming.sentenceAudioPath;
+      changed = true;
+    }
+    if (existing.imagePath != incoming.imagePath) {
+      existing.imagePath = incoming.imagePath;
+      changed = true;
+    }
+    if (existing.extraDataJson != incoming.extraDataJson) {
+      existing.extraDataJson = incoming.extraDataJson;
+      changed = true;
+    }
+
+    return changed;
   }
 
   DeckSettings _buildDeckSettingsFromManifest({
@@ -976,12 +868,10 @@ class ImporterService {
         settings.lapseTolerance = (custom['lapse_tolerance'] as num).toInt();
       }
       if (custom['use_fixed_interval_on_lapse'] != null) {
-        settings.useFixedIntervalOnLapse =
-        custom['use_fixed_interval_on_lapse'] as bool;
+        settings.useFixedIntervalOnLapse = custom['use_fixed_interval_on_lapse'] as bool;
       }
       if (custom['lapse_fixed_interval'] != null) {
-        settings.lapseFixedInterval =
-            (custom['lapse_fixed_interval'] as num).toDouble();
+        settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
       }
 
       if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
@@ -1002,8 +892,7 @@ class ImporterService {
         settings.enableWriteMode = custom['enable_write_mode'] as bool;
       }
       if (custom['write_mode_threshold'] != null) {
-        settings.writeModeThreshold =
-            (custom['write_mode_threshold'] as num).toInt();
+        settings.writeModeThreshold = (custom['write_mode_threshold'] as num).toInt();
       }
       if (custom['write_mode_max_reps'] != null) {
         settings.writeModeMaxReps = (custom['write_mode_max_reps'] as num).toInt();
@@ -1057,8 +946,8 @@ class ImporterService {
       ..audioPath = audioPath
       ..imagePath = imagePath
       ..sentenceAudioPath = sentenceAudioPath
-      ..sentence = row['TRADUCCION']?.toString()
       ..translation = row['ORACION']?.toString()
+      ..sentence = row['TRADUCCION']?.toString()
       ..state = CardState.newCard
       ..extraDataJson = jsonEncode({
         "target_reading": row['LECTURA_PALABRA'],
@@ -1072,163 +961,25 @@ class ImporterService {
 
     return [cardRecog, cardProd];
   }
-
-  String _logicalKey(String originalId, String cardType) => '$originalId||$cardType';
-
-  bool _importedContentDiffers(Flashcard existing, Flashcard imported) {
-    return existing.isoCode != imported.isoCode ||
-        existing.packName != imported.packName ||
-        existing.cardType != imported.cardType ||
-        existing.question != imported.question ||
-        existing.answer != imported.answer ||
-        existing.audioPath != imported.audioPath ||
-        existing.sentenceAudioPath != imported.sentenceAudioPath ||
-        existing.imagePath != imported.imagePath ||
-        existing.sentence != imported.sentence ||
-        existing.translation != imported.translation ||
-        existing.extraDataJson != imported.extraDataJson;
-  }
-
-  void _applyImportedContent(Flashcard target, Flashcard imported) {
-    // Preservamos todo el progreso SRS/estado del usuario.
-    target
-      ..isoCode = imported.isoCode
-      ..packName = imported.packName
-      ..cardType = imported.cardType
-      ..question = imported.question
-      ..answer = imported.answer
-      ..audioPath = imported.audioPath
-      ..sentenceAudioPath = imported.sentenceAudioPath
-      ..imagePath = imported.imagePath
-      ..sentence = imported.sentence
-      ..translation = imported.translation
-      ..extraDataJson = imported.extraDataJson;
-  }
-
-  // ============================================================
-  //  Helper listado manual
-  // ============================================================
-
-  Future<List<FileSystemEntity>> _manualRecursiveList(Directory dir) async {
-    final List<FileSystemEntity> files = [];
-    await for (final entity in dir.list(recursive: false)) {
-      files.add(entity);
-      if (entity is Directory) {
-        files.addAll(await _manualRecursiveList(entity));
-      }
-    }
-    return files;
-  }
 }
-
-class _PreparedImportPackage {
-  final String zipFilePath;
-  final Directory extractDir;
-
-  final int archiveEntriesTotal;
-  final int archiveRealFileEntries;
-  final _ExtractReport extractReport;
-
-  final List<FileSystemEntity> allEntities;
-  final Directory packageRoot;
-  final Map<String, dynamic> manifestData;
-  final String isoCode;
-  final String packName;
-  final String dbFilename;
-  final File dbFile;
-  final _MediaProcessResult? mediaResult;
-
-  const _PreparedImportPackage({
-    required this.zipFilePath,
-    required this.extractDir,
-    required this.archiveEntriesTotal,
-    required this.archiveRealFileEntries,
-    required this.extractReport,
-    required this.allEntities,
-    required this.packageRoot,
-    required this.manifestData,
-    required this.isoCode,
-    required this.packName,
-    required this.dbFilename,
-    required this.dbFile,
-    required this.mediaResult,
-  });
-}
-
-class _MergeImportSummary {
-  final int sqliteRowsRead;
-  final int cardsProcessed;
-  final int cardsCreated;
-  final int cardsUpdated;
-  final int cardsUnchanged;
-  final int duplicateLogicalCardsInImport;
-  final int existingCardsNotPresentInImport;
-
-  final bool deckSettingsCreated;
-  final bool deckSettingsUpdated;
-  final bool deckSettingsPreserved;
-
-  final int missingWordAudio;
-  final int missingSentenceAudio;
-  final int missingImages;
-
-  const _MergeImportSummary({
-    required this.sqliteRowsRead,
-    required this.cardsProcessed,
-    required this.cardsCreated,
-    required this.cardsUpdated,
-    required this.cardsUnchanged,
-    required this.duplicateLogicalCardsInImport,
-    required this.existingCardsNotPresentInImport,
-    required this.deckSettingsCreated,
-    required this.deckSettingsUpdated,
-    required this.deckSettingsPreserved,
-    required this.missingWordAudio,
-    required this.missingSentenceAudio,
-    required this.missingImages,
-  });
-}
-
-class _ExtractReport {
-  final int filesWritten;
-  final int dirsCreated;
-  final int collisions;
-  final int skipped;
-  final int errors;
-
-  const _ExtractReport({
-    required this.filesWritten,
-    required this.dirsCreated,
-    required this.collisions,
-    required this.skipped,
-    required this.errors,
-  });
-}
-
-class _MediaProcessResult {
-  final MediaIndex index;
-  final int copied;
-  final int skipped;
-  final int duplicateKeys;
-
-  const _MediaProcessResult({
-    required this.index,
-    required this.copied,
-    required this.skipped,
-    required this.duplicateKeys,
-  });
-}
-
-// ============================================================
-//  Clase índice media (más tolerante)
-// ============================================================
 
 class MediaIndex {
   final Map<String, String> exactMap;
   final Map<String, String> lowerCaseMap;
   final Map<String, String> stemMap;
 
-  MediaIndex(this.exactMap, this.lowerCaseMap, this.stemMap);
+  final int filesCopied;
+  final int filesSkipped;
+  final int keyCollisions;
+
+  MediaIndex(
+      this.exactMap,
+      this.lowerCaseMap,
+      this.stemMap, {
+        required this.filesCopied,
+        required this.filesSkipped,
+        required this.keyCollisions,
+      });
 
   String? find(String? filename) {
     if (filename == null || filename.trim().isEmpty) return null;

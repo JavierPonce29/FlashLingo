@@ -22,11 +22,11 @@ final importerServiceProvider = AutoDisposeProvider<ImporterService>.internal(
 
 typedef ImporterServiceRef = AutoDisposeProviderRef<ImporterService>;
 String _$importerControllerHash() =>
-    r'68b180da46e949e7a6d4f44b1e28086912bf5276';
+    r'f74f75c12fd6142919d59b0a16f1dafc066ee498';
 
 /// Controlador de importación para UI:
 /// - expone loading/error
-/// - permite preview + import normal + import avanzado
+/// - permite preview + import (legacy wrapper) + import avanzado
 ///
 /// Copied from [ImporterController].
 @ProviderFor(ImporterController)
