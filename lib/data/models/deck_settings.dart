@@ -36,18 +36,24 @@ class DeckSettings {
   DateTime? lastNewCardStudyDate;
 
   // =========================
+  // Day Cutoff (inicio del día de estudio)
+  // =========================
+  /// Hora (0..23) en la que empieza el "día de estudio". Default 4 AM.
+  /// Nullable para compatibilidad: null => 4.
+  int? dayCutoffHour = 4;
+
+  /// Minuto (0..59) del cutoff. Default 0.
+  /// Nullable para compatibilidad: null => 0.
+  int? dayCutoffMinute = 0;
+
+  // =========================
   // Nuevas (mínimo de aciertos el primer día)
   // =========================
 
   /// Aciertos mínimos antes de permitir que una tarjeta NUEVA pase a un día futuro.
-  /// Ejemplo: 2 => la primera vez que respondes "Bien" una nueva, se reprograma intra-día
-  /// y solo tras el segundo "Bien" pasa al siguiente día (según learningSteps).
   int newCardMinCorrectReps = 2;
 
   /// Minutos del paso intra-día usado para nuevas cuando newCardMinCorrectReps > 1.
-  /// Nota: en la app actual no se fuerza esperar estos minutos; la carta se re-encola
-  /// "más adelante" en la sesión, pero este valor se guarda en nextReview y sirve si
-  /// el usuario sale y vuelve más tarde (o al día siguiente).
   int newCardIntraDayMinutes = 10;
 
   // =========================
@@ -72,27 +78,22 @@ class DeckSettings {
   double lapseFixedInterval = 1.0;
 
   // =========================
-  // Modo escritura
+  // Write Mode
   // =========================
   bool enableWriteMode = false;
   int writeModeThreshold = 80;
   int writeModeMaxReps = 0;
 
   // =========================
-  // Undo (Deshacer)
+  // Undo
   // =========================
   bool enableUndo = true;
 
   // =========================
-  // Orden / Mezcla de estudio
+  // Mezcla / orden de sesión
   // =========================
-
-  /// Ver [DeckStudyMixMode]
   String studyMixMode = DeckStudyMixMode.reviewsFirst;
 
-  /// Para modos intercalados: cuántos repasos seguidos tomar.
-  int interleaveReviewsCount = 1;
-
-  /// Para modos intercalados: cuántas nuevas seguidas tomar.
+  int interleaveReviewsCount = 2;
   int interleaveNewCardsCount = 1;
 }

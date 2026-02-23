@@ -8,6 +8,7 @@ import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/utils/study_day.dart';
 
 part 'deck_provider.g.dart';
 
@@ -47,16 +48,18 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
     final summaries = <DeckSummary>[];
 
     for (final s in decks) {
-      // Reset diario newCardsSeenToday
+      // Reset diario newCardsSeenToday (basado en cutoff configurable)
+      final currentLabel = StudyDay.label(now, s);
       final last = s.lastNewCardStudyDate;
-      final bool sameDay = last != null &&
-          last.year == now.year &&
-          last.month == now.month &&
-          last.day == now.day;
+      final lastLabel = last == null ? null : StudyDay.label(last, s);
+      final bool sameStudyDay = lastLabel != null &&
+          lastLabel.year == currentLabel.year &&
+          lastLabel.month == currentLabel.month &&
+          lastLabel.day == currentLabel.day;
 
-      if (!sameDay) {
+      if (!sameStudyDay) {
         s.newCardsSeenToday = 0;
-        s.lastNewCardStudyDate = now;
+        s.lastNewCardStudyDate = currentLabel;
         await isar.writeTxn(() async {
           await isar.deckSettings.put(s);
         });
@@ -93,7 +96,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           .not()
           .stateEqualTo(CardState.newCard)
           .and()
-      // lessThan(now) deja fuera igualdad exacta. Para ser inclusivos:
+      // Inclusivo:
           .nextReviewLessThan(now.add(const Duration(seconds: 1)))
           .limit(s.maxReviewsPerDay)
           .findAll();

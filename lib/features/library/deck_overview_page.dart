@@ -9,6 +9,7 @@ import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
 
 class DeckOverviewPage extends ConsumerWidget {
@@ -75,29 +76,30 @@ class DeckOverviewPage extends ConsumerWidget {
       });
     }
 
-    // --- GESTIÓN DE LÍMITE DIARIO ---
-    // Verificar si es un nuevo día para resetear el contador en la DB
+    // --- GESTIÓN DE LÍMITE DIARIO (basado en cutoff configurable) ---
+    final currentLabel = StudyDay.label(now, settings);
     final last = settings.lastNewCardStudyDate;
-    final bool isSameDay = last != null &&
-        last.year == now.year &&
-        last.month == now.month &&
-        last.day == now.day;
+    final lastLabel = last == null ? null : StudyDay.label(last, settings);
+    final bool isSameStudyDay = lastLabel != null &&
+        lastLabel.year == currentLabel.year &&
+        lastLabel.month == currentLabel.month &&
+        lastLabel.day == currentLabel.day;
 
-    if (!isSameDay) {
+    if (!isSameStudyDay) {
       settings.newCardsSeenToday = 0;
-      settings.lastNewCardStudyDate = now;
+      settings.lastNewCardStudyDate = currentLabel;
 
       await isar.writeTxn(() async {
         await isar.deckSettings.put(settings!);
       });
     }
 
-    // 2) Si existe una sesión guardada DEL MISMO DÍA, reanudarla.
+    // 2) Si existe una sesión guardada DEL MISMO DÍA (de estudio), reanudarla.
     final existingSession =
     await isar.studySessions.filter().packNameEqualTo(packName).findFirst();
 
     if (existingSession != null) {
-      if (_isSameDay(existingSession.sessionDay, now)) {
+      if (_isSameDay(existingSession.sessionDay, currentLabel)) {
         final resumedCards =
         await _loadCardsFromSession(isar, existingSession.queueCardIds);
 
@@ -124,7 +126,7 @@ class DeckOverviewPage extends ConsumerWidget {
           await isar.studySessions.delete(existingSession.id);
         });
       } else {
-        // Sesión vieja: eliminar para evitar mezclar días.
+        // Sesión vieja: eliminar para evitar mezclar días de estudio.
         await isar.writeTxn(() async {
           await isar.studySessions.delete(existingSession.id);
         });
@@ -135,14 +137,14 @@ class DeckOverviewPage extends ConsumerWidget {
     final int remainingQuota =
     max(0, settings.newCardsPerDay - settings.newCardsSeenToday);
 
-    // 4) Obtener REPASOS (Limitados)
+    // 4) Obtener REPASOS (Limitados) (inclusivo)
     final reviews = await isar.flashcards
         .filter()
         .packNameEqualTo(packName)
         .not()
         .stateEqualTo(CardState.newCard)
         .and()
-        .nextReviewLessThan(now)
+        .nextReviewLessThan(now.add(const Duration(seconds: 1)))
         .limit(settings.maxReviewsPerDay)
         .findAll();
 
@@ -160,7 +162,7 @@ class DeckOverviewPage extends ConsumerWidget {
           .limit(remainingQuota)
           .findAll();
 
-      // Ordenar Recog -> Prod (esto se mantiene dentro del bloque de nuevas)
+      // Ordenar Recog -> Prod
       final newRecog =
       newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
       final newProd =
@@ -178,9 +180,7 @@ class DeckOverviewPage extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (sessionCards.isEmpty) {
-      // Mensaje específico si es por límite diario
       String message = "¡Todo al día! No hay cartas pendientes.";
-
       if (remainingQuota == 0 && settings.newCardsPerDay > 0) {
         message = "¡Límite diario de nuevas alcanzado!";
       }
@@ -191,12 +191,12 @@ class DeckOverviewPage extends ConsumerWidget {
       return;
     }
 
-    // 7) Crear StudySession persistida (para poder salir y volver)
+    // 7) Crear StudySession persistida
     final session = StudySession()
       ..packName = packName
       ..queueCardIds = sessionCards.map((c) => c.id).toList()
       ..currentIndex = 0
-      ..sessionDay = DateTime(now.year, now.month, now.day)
+      ..sessionDay = currentLabel
       ..lastUpdated = now;
 
     await isar.writeTxn(() async {

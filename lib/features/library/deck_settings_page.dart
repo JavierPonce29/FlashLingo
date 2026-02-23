@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
+import 'package:flashcards_app/data/models/study_session.dart';
 
 class DeckSettingsPage extends ConsumerStatefulWidget {
   final String packName;
@@ -49,6 +50,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   String _studyMixMode = DeckStudyMixMode.reviewsFirst;
   late final TextEditingController _interleaveReviewsCountController;
   late final TextEditingController _interleaveNewCardsCountController;
+
+  // --- DAY CUTOFF (inicio del día de estudio) ---
+  int _dayCutoffHour = 4;
+  int _dayCutoffMinute = 0;
 
   bool _isLoading = true;
 
@@ -135,6 +140,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
     _loadedSettings = settings;
 
+    // Day cutoff
+    _dayCutoffHour = (settings.dayCutoffHour ?? 4).clamp(0, 23);
+    _dayCutoffMinute = (settings.dayCutoffMinute ?? 0).clamp(0, 59);
+
     // Cargar valores
     _newCardsLimitController.text = settings.newCardsPerDay.toString();
     _reviewsLimitController.text = settings.maxReviewsPerDay.toString();
@@ -168,10 +177,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
         ? settings.studyMixMode
         : DeckStudyMixMode.reviewsFirst;
-    _interleaveReviewsCountController.text =
-        settings.interleaveReviewsCount.toString();
-    _interleaveNewCardsCountController.text =
-        settings.interleaveNewCardsCount.toString();
+    _interleaveReviewsCountController.text = settings.interleaveReviewsCount.toString();
+    _interleaveNewCardsCountController.text = settings.interleaveNewCardsCount.toString();
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -189,39 +196,28 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
     final tolerance = int.parse(_lapseToleranceController.text.trim());
     final lapseDays = _useFixedIntervalOnLapse
-        ? double.parse(
-      _lapseFixedIntervalController.text.trim().replaceAll(',', '.'),
-    )
+        ? double.parse(_lapseFixedIntervalController.text.trim().replaceAll(',', '.'))
         : 1.0; // valor no usado si switch está apagado
 
     final pMin = double.parse(_pMinController.text.trim().replaceAll(',', '.'));
-    final alpha = double.parse(
-      _alphaController.text.trim().replaceAll(',', '.'),
-    );
+    final alpha = double.parse(_alphaController.text.trim().replaceAll(',', '.'));
     final beta = double.parse(_betaController.text.trim().replaceAll(',', '.'));
-    final offset = double.parse(
-      _offsetController.text.trim().replaceAll(',', '.'),
-    );
-    final initialNt = double.parse(
-      _initialNtController.text.trim().replaceAll(',', '.'),
-    );
+    final offset = double.parse(_offsetController.text.trim().replaceAll(',', '.'));
+    final initialNt = double.parse(_initialNtController.text.trim().replaceAll(',', '.'));
 
     final learningSteps = _parseLearningSteps(_learningStepsController.text);
 
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
 
-    final writeThres = _enableWriteMode
-        ? int.parse(_writeThresholdController.text.trim())
-        : 80;
-    final writeReps = _enableWriteMode
-        ? int.parse(_writeMaxRepsController.text.trim())
-        : 0;
+    final writeThres = _enableWriteMode ? int.parse(_writeThresholdController.text.trim()) : 80;
+    final writeReps = _enableWriteMode ? int.parse(_writeMaxRepsController.text.trim()) : 0;
 
-    final interleaveReviewsCount =
-    int.parse(_interleaveReviewsCountController.text.trim());
-    final interleaveNewCount =
-    int.parse(_interleaveNewCardsCountController.text.trim());
+    final interleaveReviewsCount = int.parse(_interleaveReviewsCountController.text.trim());
+    final interleaveNewCount = int.parse(_interleaveNewCardsCountController.text.trim());
+
+    final newCutoffHour = _dayCutoffHour.clamp(0, 23);
+    final newCutoffMinute = _dayCutoffMinute.clamp(0, 59);
 
     try {
       await isar.writeTxn(() async {
@@ -230,13 +226,17 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
             .packNameEqualTo(widget.packName)
             .findFirst();
 
-        final settingsToSave =
-            existing ?? (DeckSettings()..packName = widget.packName);
+        final oldCutoffHour = (existing?.dayCutoffHour ?? 4).clamp(0, 23);
+        final oldCutoffMinute = (existing?.dayCutoffMinute ?? 0).clamp(0, 59);
+
+        final settingsToSave = existing ?? (DeckSettings()..packName = widget.packName);
 
         settingsToSave
           ..packName = widget.packName
           ..newCardsPerDay = newLimit
           ..maxReviewsPerDay = revLimit
+          ..dayCutoffHour = newCutoffHour
+          ..dayCutoffMinute = newCutoffMinute
           ..lapseTolerance = tolerance
           ..useFixedIntervalOnLapse = _useFixedIntervalOnLapse
           ..lapseFixedInterval = lapseDays
@@ -257,6 +257,12 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..interleaveNewCardsCount = interleaveNewCount;
 
         await isar.deckSettings.put(settingsToSave);
+
+        // Si cambió el cutoff, limpiamos la sesión persistida para evitar reanudaciones inconsistentes.
+        if (oldCutoffHour != newCutoffHour || oldCutoffMinute != newCutoffMinute) {
+          await isar.studySessions.filter().packNameEqualTo(widget.packName).deleteAll();
+        }
+
         _loadedSettings = settingsToSave;
       });
 
@@ -287,10 +293,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final parts = raw
         .split(',')
         .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) return [1.0, 4.0];
+        .where((s) => s.isNotEmpty);
 
     final list = <double>[];
     for (final p in parts) {
@@ -424,6 +427,75 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               ),
               const SizedBox(height: 20),
 
+              // --- DAY CUTOFF ---
+              _buildSectionTitle("Day Cutoff (inicio del día de estudio)"),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blueGrey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Define desde qué hora empieza tu 'día de estudio'.\n"
+                          "Ej: 04:00 => lo que estudies a las 02:00 cuenta como el día anterior.",
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _dayCutoffHour,
+                            decoration: const InputDecoration(
+                              labelText: "Hora",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: List.generate(
+                              24,
+                                  (h) => DropdownMenuItem(
+                                value: h,
+                                child: Text(h.toString().padLeft(2, '0')),
+                              ),
+                            ),
+                            onChanged: (v) =>
+                                setState(() => _dayCutoffHour = v ?? 4),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _dayCutoffMinute,
+                            decoration: const InputDecoration(
+                              labelText: "Minuto",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: List.generate(
+                              60,
+                                  (m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(m.toString().padLeft(2, '0')),
+                              ),
+                            ),
+                            onChanged: (v) =>
+                                setState(() => _dayCutoffMinute = v ?? 0),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Cutoff actual: ${_dayCutoffHour.toString().padLeft(2, '0')}:${_dayCutoffMinute.toString().padLeft(2, '0')}",
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
               // --- ORDEN / MEZCLA ---
               _buildSectionTitle("Orden del Estudio / Mezcla"),
               Container(
@@ -528,16 +600,14 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                       ),
                       value: _enableWriteMode,
                       activeColor: Colors.deepPurple,
-                      onChanged: (val) =>
-                          setState(() => _enableWriteMode = val),
+                      onChanged: (val) => setState(() => _enableWriteMode = val),
                     ),
                     if (_enableWriteMode) ...[
                       const SizedBox(height: 10),
                       _buildTextField(
                         controller: _writeThresholdController,
                         label: "Exactitud Mínima (%)",
-                        helper:
-                        "Si no llegas a este % se bloquea el botón 'Bien'.",
+                        helper: "Si no llegas a este % se bloquea el botón 'Bien'.",
                         inputType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
@@ -604,12 +674,9 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 label: "Pasos (DÍAS)",
                 helper:
                 "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
                 validator: _validateLearningSteps,
               ),
-
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -663,7 +730,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
 
               // --- ALGORITMO ---
@@ -672,9 +738,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 controller: _pMinController,
                 label: "P_min",
                 helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) => _validateDouble(
                   v,
                   label: 'P_min',
@@ -687,31 +751,23 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 controller: _alphaController,
                 label: "Alpha",
                 helper: "Correcto: nt = nt * (1 - alpha).",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (v) =>
-                    _validateDouble(v, label: 'Alpha', min: 0),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => _validateDouble(v, label: 'Alpha', min: 0),
               ),
               const SizedBox(height: 10),
               _buildTextField(
                 controller: _betaController,
                 label: "Beta",
                 helper: "Incorrecto: nt = nt * (1 + beta).",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (v) =>
-                    _validateDouble(v, label: 'Beta', min: 0),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => _validateDouble(v, label: 'Beta', min: 0),
               ),
               const SizedBox(height: 10),
               _buildTextField(
                 controller: _offsetController,
                 label: "Offset (días)",
                 helper: "Se resta al intervalo final.",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) => _validateDouble(v, label: 'Offset'),
               ),
               const SizedBox(height: 10),
@@ -719,9 +775,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 controller: _initialNtController,
                 label: "Nt inicial",
                 helper: "Decaimiento inicial.",
-                inputType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                inputType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) => _validateDouble(
                   v,
                   label: 'Nt inicial',
@@ -735,8 +789,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               _buildTextField(
                 controller: _lapseToleranceController,
                 label: "Tolerancia (lapses)",
-                helper:
-                "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
+                helper: "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
                 inputType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
@@ -751,20 +804,16 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               const SizedBox(height: 10),
               SwitchListTile(
                 title: const Text("Usar intervalo fijo en lapse"),
-                subtitle: const Text(
-                  "Si está activo, un lapse programa un intervalo fijo.",
-                ),
+                subtitle: const Text("Si está activo, un lapse programa un intervalo fijo."),
                 value: _useFixedIntervalOnLapse,
-                onChanged: (v) =>
-                    setState(() => _useFixedIntervalOnLapse = v),
+                onChanged: (v) => setState(() => _useFixedIntervalOnLapse = v),
               ),
               if (_useFixedIntervalOnLapse) ...[
                 _buildTextField(
                   controller: _lapseFixedIntervalController,
                   label: "Intervalo fijo (días)",
                   helper: "Ej: 1.0",
-                  inputType:
-                  const TextInputType.numberWithOptions(decimal: true),
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (v) => _validateDouble(
                     v,
                     label: 'Intervalo fijo',

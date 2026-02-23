@@ -8,6 +8,7 @@ import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
 import 'package:flashcards_app/features/study_session/srs_service.dart';
 
@@ -392,8 +393,20 @@ class _StudyPageState extends State<StudyPage> {
           prevSeen = latest.newCardsSeenToday;
           prevLastDate = latest.lastNewCardStudyDate;
 
+          final currentLabel = StudyDay.label(now, latest);
+          final last = latest.lastNewCardStudyDate;
+          final lastLabel = last == null ? null : StudyDay.label(last, latest);
+          final bool sameStudyDay = lastLabel != null &&
+              lastLabel.year == currentLabel.year &&
+              lastLabel.month == currentLabel.month &&
+              lastLabel.day == currentLabel.day;
+
+          if (!sameStudyDay) {
+            latest.newCardsSeenToday = 0;
+          }
+
           latest.newCardsSeenToday += 1;
-          latest.lastNewCardStudyDate = now;
+          latest.lastNewCardStudyDate = currentLabel;
           await isar.deckSettings.put(latest);
           _currentDeckSettings = latest;
         }
@@ -510,7 +523,9 @@ class _StudyPageState extends State<StudyPage> {
     if (isar == null) return;
 
     final now = DateTime.now();
-    final day = DateTime(now.year, now.month, now.day);
+    final day = _currentDeckSettings != null
+        ? StudyDay.label(now, _currentDeckSettings!)
+        : DateTime(now.year, now.month, now.day);
 
     await isar.writeTxn(() async {
       var session = await isar.studySessions

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/data/utils/study_day.dart';
 
 class SrsService {
   /// Retorna `true` si la carta debe repetirse hoy dentro de la misma sesión
@@ -32,7 +33,7 @@ class SrsService {
       } else {
         // Si falla, se queda como new y vuelve a aparecer pronto (intra-día).
         card.learningStep = 0;
-        _scheduleNextReview(card, _minutesToDays(1), now); // 1 minuto
+        _scheduleNextReview(card, _minutesToDays(1), now, settings); // 1 minuto
         return true;
       }
     }
@@ -61,6 +62,7 @@ class SrsService {
   bool _handleLearningSuccess(Flashcard card, DeckSettings settings, DateTime now) {
     // Reset streak de lapses cuando el usuario acierta (evita arrastre desde learning).
     card.consecutiveLapses = 0;
+
     // Si no hay pasos, por seguridad calculamos con algoritmo.
     if (card.fixedPhaseQueue.isEmpty) {
       card.state = CardState.review;
@@ -76,7 +78,7 @@ class SrsService {
       card.learningStep = nextIndex;
 
       final intervalDays = card.fixedPhaseQueue[nextIndex];
-      _scheduleNextReview(card, intervalDays, now);
+      _scheduleNextReview(card, intervalDays, now, settings);
 
       // Repetir hoy si es un intervalo intra-día (< 1 día)
       return intervalDays < 1.0;
@@ -92,14 +94,18 @@ class SrsService {
     return false;
   }
 
-  bool _handleLearningFailure(Flashcard card, DeckSettings settings, DateTime now,) {
+  bool _handleLearningFailure(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     card.learningStep = -1;
 
     // Reiniciar cola de pasos (no la reescribimos si ya existía, solo si está vacía)
     _ensureFixedQueueInitialized(card, settings);
 
     // Castigo intra-día: 10 min
-    _scheduleNextReview(card, _minutesToDays(10), now);
+    _scheduleNextReview(card, _minutesToDays(10), now, settings);
     return true;
   }
 
@@ -107,9 +113,14 @@ class SrsService {
   // Review
   // =========================
 
-  bool _applyEbbinghausFailure(Flashcard card, DeckSettings settings, DateTime now,) {
+  bool _applyEbbinghausFailure(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     // Fallo en REVIEW: incrementa la racha de lapses para que lapseTolerance funcione.
     card.consecutiveLapses++;
+
     // Fallo: el olvido se hace más rápido (nt sube).
     card.decayRate = card.decayRate * (1.0 + settings.beta);
 
@@ -126,14 +137,14 @@ class SrsService {
       _ensureFixedQueueInitialized(card, settings);
 
       // Castigo corto intra-día (10 min) para volver a entrar en la cola.
-      _scheduleNextReview(card, _minutesToDays(10), now);
+      _scheduleNextReview(card, _minutesToDays(10), now, settings);
       return true;
     }
 
     // B) CASTIGO SUAVE
     if (settings.useFixedIntervalOnLapse) {
       final intervalDays = settings.lapseFixedInterval;
-      _scheduleNextReview(card, intervalDays, now);
+      _scheduleNextReview(card, intervalDays, now, settings);
       return intervalDays < 1.0;
     } else {
       // El algoritmo decide (pero con decayRate ya empeorado).
@@ -142,9 +153,14 @@ class SrsService {
     }
   }
 
-  void _applyEbbinghausSuccess(Flashcard card, DeckSettings settings, DateTime now,) {
+  void _applyEbbinghausSuccess(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     // Éxito en REVIEW: reinicia la racha de lapses.
     card.consecutiveLapses = 0;
+
     // Éxito: el olvido se hace más lento (nt baja).
     card.decayRate = card.decayRate * (1.0 - settings.alpha);
 
@@ -162,7 +178,11 @@ class SrsService {
     }
   }
 
-  void _calculateAndSchedule(Flashcard card, DeckSettings settings, DateTime now,) {
+  void _calculateAndSchedule(
+      Flashcard card,
+      DeckSettings settings,
+      DateTime now,
+      ) {
     // Fórmula: Intervalo = (-ln(P_min) / nt) - Offset
     final pMinSafe = settings.pMin.clamp(1e-6, 0.999999).toDouble();
     final numerator = -log(pMinSafe);
@@ -179,14 +199,18 @@ class SrsService {
       intervalDays = max(1, intervalDays);
     }
 
-    _scheduleNextReview(card, intervalDays.toDouble(), now);
+    _scheduleNextReview(card, intervalDays.toDouble(), now, settings);
   }
 
   // =========================
   // Helpers: fixed queue init
   // =========================
 
-  void _ensureFixedQueueInitialized(Flashcard card, DeckSettings settings, {bool forNewCard = false,}) {
+  void _ensureFixedQueueInitialized(
+      Flashcard card,
+      DeckSettings settings, {
+        bool forNewCard = false,
+      }) {
     // IMPORTANTE:
     // Para tarjetas NUEVAS, SIEMPRE reconstruimos la cola para inyectar
     // los pasos intra-día (newCardMinCorrectReps / newCardIntraDayMinutes),
@@ -221,28 +245,29 @@ class SrsService {
   }
 
   // =========================
-  // Scheduling (normalización 04:00)
+  // Scheduling (día de estudio + cutoff configurable)
   // =========================
 
-  void _scheduleNextReview(Flashcard card, double intervalDays, DateTime now) {
-    // Permitir fracciones (intra-día): minutos/horas exactas desde "ahora".
+  void _scheduleNextReview(
+      Flashcard card,
+      double intervalDays,
+      DateTime now,
+      DeckSettings settings,
+      ) {
+    // Intra-día (< 1.0): minutos/horas exactas desde "ahora".
     if (intervalDays < 1.0) {
       final minutes = max(1, (intervalDays * 1440).round());
       card.nextReview = now.add(Duration(minutes: minutes));
       return;
     }
 
-    // 1 día o más: usar día calendario + normalizar a las 04:00.
+    // Días (>= 1.0): relativo al "día de estudio" (cutoff) y normalizado al cutoff.
+    // Ejemplo: cutoff=04:00, now=02:00 => el día de estudio actual empezó "ayer" 04:00.
+    // Si intervalDays=1 => programa "hoy" a las 04:00.
     final days = max(1, intervalDays.ceil());
-    final targetDate = now.add(Duration(days: days));
-
-    card.nextReview = DateTime(
-      targetDate.year,
-      targetDate.month,
-      targetDate.day,
-      4, // 04:00 AM
-      0,
-    );
+    final base = StudyDay.start(now, settings);
+    final target = base.add(Duration(days: days));
+    card.nextReview = target; // ya está en cutoff exacto
   }
 
   double _minutesToDays(int minutes) => minutes / 1440.0;
