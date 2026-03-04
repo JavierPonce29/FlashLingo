@@ -2,33 +2,20 @@ import 'dart:async';
 
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
-
 part 'deck_provider.g.dart';
 
 class DeckSummary {
   final String packName;
-
-  /// Icono (URI file:///) del mazo. Si es null, la UI usa un icono por defecto.
   final String? iconUri;
-
-  /// Nuevas que aún pueden entrar hoy (limitadas por cuota restante).
   final int newCardsDue;
-
-  /// Cartas en “primer paso” (learningStep==0), aunque aún no estén vencidas.
-  /// Esto es exactamente lo que quieres mostrar en naranja.
   final int firstStepDue;
-
-  /// Repasos vencidos (no-new) excluyendo las del primer paso vencidas,
-  /// respetando maxReviewsPerDay.
   final int reviewCardsDue;
-
   DeckSummary({
     required this.packName,
     required this.iconUri,
@@ -36,21 +23,16 @@ class DeckSummary {
     required this.firstStepDue,
     required this.reviewCardsDue,
   });
-
-  // Compatibilidad con HomePage (usa deck.name)
   String get name => packName;
 }
 
 @Riverpod(keepAlive: true)
 Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
   final isar = await ref.watch(isarDbProvider.future);
-
   Future<List<DeckSummary>> compute() async {
     final now = DateTime.now();
-
     final decks = await isar.deckSettings.where().findAll();
     final summaries = <DeckSummary>[];
-
     for (final s in decks) {
       // Reset diario newCardsSeenToday (basado en cutoff configurable)
       final currentLabel = StudyDay.label(now, s);
@@ -60,7 +42,6 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           lastLabel.year == currentLabel.year &&
           lastLabel.month == currentLabel.month &&
           lastLabel.day == currentLabel.day;
-
       if (!sameStudyDay) {
         s.newCardsSeenToday = 0;
         s.lastNewCardStudyDate = currentLabel;
@@ -110,7 +91,6 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
       }
 
       final reviewDue = dueNonNew.length - firstStepDueNow;
-
       summaries.add(
         DeckSummary(
           packName: s.packName,
@@ -121,14 +101,11 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
         ),
       );
     }
-
     return summaries;
   }
 
   yield await compute();
-
   final controller = StreamController<void>(sync: true);
-
   final sub1 = isar.flashcards.watchLazy().listen((_) {
     if (!controller.isClosed) controller.add(null);
   });
@@ -150,7 +127,6 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
 @Riverpod(keepAlive: true)
 Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
   final isar = await ref.watch(isarDbProvider.future);
-
   await isar.writeTxn(() async {
     await isar.flashcards.filter().packNameEqualTo(packName).deleteAll();
     await isar.reviewLogs.filter().packNameEqualTo(packName).deleteAll();
@@ -178,7 +154,7 @@ Future<void> renameDeck(
   }
   if (oldName == newName) return;
 
-  // Evitar colisiones: DeckSettings o tarjetas "huérfanas" con ese nombre.
+  // Evitar colisiones
   final existingSettings =
   await isar.deckSettings.filter().packNameEqualTo(newName).findFirst();
   if (existingSettings != null) {

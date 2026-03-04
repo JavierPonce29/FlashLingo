@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:archive/archive.dart';
 import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sql;
 import 'package:uuid/uuid.dart';
-
 import '../../data/models/deck_settings.dart';
 import '../../data/models/flashcard.dart';
 
@@ -15,19 +13,10 @@ enum ImportDeckConflictAction {
   createNewDeck,
   updateExistingDeck,
 }
-
 class ImportExecutionOptions {
   final ImportDeckConflictAction action;
-
-  /// Solo se usa cuando [action] es [ImportDeckConflictAction.createNewDeck].
-  /// Permite renombrar el mazo importado para evitar conflicto.
   final String? customPackName;
-
-  /// Si se está actualizando un mazo existente:
-  /// - false (recomendado): conserva la configuración del usuario
-  /// - true: reemplaza la configuración del mazo con la del manifest importado
   final bool updateDeckSettingsFromManifest;
-
   const ImportExecutionOptions({
     required this.action,
     this.customPackName,
@@ -48,18 +37,14 @@ class ImportExecutionOptions {
 class ImportPreviewResult {
   final String zipFilePath;
   final String zipFileName;
-
   final String importedPackName;
   final String isoCode;
   final String dbFilename;
-
   final bool deckNameExists;
   final int sqliteRows;
   final int estimatedCardsToImport;
-
   final int zipEntriesTotal;
   final int zipRealFileEntries;
-
   const ImportPreviewResult({
     required this.zipFilePath,
     required this.zipFileName,
@@ -86,33 +71,25 @@ class ImportConflictException implements Exception {
 class ImportSummary {
   final String zipFilePath;
   final String zipFileName;
-
   final String importedPackName;
   final String targetPackName;
   final String isoCode;
-
   final bool deckSettingsCreated;
   final bool deckSettingsUpdated;
   final bool deckSettingsPreserved;
-
   final int sqliteRows;
   final int cardsCreated;
   final int cardsUpdated;
   final int cardsUnchanged;
-
   final int duplicateLogicalCardsInImport;
-
   final int missingWordAudio;
   final int missingSentenceAudio;
   final int missingImages;
-
   final int archiveEntriesTotal;
   final int archiveRealFileEntries;
-
   final int mediaFilesCopied;
   final int mediaFilesSkipped;
   final int mediaKeyCollisions;
-
   const ImportSummary({
     required this.zipFilePath,
     required this.zipFileName,
@@ -146,12 +123,9 @@ class _PreparedPackage {
   final String isoCode;
   final String dbFilename;
   final Map<String, dynamic> manifestData;
-
   final int archiveEntriesTotal;
   final int archiveRealFileEntries;
-
   final MediaIndex? mediaIndex;
-
   const _PreparedPackage({
     required this.extractDir,
     required this.packageRoot,
@@ -170,18 +144,14 @@ class _MergeImportSummary {
   final bool deckSettingsCreated;
   final bool deckSettingsUpdated;
   final bool deckSettingsPreserved;
-
   final int sqliteRows;
   final int cardsCreated;
   final int cardsUpdated;
   final int cardsUnchanged;
-
   final int duplicateLogicalCardsInImport;
-
   final int missingWordAudio;
   final int missingSentenceAudio;
   final int missingImages;
-
   const _MergeImportSummary({
     required this.deckSettingsCreated,
     required this.deckSettingsUpdated,
@@ -200,19 +170,15 @@ class _MergeImportSummary {
 class ImporterService {
   final Isar isar;
   final Uuid _uuid = const Uuid();
-
   ImporterService(this.isar);
-
   Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
     final prepared = await _preparePackage(zipFilePath, copyMedia: false);
-
     try {
       final sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
       try {
         final rows = await sqliteDb.rawQuery('SELECT COUNT(*) AS c FROM flashcards');
         final sqliteRows = (rows.isNotEmpty ? (rows.first['c'] as int?) : null) ?? 0;
         final exists = await _deckExistsByName(prepared.packName);
-
         return ImportPreviewResult(
           zipFilePath: zipFilePath,
           zipFileName: p.basename(zipFilePath),
@@ -232,22 +198,17 @@ class ImporterService {
       await _cleanupExtractDir(prepared.extractDir);
     }
   }
-
-  /// Importación avanzada con resolución explícita de conflicto.
   /// Devuelve un resumen para mostrar en pantalla al finalizar.
   Future<ImportSummary> importFlashcardPackageAdvanced(
       String zipFilePath, {
         required ImportExecutionOptions options,
       }) async {
     final prepared = await _preparePackage(zipFilePath, copyMedia: true);
-
     sql.Database? sqliteDb;
     try {
       final importedPackName = prepared.packName;
       final targetPackName = _resolveTargetPackName(importedPackName, options);
-
       final targetExists = await _deckExistsByName(targetPackName);
-
       if (options.action == ImportDeckConflictAction.createNewDeck && targetExists) {
         final preview = ImportPreviewResult(
           zipFilePath: zipFilePath,
@@ -263,7 +224,6 @@ class ImporterService {
         );
         throw ImportConflictException(preview);
       }
-
       if (options.action == ImportDeckConflictAction.updateExistingDeck && !targetExists) {
         throw StateError(
           "No existe el mazo '$targetPackName' para actualizar. "
@@ -272,7 +232,6 @@ class ImporterService {
       }
 
       sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
-
       final mediaIndex = prepared.mediaIndex!;
       final merge = await _migrateDataToIsar(
         sqliteDb,
@@ -329,7 +288,6 @@ class ImporterService {
     final settings =
     await isar.deckSettings.filter().packNameEqualTo(packName).findFirst();
     if (settings != null) return true;
-
     final anyCards = await isar.flashcards
         .filter()
         .packNameEqualTo(packName)
@@ -343,33 +301,24 @@ class ImporterService {
         required bool copyMedia,
       }) async {
     final extractDir = await _createTempExtractDir(zipFilePath);
-
     final fileBytes = await File(zipFilePath).readAsBytes();
     final archive = ZipDecoder().decodeBytes(fileBytes);
-
     int totalEntries = archive.length;
     int realFileEntries = 0;
 
-    // Extraer ZIP de forma segura (anti zip-slip)
     for (final entry in archive) {
       if (!entry.isFile) continue;
-
       final name = entry.name.replaceAll('\\', '/');
       if (name.startsWith('__MACOSX/')) continue;
-
       realFileEntries++;
-
       final normalized = p.normalize(name);
       if (normalized.contains('..')) {
         print("⚠️ Entrada sospechosa (zip-slip) ignorada: $name");
         continue;
       }
-
       final outPath = p.join(extractDir.path, normalized);
-
       final outFile = File(outPath);
       await outFile.parent.create(recursive: true);
-
       // Evitar overwrite silencioso: renombrar si ya existe
       var finalPath = outPath;
       int counter = 1;
@@ -389,18 +338,14 @@ class ImporterService {
     if (!manifestFile.existsSync()) {
       throw StateError("No se encontró manifest.json en el paquete.");
     }
-
     final manifestData =
     jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
-
     final isoCode = (manifestData['language_id'] ?? '').toString().trim();
     final packName = (manifestData['pack_name'] ?? '').toString().trim();
     final dbFilename = (manifestData['db_filename'] ?? '').toString().trim();
-
     if (isoCode.isEmpty || packName.isEmpty || dbFilename.isEmpty) {
       throw StateError("manifest.json inválido: faltan campos requeridos.");
     }
-
     final packageRoot = Directory(extractDir.path);
     final dbFile = File(p.join(extractDir.path, dbFilename));
     if (!dbFile.existsSync()) {
@@ -411,7 +356,6 @@ class ImporterService {
     if (copyMedia) {
       mediaIndex = await _processAllMedia(packageRoot, extractDir);
     }
-
     return _PreparedPackage(
       extractDir: extractDir,
       packageRoot: packageRoot,
@@ -430,7 +374,6 @@ class ImporterService {
     final docs = await getApplicationDocumentsDirectory();
     final tempRoot = Directory(p.join(docs.path, 'import_tmp'));
     await tempRoot.create(recursive: true);
-
     final name = p.basenameWithoutExtension(zipFilePath);
     final dir = Directory(p.join(tempRoot.path, "${name}_${DateTime.now().millisecondsSinceEpoch}"));
     await dir.create(recursive: true);
@@ -453,54 +396,42 @@ class ImporterService {
     final docs = await getApplicationDocumentsDirectory();
     final destDir = Directory(p.join(docs.path, 'media_assets'));
     await destDir.create(recursive: true);
-
     final exactMap = <String, String>{};
     final lowerCaseMap = <String, String>{};
     final stemMap = <String, String>{};
-
     int count = 0;
     int skipped = 0;
     int dupKeys = 0;
-
     final entities = extractDir
         .listSync(recursive: true)
         .whereType<File>()
         .where((f) => !p.basename(f.path).toLowerCase().endsWith('.db'))
         .where((f) => p.basename(f.path).toLowerCase() != 'manifest.json')
         .toList();
-
     for (final entity in entities) {
       final ext = p.extension(entity.path);
       if (ext.isEmpty) {
         skipped++;
         continue;
       }
-
       final uniqueName = "${_uuid.v4()}$ext";
       final destFile = File(p.join(destDir.path, uniqueName));
       await entity.copy(destFile.path);
-
-      final destUri = destFile.uri.toString(); // file:///...
+      final destUri = destFile.uri.toString();
       count++;
-
       final relFromPackage = _safeRelative(entity.path, packageRoot.path);
       final relFromExtract = _safeRelative(entity.path, extractDir.path);
-
       final keys = <String>{
         p.basename(entity.path),
         relFromPackage,
         relFromExtract,
       };
-
-      // también aceptar basename decodificado
       try {
         keys.add(Uri.decodeFull(p.basename(entity.path)));
       } catch (_) {}
-
       final stem1 = p.basenameWithoutExtension(p.basename(entity.path)).toLowerCase();
       final stem2 = p.basenameWithoutExtension(relFromPackage).toLowerCase();
       final stem3 = p.basenameWithoutExtension(relFromExtract).toLowerCase();
-
       for (final k in keys) {
         if (k.trim().isEmpty) continue;
         if (exactMap.containsKey(k)) {
@@ -529,10 +460,7 @@ class ImporterService {
         }
       }
     }
-
-    print(
-      "✅ Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)",
-    );
+    print("✅ Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)");
 
     return MediaIndex(
       exactMap,
@@ -560,8 +488,6 @@ class ImporterService {
     return s;
   }
 
-  /// Extrae referencia de icono del manifest (ruta dentro del zip).
-  /// Acepta varias claves para ser compatible con distintas versiones.
   String? _extractDeckIconRef(Map<String, dynamic> manifestData) {
     final candidates = <dynamic>[
       manifestData['deck_icon'],
@@ -572,13 +498,10 @@ class ImporterService {
       manifestData['icon_path'],
       manifestData['iconPath'],
     ];
-
     for (final c in candidates) {
       final s = _normalizeDbRef(c);
       if (s != null) return s;
     }
-
-    // También permitir que venga dentro de "settings"
     final settings = manifestData['settings'];
     if (settings is Map) {
       final m = Map<String, dynamic>.from(settings);
@@ -587,7 +510,6 @@ class ImporterService {
       );
       if (inner != null) return inner;
     }
-
     return null;
   }
 
@@ -610,18 +532,14 @@ class ImporterService {
       packName: targetPackName,
       manifestData: manifestData,
     );
-
     // Icono del mazo (si existe en manifest)
     final iconRef = _extractDeckIconRef(manifestData);
     final iconUri = mediaIndex.find(iconRef);
-
     bool deckSettingsCreated = false;
     bool deckSettingsUpdated = false;
     bool deckSettingsPreserved = false;
-
     final existingSettings =
     await isar.deckSettings.filter().packNameEqualTo(targetPackName).findFirst();
-
     await isar.writeTxn(() async {
       if (existingSettings == null) {
         importedSettings.deckIconUri = iconUri;
@@ -633,25 +551,17 @@ class ImporterService {
                 !options.updateDeckSettingsFromManifest) ||
                 (options.action == ImportDeckConflictAction.createNewDeck &&
                     targetDeckExistedBeforeImport);
-
         if (preserveUserSettings) {
           deckSettingsPreserved = true;
-
-          // Aunque preservemos settings, si el paquete trae icono, lo actualizamos
-          // (se considera "contenido del mazo", no preferencia de usuario).
           if (iconUri != null && iconUri != existingSettings.deckIconUri) {
             existingSettings.deckIconUri = iconUri;
             await isar.deckSettings.put(existingSettings);
           }
         } else {
-          // Reemplazar settings por las importadas, pero conservar tracking diario
           importedSettings.id = existingSettings.id;
           importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
           importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
-
-          // Icono: si el manifest no trae, conservamos el existente
           importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
-
           await isar.deckSettings.putByIndex('packName', importedSettings);
           deckSettingsUpdated = true;
         }
@@ -661,7 +571,6 @@ class ImporterService {
     // 2) Leer filas SQLite
     final rows = await db.query('flashcards');
     print("🗄️ Importando ${rows.length} registros de la base de datos...");
-
     final double initialNtValue = importedSettings.initialNt;
 
     // 3) Si es actualización, cargar tarjetas existentes del mazo una vez
@@ -674,10 +583,8 @@ class ImporterService {
       }
       print("🔎 Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.");
     }
-
     final List<Flashcard> toInsert = [];
     final List<Flashcard> toUpdate = [];
-
     final seenImportKeys = <String>{};
     int duplicateLogicalCardsInImport = 0;
     int cardsCreated = 0;
@@ -686,18 +593,14 @@ class ImporterService {
     int missingWordAudio = 0;
     int missingSentenceAudio = 0;
     int missingImages = 0;
-
     for (int i = 0; i < rows.length; i++) {
       final row = rows[i];
-
       final wordAudioRef = _normalizeDbRef(row['AUDIO_PALABRA']);
       final sentenceAudioRef = _normalizeDbRef(row['AUDIO_ORACION']);
       final imageRef = _normalizeDbRef(row['IMAGEN']);
-
       final String? audioPath = mediaIndex.find(wordAudioRef);
       final String? sentenceAudioPath = mediaIndex.find(sentenceAudioRef);
       final String? imagePath = mediaIndex.find(imageRef);
-
       if (wordAudioRef != null && audioPath == null) {
         missingWordAudio++;
         if (missingWordAudio <= 20) {
@@ -716,10 +619,8 @@ class ImporterService {
           print("⚠️ Imagen faltante fila ${i + 1}: '$imageRef'");
         }
       }
-
       final originalId = (row['ID'] ?? '').toString().trim();
       if (originalId.isEmpty) continue;
-
       final cards = _buildCardsFromRow(
         row: row,
         originalId: originalId,
@@ -738,7 +639,6 @@ class ImporterService {
           continue;
         }
         seenImportKeys.add(key);
-
         if (options.action == ImportDeckConflictAction.updateExistingDeck) {
           final existing = existingByLogicalKey[key];
           if (existing == null) {
@@ -786,10 +686,8 @@ class ImporterService {
   }
 
   String _logicalKey(String originalId, String cardType) => '$originalId::$cardType';
-
   bool _applyImportedContent(Flashcard existing, Flashcard incoming) {
     bool changed = false;
-
     if (existing.question != incoming.question) {
       existing.question = incoming.question;
       changed = true;
@@ -822,7 +720,6 @@ class ImporterService {
       existing.extraDataJson = incoming.extraDataJson;
       changed = true;
     }
-
     return changed;
   }
 
@@ -854,16 +751,13 @@ class ImporterService {
     if (manifestData.containsKey('settings') && manifestData['settings'] is Map) {
       final Map<String, dynamic> custom =
       Map<String, dynamic>.from(manifestData['settings'] as Map);
-
       print("⚙️ Aplicando configuraciones personalizadas del mazo...");
-
       if (custom['new_cards_per_day'] != null) {
         settings.newCardsPerDay = (custom['new_cards_per_day'] as num).toInt();
       }
       if (custom['max_reviews_per_day'] != null) {
         settings.maxReviewsPerDay = (custom['max_reviews_per_day'] as num).toInt();
       }
-
       if (custom['lapse_tolerance'] != null) {
         settings.lapseTolerance = (custom['lapse_tolerance'] as num).toInt();
       }
@@ -873,7 +767,6 @@ class ImporterService {
       if (custom['lapse_fixed_interval'] != null) {
         settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
       }
-
       if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
       if (custom['alpha'] != null) settings.alpha = (custom['alpha'] as num).toDouble();
       if (custom['beta'] != null) settings.beta = (custom['beta'] as num).toDouble();
@@ -881,13 +774,11 @@ class ImporterService {
       if (custom['initial_nt'] != null) {
         settings.initialNt = (custom['initial_nt'] as num).toDouble();
       }
-
       if (custom['learning_steps'] != null && custom['learning_steps'] is List) {
         settings.learningSteps = (custom['learning_steps'] as List)
             .map((e) => (e as num).toDouble())
             .toList();
       }
-
       if (custom['enable_write_mode'] != null) {
         settings.enableWriteMode = custom['enable_write_mode'] as bool;
       }
@@ -898,10 +789,8 @@ class ImporterService {
         settings.writeModeMaxReps = (custom['write_mode_max_reps'] as num).toInt();
       }
     }
-
     return settings;
   }
-
   List<Flashcard> _buildCardsFromRow({
     required Map<String, Object?> row,
     required String originalId,
@@ -958,20 +847,16 @@ class ImporterService {
       ..fixedPhaseQueue = <double>[]
       ..learningStep = 0
       ..consecutiveLapses = 0;
-
     return [cardRecog, cardProd];
   }
 }
-
 class MediaIndex {
   final Map<String, String> exactMap;
   final Map<String, String> lowerCaseMap;
   final Map<String, String> stemMap;
-
   final int filesCopied;
   final int filesSkipped;
   final int keyCollisions;
-
   MediaIndex(
       this.exactMap,
       this.lowerCaseMap,
@@ -980,11 +865,9 @@ class MediaIndex {
         required this.filesSkipped,
         required this.keyCollisions,
       });
-
   String? find(String? filename) {
     if (filename == null || filename.trim().isEmpty) return null;
     var clean = filename.trim();
-
     // Si viene como file://..., intentar extraer nombre/ruta
     if (clean.startsWith('file://')) {
       try {
@@ -992,34 +875,27 @@ class MediaIndex {
         clean = uri.path.replaceAll('\\', '/');
       } catch (_) {}
     }
-
     // 1) exacto
     if (exactMap.containsKey(clean)) return exactMap[clean];
-
     // 2) decodificado
     try {
       final decoded = Uri.decodeFull(clean);
       if (exactMap.containsKey(decoded)) return exactMap[decoded];
     } catch (_) {}
-
     // 3) minúsculas
     final lower = clean.toLowerCase();
     if (lowerCaseMap.containsKey(lower)) return lowerCaseMap[lower];
-
     // 4) minúsculas decodificado
     try {
       final decodedLower = Uri.decodeFull(clean).toLowerCase();
       if (lowerCaseMap.containsKey(decodedLower)) return lowerCaseMap[decodedLower];
     } catch (_) {}
-
     // 5) stem (ignora extensión)
     final stem = p.basenameWithoutExtension(clean).toLowerCase();
     if (stemMap.containsKey(stem)) return stemMap[stem];
-
     // 6) stem por basename si venía con ruta
     final baseStem = p.basenameWithoutExtension(p.basename(clean)).toLowerCase();
     if (stemMap.containsKey(baseStem)) return stemMap[baseStem];
-
     return null;
   }
 }

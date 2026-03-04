@@ -1,25 +1,20 @@
 import 'package:isar/isar.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 
 class DeckSettingsPage extends ConsumerStatefulWidget {
   final String packName;
-
   const DeckSettingsPage({super.key, required this.packName});
-
   @override
   ConsumerState<DeckSettingsPage> createState() => _DeckSettingsPageState();
 }
 
 class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   final _formKey = GlobalKey<FormState>();
-
   // --- CONTROLADORES EXISTENTES ---
   late final TextEditingController _newCardsLimitController;
   late final TextEditingController _reviewsLimitController;
@@ -29,37 +24,27 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   late final TextEditingController _offsetController;
   late final TextEditingController _initialNtController;
   late final TextEditingController _learningStepsController;
-
   // --- NUEVAS (mínimo 2 vistas el primer día) ---
   late final TextEditingController _newMinCorrectRepsController;
   late final TextEditingController _newIntraDayMinutesController;
-
   late final TextEditingController _lapseToleranceController;
   late final TextEditingController _lapseFixedIntervalController;
   bool _useFixedIntervalOnLapse = true;
-
   // --- MODO ESCRITURA ---
   late final TextEditingController _writeThresholdController;
   late final TextEditingController _writeMaxRepsController;
   bool _enableWriteMode = false;
-
   // --- UNDO ---
   bool _enableUndo = true;
-
   // --- ORDEN / MEZCLA ---
   String _studyMixMode = DeckStudyMixMode.reviewsFirst;
   late final TextEditingController _interleaveReviewsCountController;
   late final TextEditingController _interleaveNewCardsCountController;
-
   // --- DAY CUTOFF (inicio del día de estudio) ---
   int _dayCutoffHour = 4;
   int _dayCutoffMinute = 0;
-
   bool _isLoading = true;
-
-  // Guardamos la última config cargada (para editar/guardar de forma segura)
   DeckSettings? _loadedSettings;
-
   bool get _isInterleaveMode =>
       _studyMixMode == DeckStudyMixMode.interleaveReviewsThenNew ||
           _studyMixMode == DeckStudyMixMode.interleaveNewThenReviews;
@@ -67,7 +52,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   @override
   void initState() {
     super.initState();
-
     _newCardsLimitController = TextEditingController();
     _reviewsLimitController = TextEditingController();
     _pMinController = TextEditingController();
@@ -76,19 +60,14 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _offsetController = TextEditingController();
     _initialNtController = TextEditingController();
     _learningStepsController = TextEditingController();
-
     _newMinCorrectRepsController = TextEditingController();
     _newIntraDayMinutesController = TextEditingController();
-
     _lapseToleranceController = TextEditingController();
     _lapseFixedIntervalController = TextEditingController();
-
     _writeThresholdController = TextEditingController();
     _writeMaxRepsController = TextEditingController();
-
     _interleaveReviewsCountController = TextEditingController();
     _interleaveNewCardsCountController = TextEditingController();
-
     _loadSettings();
   }
 
@@ -102,19 +81,14 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _offsetController.dispose();
     _initialNtController.dispose();
     _learningStepsController.dispose();
-
     _newMinCorrectRepsController.dispose();
     _newIntraDayMinutesController.dispose();
-
     _lapseToleranceController.dispose();
     _lapseFixedIntervalController.dispose();
-
     _writeThresholdController.dispose();
     _writeMaxRepsController.dispose();
-
     _interleaveReviewsCountController.dispose();
     _interleaveNewCardsCountController.dispose();
-
     super.dispose();
   }
 
@@ -124,13 +98,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
   Future<void> _loadSettings() async {
     final isar = await ref.read(isarDbProvider.future);
-
     var settings = await isar.deckSettings
         .filter()
         .packNameEqualTo(widget.packName)
         .findFirst();
-
-    // Si no existe, crearla y guardarla (importante por índice único packName)
     if (settings == null) {
       settings = DeckSettings()..packName = widget.packName;
       await isar.writeTxn(() async {
@@ -139,47 +110,36 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     }
 
     _loadedSettings = settings;
-
     // Day cutoff
     _dayCutoffHour = (settings.dayCutoffHour ?? 4).clamp(0, 23);
     _dayCutoffMinute = (settings.dayCutoffMinute ?? 0).clamp(0, 59);
-
     // Cargar valores
     _newCardsLimitController.text = settings.newCardsPerDay.toString();
     _reviewsLimitController.text = settings.maxReviewsPerDay.toString();
-
     _pMinController.text = settings.pMin.toString();
     _alphaController.text = settings.alpha.toString();
     _betaController.text = settings.beta.toString();
     _offsetController.text = settings.offset.toString();
     _initialNtController.text = settings.initialNt.toString();
-
     // Learning steps en DÍAS (admite fracciones)
     _learningStepsController.text = settings.learningSteps.join(', ');
-
     // Nuevas: mínimo de aciertos antes de pasar a otro día
     _newMinCorrectRepsController.text = settings.newCardMinCorrectReps.toString();
     _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes.toString();
-
     _lapseToleranceController.text = settings.lapseTolerance.toString();
     _lapseFixedIntervalController.text = settings.lapseFixedInterval.toString();
-
     _enableWriteMode = settings.enableWriteMode;
     _writeThresholdController.text = settings.writeModeThreshold.toString();
     _writeMaxRepsController.text = settings.writeModeMaxReps.toString();
-
     _useFixedIntervalOnLapse = settings.useFixedIntervalOnLapse;
-
     // Undo
     _enableUndo = settings.enableUndo;
-
     // Orden / mezcla
     _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
         ? settings.studyMixMode
         : DeckStudyMixMode.reviewsFirst;
     _interleaveReviewsCountController.text = settings.interleaveReviewsCount.toString();
     _interleaveNewCardsCountController.text = settings.interleaveNewCardsCount.toString();
-
     if (!mounted) return;
     setState(() => _isLoading = false);
   }
@@ -187,35 +147,25 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   Future<void> _saveSettings() async {
     // Validar primero
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     final isar = await ref.read(isarDbProvider.future);
-
-    // Parseo seguro (ya validado)
     final newLimit = int.parse(_newCardsLimitController.text.trim());
     final revLimit = int.parse(_reviewsLimitController.text.trim());
-
     final tolerance = int.parse(_lapseToleranceController.text.trim());
     final lapseDays = _useFixedIntervalOnLapse
         ? double.parse(_lapseFixedIntervalController.text.trim().replaceAll(',', '.'))
-        : 1.0; // valor no usado si switch está apagado
-
+        : 1.0;
     final pMin = double.parse(_pMinController.text.trim().replaceAll(',', '.'));
     final alpha = double.parse(_alphaController.text.trim().replaceAll(',', '.'));
     final beta = double.parse(_betaController.text.trim().replaceAll(',', '.'));
     final offset = double.parse(_offsetController.text.trim().replaceAll(',', '.'));
     final initialNt = double.parse(_initialNtController.text.trim().replaceAll(',', '.'));
-
     final learningSteps = _parseLearningSteps(_learningStepsController.text);
-
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
-
     final writeThres = _enableWriteMode ? int.parse(_writeThresholdController.text.trim()) : 80;
     final writeReps = _enableWriteMode ? int.parse(_writeMaxRepsController.text.trim()) : 0;
-
     final interleaveReviewsCount = int.parse(_interleaveReviewsCountController.text.trim());
     final interleaveNewCount = int.parse(_interleaveNewCardsCountController.text.trim());
-
     final newCutoffHour = _dayCutoffHour.clamp(0, 23);
     final newCutoffMinute = _dayCutoffMinute.clamp(0, 59);
 
@@ -228,7 +178,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
         final oldCutoffHour = (existing?.dayCutoffHour ?? 4).clamp(0, 23);
         final oldCutoffMinute = (existing?.dayCutoffMinute ?? 0).clamp(0, 59);
-
         final settingsToSave = existing ?? (DeckSettings()..packName = widget.packName);
 
         settingsToSave
@@ -258,7 +207,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
         await isar.deckSettings.put(settingsToSave);
 
-        // Si cambió el cutoff, limpiamos la sesión persistida para evitar reanudaciones inconsistentes.
         if (oldCutoffHour != newCutoffHour || oldCutoffMinute != newCutoffMinute) {
           await isar.studySessions.filter().packNameEqualTo(widget.packName).deleteAll();
         }
@@ -294,13 +242,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
         .split(',')
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty);
-
     final list = <double>[];
     for (final p in parts) {
       final v = double.tryParse(p.replaceAll(',', '.'));
       if (v != null && v > 0) list.add(v);
     }
-
     return list.isEmpty ? [1.0, 4.0] : list;
   }
 
@@ -333,11 +279,9 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   String? _validateLearningSteps(String? v) {
     final raw = (v ?? '').trim();
     if (raw.isEmpty) return 'Requerido';
-
     final list = _parseLearningSteps(raw);
     if (list.isEmpty) return 'Ingresa al menos 1 paso válido';
     if (list.any((x) => x <= 0)) return 'Los pasos deben ser > 0';
-
     return null;
   }
 
@@ -426,7 +370,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ],
               ),
               const SizedBox(height: 20),
-
               // --- DAY CUTOFF ---
               _buildSectionTitle("Day Cutoff (inicio del día de estudio)"),
               Container(
@@ -495,7 +438,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // --- ORDEN / MEZCLA ---
               _buildSectionTitle("Orden del Estudio / Mezcla"),
               Container(
@@ -577,7 +519,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // --- MODO ESCRITURA ---
               _buildSectionTitle("Modo Escritura (Producción)"),
               Container(
@@ -641,7 +582,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // --- UNDO ---
               _buildSectionTitle("Botón Deshacer"),
               Container(
@@ -666,7 +606,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // --- APRENDIZAJE ---
               _buildSectionTitle("Fase de Aprendizaje"),
               _buildTextField(
@@ -731,7 +670,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ],
               ),
               const SizedBox(height: 20),
-
               // --- ALGORITMO ---
               _buildSectionTitle("Algoritmo Ebbinghaus"),
               _buildTextField(
@@ -783,7 +721,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // --- LAPSES ---
               _buildSectionTitle("Lapses"),
               _buildTextField(
@@ -821,7 +758,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,

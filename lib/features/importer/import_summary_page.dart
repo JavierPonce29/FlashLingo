@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-
 import 'package:flashcards_app/features/importer/importer_service.dart';
 
 class ImportSummaryPage extends StatelessWidget {
   final ImportSummary summary;
-
   const ImportSummaryPage({super.key, required this.summary});
-
-  // Helpers para compatibilidad entre versiones distintas de ImportSummary.
   T? _try<T>(T Function(dynamic s) getter) {
     try {
       return getter(summary as dynamic);
@@ -15,76 +11,56 @@ class ImportSummaryPage extends StatelessWidget {
       return null;
     }
   }
-
   String _s(String? v, {String fallback = '—'}) {
     final t = v?.trim();
     return (t == null || t.isEmpty) ? fallback : t;
   }
-
   @override
   Widget build(BuildContext context) {
     // -------- Compat: campos básicos --------
     final action = _try<ImportDeckConflictAction?>((s) => s.action);
-
     final zipFileName = _s(_try<String?>((s) => s.zipFileName));
     final importedPackName = _s(_try<String?>((s) => s.importedPackName));
-
     final finalPackName = _s(
       _try<String?>((s) => s.finalPackName) ?? _try<String?>((s) => s.targetPackName),
     );
-
     final isoCode = _s(_try<String?>((s) => s.isoCode));
-
     // -------- Compat: settings flags --------
     final deckSettingsCreated = _try<bool?>((s) => s.deckSettingsCreated) ?? false;
     final deckSettingsUpdated = _try<bool?>((s) => s.deckSettingsUpdated) ?? false;
     final deckSettingsPreserved = _try<bool?>((s) => s.deckSettingsPreserved) ?? false;
-
     // -------- Compat: info “update/new” --------
     final targetDeckExistedBeforeImport =
     _try<bool?>((s) => s.targetDeckExistedBeforeImport);
-
     final bool isUpdate = action == ImportDeckConflictAction.updateExistingDeck ||
         (action == null && (deckSettingsUpdated || deckSettingsPreserved));
-
     // -------- Compat: tarjetas --------
     final cardsCreated = _try<int?>((s) => s.cardsCreated) ?? 0;
     final cardsUpdated = _try<int?>((s) => s.cardsUpdated) ?? 0;
     final cardsUnchanged = _try<int?>((s) => s.cardsUnchanged) ?? 0;
-
-    // Algunas versiones tenían cardsProcessed; si no existe, lo calculamos.
     final cardsProcessed = _try<int?>((s) => s.cardsProcessed) ??
         (cardsCreated + cardsUpdated + cardsUnchanged);
-
     final sqliteRowsRead =
         _try<int?>((s) => s.sqliteRowsRead) ?? _try<int?>((s) => s.sqliteRows);
-
     final duplicateLogicalCardsInImport =
     _try<int?>((s) => s.duplicateLogicalCardsInImport);
-
     final existingCardsNotPresentInImport =
     _try<int?>((s) => s.existingCardsNotPresentInImport);
-
     // -------- Compat: extracción/zip --------
     final zipEntriesTotal =
         _try<int?>((s) => s.zipEntriesTotal) ?? _try<int?>((s) => s.archiveEntriesTotal);
-
     final zipRealFileEntries =
         _try<int?>((s) => s.zipRealFileEntries) ?? _try<int?>((s) => s.archiveRealFileEntries);
-
     final extractedFilesWritten = _try<int?>((s) => s.extractedFilesWritten);
     final extractedDirsCreated = _try<int?>((s) => s.extractedDirsCreated);
     final extractedCollisions = _try<int?>((s) => s.extractedCollisions);
     final extractedSkipped = _try<int?>((s) => s.extractedSkipped);
     final extractedErrors = _try<int?>((s) => s.extractedErrors);
-
     // -------- Compat: media copiada --------
     final mediaFilesCopied = _try<int?>((s) => s.mediaFilesCopied);
     final mediaFilesSkipped = _try<int?>((s) => s.mediaFilesSkipped);
-
     final mediaDuplicateKeys =
         _try<int?>((s) => s.mediaDuplicateKeys) ?? _try<int?>((s) => s.mediaKeyCollisions);
-
     // -------- Compat: diagnóstico de media en tarjetas --------
     final missingWordAudio = _try<int?>((s) => s.missingWordAudio);
     final missingSentenceAudio = _try<int?>((s) => s.missingSentenceAudio);
@@ -98,7 +74,7 @@ class ImportSummaryPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // =============================
-          // Card 1: info general (igual estética original)
+          // Card 1: info general
           // =============================
           Card(
             child: Padding(
@@ -129,11 +105,10 @@ class ImportSummaryPage extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
 
           // =============================
-          // Card 2: Tarjetas (chips como antes)
+          // Card 2: Tarjetas
           // =============================
           Card(
             child: Padding(
@@ -176,15 +151,12 @@ class ImportSummaryPage extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 12),
-
                   if (sqliteRowsRead != null) _kv('Registros SQLite leídos', '$sqliteRowsRead'),
-
                   if (duplicateLogicalCardsInImport != null)
                     _kv(
                       'Duplicadas dentro del archivo (lógicas)',
                       '$duplicateLogicalCardsInImport',
                     ),
-
                   if (existingCardsNotPresentInImport != null)
                     _kv(
                       'Tarjetas existentes no presentes en el archivo',
@@ -194,11 +166,10 @@ class ImportSummaryPage extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
 
           // =============================
-          // Card 3: Configuración del mazo (igual estética original)
+          // Card 3: Configuración del mazo
           // =============================
           Card(
             child: Padding(
@@ -219,7 +190,7 @@ class ImportSummaryPage extends StatelessWidget {
           const SizedBox(height: 12),
 
           // =============================
-          // Card 4: Multimedia y extracción (igual estética original)
+          // Card 4: Multimedia y extracción
           // =============================
           Card(
             child: Padding(
@@ -229,24 +200,18 @@ class ImportSummaryPage extends StatelessWidget {
                 children: [
                   Text('Multimedia y extracción', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-
                   if (zipEntriesTotal != null) _kv('Entradas ZIP totales', '$zipEntriesTotal'),
                   if (zipRealFileEntries != null) _kv('Archivos reales en ZIP', '$zipRealFileEntries'),
-
                   // Estos campos existen en la versión “larga” (antigua). Si no existen, simplemente no se muestran.
                   if (extractedFilesWritten != null) _kv('Archivos extraídos', '$extractedFilesWritten'),
                   if (extractedDirsCreated != null) _kv('Carpetas creadas', '$extractedDirsCreated'),
                   if (extractedCollisions != null) _kv('Colisiones renombradas', '$extractedCollisions'),
                   if (extractedSkipped != null) _kv('Omitidos en extracción', '$extractedSkipped'),
                   if (extractedErrors != null) _kv('Errores de extracción', '$extractedErrors'),
-
                   const Divider(height: 20),
-
                   if (mediaFilesCopied != null) _kv('Media copiada', '$mediaFilesCopied'),
                   if (mediaFilesSkipped != null) _kv('Media omitida', '$mediaFilesSkipped'),
                   if (mediaDuplicateKeys != null) _kv('Claves media duplicadas', '$mediaDuplicateKeys'),
-
-                  // Si no hay nada de esta sección (por alguna razón), mostrar un dash.
                   if (zipEntriesTotal == null &&
                       zipRealFileEntries == null &&
                       extractedFilesWritten == null &&
@@ -257,11 +222,10 @@ class ImportSummaryPage extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
 
           // =============================
-          // Card 5: Diagnóstico de media en tarjetas (igual estética original)
+          // Card 5: Diagnóstico de media en tarjetas
           // =============================
           Card(
             child: Padding(
@@ -274,7 +238,6 @@ class ImportSummaryPage extends StatelessWidget {
                   if (missingWordAudio != null) _kv('Audio de palabra faltante', '$missingWordAudio'),
                   if (missingSentenceAudio != null) _kv('Audio de oración faltante', '$missingSentenceAudio'),
                   if (missingImages != null) _kv('Imágenes faltantes', '$missingImages'),
-
                   if (missingWordAudio == null && missingSentenceAudio == null && missingImages == null)
                     const Text('—', style: TextStyle(color: Colors.black54)),
                 ],
@@ -285,7 +248,7 @@ class ImportSummaryPage extends StatelessWidget {
           const SizedBox(height: 18),
 
           // =============================
-          // Botón Volver (igual estética original)
+          // Botón Volver
           // =============================
           Row(
             children: [

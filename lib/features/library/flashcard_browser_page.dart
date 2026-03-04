@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 
 class FlashcardBrowserPage extends ConsumerStatefulWidget {
   final String packName;
-
   const FlashcardBrowserPage({super.key, required this.packName});
-
   @override
   ConsumerState<FlashcardBrowserPage> createState() =>
       _FlashcardBrowserPageState();

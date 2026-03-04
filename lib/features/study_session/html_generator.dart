@@ -80,7 +80,7 @@ class HtmlGenerator {
       }
     }
 
-    // ✅ LECTURA SIN AUDIO
+    // LECTURA SIN AUDIO
     function showReading() {
       document.querySelectorAll('.reading-text').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
       document.querySelectorAll('.delayed-btn').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
@@ -130,7 +130,7 @@ class HtmlGenerator {
       return plain.replace(/\\s+/g, ' ').trim();
     }
 
-    // ✅ RESPUESTA CON AUTOPLAY
+    // RESPUESTA CON AUTOPLAY
     function showAnswer() {
       var qView = document.getElementById('q-view');
       var aView = document.getElementById('a-view');
@@ -230,12 +230,6 @@ class HtmlGenerator {
 </html>
 """;
   }
-
-  // ========== (resto igual que tu versión actual) ==========
-  // Para no romper nada, deja tal cual tus métodos:
-  // _generateSimpleRecogBody, _generateProdBody, _generateComplexRecogBody, _audioHtml, _playBtn, _getBaseCss
-  // (si quieres, te lo vuelvo a pegar completo, pero no cambia nada más)
-  // ========================================================
 
   static String _generateSimpleRecogBody(Flashcard card, Map<String, dynamic> extra) {
     final String formas = (extra['forms'] ?? '').toString();

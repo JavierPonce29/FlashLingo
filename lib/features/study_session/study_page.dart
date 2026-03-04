@@ -1,9 +1,7 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:isar/isar.dart';
-
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
@@ -16,54 +14,38 @@ class StudyPage extends StatefulWidget {
   final String packName;
   final List<Flashcard> cards;
   final int initialIndex;
-
   const StudyPage({
     super.key,
     required this.packName,
     required this.cards,
     this.initialIndex = 0,
   });
-
   @override
   State<StudyPage> createState() => _StudyPageState();
 }
 
 class _StudyPageState extends State<StudyPage> {
   InAppWebViewController? webViewController;
-
   late List<Flashcard> studyQueue;
   int currentIndex = 0;
-
   bool isAnswerShown = false;
   bool isReadingShown = false;
   bool isComplexCard = false;
-
   bool isWriteModeActive = false;
   int currentWriteScore = 0;
   int minScoreRequired = 0;
-
   final SrsService _srsService = SrsService();
   DeckSettings? _currentDeckSettings;
-
   bool _webReady = false;
   bool _pendingReloadAfterSettings = false;
-
   bool _sessionCleared = false;
-
   _UndoAction? _lastUndo;
-
   @override
   void initState() {
     super.initState();
-
     studyQueue = List.from(widget.cards);
-    currentIndex = widget.initialIndex.clamp(
-      0,
-      studyQueue.isEmpty ? 0 : studyQueue.length - 1,
-    ).toInt();
-
+    currentIndex = widget.initialIndex.clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1).toInt();
     _loadDeckSettings();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _persistStudySession();
       _recomputeCurrentCardState();
@@ -71,24 +53,18 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   bool get _isFinished => currentIndex >= studyQueue.length;
-
   bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
-
   Future<void> _loadDeckSettings() async {
     final isar = Isar.getInstance();
     if (isar == null) return;
-
     final settings = await isar.deckSettings
         .filter()
         .packNameEqualTo(widget.packName)
         .findFirst();
-
     if (!mounted) return;
-
     setState(() {
       _currentDeckSettings = settings;
     });
-
     _recomputeCurrentCardState(reloadHtml: true);
   }
 
@@ -98,7 +74,6 @@ class _StudyPageState extends State<StudyPage> {
       return;
     }
     if (_isFinished) return;
-
     final card = studyQueue[currentIndex];
     webViewController!.loadData(
       data: HtmlGenerator.generateContent(
@@ -113,14 +88,11 @@ class _StudyPageState extends State<StudyPage> {
     if (card.state == CardState.learning && card.learningStep == 0) return Colors.orange;
     return Colors.green;
   }
-
   bool _isEpoch(DateTime dt) => dt.millisecondsSinceEpoch == 0;
 
   void _recomputeCurrentCardState({bool reloadHtml = false}) {
     if (_isFinished) return;
-
     final card = studyQueue[currentIndex];
-
     Map<String, dynamic> extra = {};
     if (card.extraDataJson != null && card.extraDataJson!.isNotEmpty) {
       try {
@@ -137,7 +109,6 @@ class _StudyPageState extends State<StudyPage> {
     final readingStr = (readingVal is String) ? readingVal.trim() : '';
     final bool isRecog = card.cardType.endsWith('recog');
     final bool hasReading = readingStr.isNotEmpty && readingStr != card.question.trim();
-
     final bool writeEnabled = _currentDeckSettings?.enableWriteMode ?? false;
     final bool isProd = card.cardType.endsWith('prod');
     final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
@@ -146,7 +117,6 @@ class _StudyPageState extends State<StudyPage> {
 
     setState(() {
       isComplexCard = isRecog && hasReading;
-
       isWriteModeActive = writeActive;
       minScoreRequired = writeActive ? (_currentDeckSettings?.writeModeThreshold ?? 80) : 0;
       currentWriteScore = 0;
@@ -198,7 +168,6 @@ class _StudyPageState extends State<StudyPage> {
 
   Widget _buildStudy() {
     final card = studyQueue[currentIndex];
-
     return Scaffold(
       appBar: AppBar(
         title: Text("Estudiando (${currentIndex + 1}/${studyQueue.length})"),
@@ -245,7 +214,6 @@ class _StudyPageState extends State<StudyPage> {
                     return null;
                   },
                 );
-
                 if (_pendingReloadAfterSettings) {
                   _pendingReloadAfterSettings = false;
                   _reloadCurrentHtml();
@@ -297,7 +265,6 @@ class _StudyPageState extends State<StudyPage> {
     }
 
     final bool writePassed = !isWriteModeActive || (currentWriteScore >= minScoreRequired);
-
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -351,25 +318,17 @@ class _StudyPageState extends State<StudyPage> {
     final settings = _currentDeckSettings;
     final isar = Isar.getInstance();
     if (settings == null || isar == null) return;
-
     final now = DateTime.now();
     final prevIndex = currentIndex;
-
     // Snapshot para Undo antes de mutar
-    final undo = _UndoAction(
-      prevIndex: prevIndex,
-      cardId: card.id,
-      snapshot: _FlashcardSnapshot.fromCard(card),
-    );
+    final undo = _UndoAction(prevIndex: prevIndex, cardId: card.id, snapshot: _FlashcardSnapshot.fromCard(card));
 
-    // Contar nueva SOLO en el primer rating real (lastReview == epoch)
-    final bool shouldCountNew =
-        (card.state == CardState.newCard) && _isEpoch(card.lastReview);
-
+    // Contar nueva SOLO en el primer rating real
+    final bool shouldCountNew = (card.state == CardState.newCard) && _isEpoch(card.lastReview);
     // Aplicar SRS
     final bool repeatToday = _srsService.reviewCard(card, isCorrect, settings);
 
-    // Marcar lastReview (evita doble conteo + útil para stats)
+    // Marcar lastReview
     card.lastReview = now;
 
     int daysInterval = card.nextReview.difference(now).inDays;
@@ -392,7 +351,6 @@ class _StudyPageState extends State<StudyPage> {
         if (latest != null) {
           prevSeen = latest.newCardsSeenToday;
           prevLastDate = latest.lastNewCardStudyDate;
-
           final currentLabel = StudyDay.label(now, latest);
           final last = latest.lastNewCardStudyDate;
           final lastLabel = last == null ? null : StudyDay.label(last, latest);
@@ -400,18 +358,15 @@ class _StudyPageState extends State<StudyPage> {
               lastLabel.year == currentLabel.year &&
               lastLabel.month == currentLabel.month &&
               lastLabel.day == currentLabel.day;
-
           if (!sameStudyDay) {
             latest.newCardsSeenToday = 0;
           }
-
           latest.newCardsSeenToday += 1;
           latest.lastNewCardStudyDate = currentLabel;
           await isar.deckSettings.put(latest);
           _currentDeckSettings = latest;
         }
       }
-
       await isar.flashcards.put(card);
       logId = await isar.reviewLogs.put(reviewLog);
     });
@@ -446,7 +401,6 @@ class _StudyPageState extends State<StudyPage> {
     final isar = Isar.getInstance();
     if (action == null || settings == null || isar == null) return;
     if (!_undoEnabled) return;
-
     // Si se re-encoló por repeatToday, revertir UNA ocurrencia
     if (action.didAppendToQueue) {
       for (int i = studyQueue.length - 1; i >= 0; i--) {
@@ -468,12 +422,10 @@ class _StudyPageState extends State<StudyPage> {
       orElse: () => null,
     );
     if (target == null) return;
-
     action.snapshot.applyTo(target);
 
     await isar.writeTxn(() async {
       await isar.flashcards.put(target!);
-
       if (action.reviewLogId != null) {
         await isar.reviewLogs.delete(action.reviewLogId!);
       }
@@ -490,10 +442,7 @@ class _StudyPageState extends State<StudyPage> {
     });
 
     setState(() {
-      currentIndex = action.prevIndex.clamp(
-        0,
-        studyQueue.isEmpty ? 0 : studyQueue.length - 1,
-      ).toInt();
+      currentIndex = action.prevIndex.clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1).toInt();
       isAnswerShown = false;
       isReadingShown = false;
       currentWriteScore = 0;
@@ -521,12 +470,10 @@ class _StudyPageState extends State<StudyPage> {
   Future<void> _persistStudySession() async {
     final isar = Isar.getInstance();
     if (isar == null) return;
-
     final now = DateTime.now();
     final day = _currentDeckSettings != null
         ? StudyDay.label(now, _currentDeckSettings!)
         : DateTime(now.year, now.month, now.day);
-
     await isar.writeTxn(() async {
       var session = await isar.studySessions
           .filter()
@@ -534,14 +481,12 @@ class _StudyPageState extends State<StudyPage> {
           .findFirst();
 
       session ??= StudySession()..packName = widget.packName;
-
       session
         ..packName = widget.packName
         ..queueCardIds = studyQueue.map((c) => c.id).toList()
         ..currentIndex = currentIndex
         ..sessionDay = day
         ..lastUpdated = now;
-
       await isar.studySessions.put(session);
     });
   }
@@ -611,9 +556,7 @@ class _UndoAction {
   final _FlashcardSnapshot snapshot;
 
   int? reviewLogId;
-
   bool didAppendToQueue = false;
-
   bool didIncrementNewCounter = false;
   int? deckSettingsId;
   late int prevNewCardsSeenToday;

@@ -1,7 +1,5 @@
 import 'package:isar/isar.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
@@ -14,13 +12,10 @@ class DeckStatsData {
   final int learningCards;
   final int reviewCards;
   final int relearningCards;
-
   /// Para gráfico de barras (futuro): 0..14 días desde hoy -> cantidad de repasos programados
   final Map<int, int> futureReviews;
-
   /// Para mapa de calor (pasado): fecha (normalizada a día) -> cantidad de repasos
   final Map<DateTime, int> heatmapData;
-
   DeckStatsData({
     required this.totalCards,
     required this.newCards,
@@ -35,15 +30,12 @@ class DeckStatsData {
 final deckStatsProvider =
 FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
   final isar = await ref.watch(isarDbProvider.future);
-
   final now = DateTime.now();
-
   final settings = await isar.deckSettings
       .filter()
       .packNameEqualTo(packName)
       .findFirst() ??
       (DeckSettings()..packName = packName);
-
   final startOfStudyDay = StudyDay.start(now, settings);
   final labelToday = StudyDay.label(now, settings);
 
@@ -54,25 +46,21 @@ FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
       .filter()
       .packNameEqualTo(packName)
       .count();
-
   final newCards = await isar.flashcards
       .filter()
       .packNameEqualTo(packName)
       .stateEqualTo(CardState.newCard)
       .count();
-
   final learningCards = await isar.flashcards
       .filter()
       .packNameEqualTo(packName)
       .stateEqualTo(CardState.learning)
       .count();
-
   final reviewCards = await isar.flashcards
       .filter()
       .packNameEqualTo(packName)
       .stateEqualTo(CardState.review)
       .count();
-
   final relearningCards = await isar.flashcards
       .filter()
       .packNameEqualTo(packName)

@@ -1,7 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart'; // <--- LIBRERÍA NUEVA
+import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'stats_provider.dart';
 
 class StatsPage extends ConsumerWidget {
@@ -98,7 +98,7 @@ class StatsPage extends ConsumerWidget {
     );
   }
 
-  // --- NUEVO: MAPA DE CALOR ---
+  // --- MAPA DE CALOR ---
   Widget _buildHeatmap(BuildContext context, DeckStatsData stats) {
     return Card(
       elevation: 2,
@@ -112,7 +112,7 @@ class StatsPage extends ConsumerWidget {
           colorsets: {
             1: Theme.of(
               context,
-            ).primaryColor, // Color base (se hace más oscuro con más actividad)
+            ).primaryColor,
           },
           onClick: (value) {
             ScaffoldMessenger.of(context).showSnackBar(

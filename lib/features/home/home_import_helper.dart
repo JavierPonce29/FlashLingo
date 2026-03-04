@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
@@ -12,10 +11,8 @@ import 'package:flashcards_app/features/importer/importer_service.dart';
 
 class HomeImportHelper {
   const HomeImportHelper._();
-
   static Future<void> pickAndImportFile(BuildContext context, WidgetRef ref) async {
     bool loaderOpen = false;
-
     void showLoader([String message = 'Procesando...']) {
       if (!context.mounted) return;
       loaderOpen = true;
@@ -49,16 +46,13 @@ class HomeImportHelper {
       }
       loaderOpen = false;
     }
-
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'flashjp'],
       );
-
       if (result == null || result.files.single.path == null) return;
       final filePath = result.files.single.path!;
-
       final importerCtrl = ref.read(importerControllerProvider.notifier);
 
       // 1) PREVIEW
@@ -66,14 +60,12 @@ class HomeImportHelper {
       showLoader('Analizando paquete...');
       final preview = await importerCtrl.previewFlashcardPackage(filePath);
       closeLoaderIfOpen();
-
       // 2) Resolver conflicto (si existe)
       final options = await _resolveImportOptionsFromPreview(context, ref, preview);
       if (options == null) {
         importerCtrl.resetState();
         return; // usuario canceló
       }
-
       // 3) IMPORTAR
       if (!context.mounted) return;
       showLoader('Importando mazo...');
@@ -83,9 +75,7 @@ class HomeImportHelper {
       );
       closeLoaderIfOpen();
       importerCtrl.resetState();
-
       if (!context.mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("¡Importación completada!"),
@@ -118,7 +108,6 @@ class HomeImportHelper {
     } catch (e) {
       closeLoaderIfOpen();
       if (!context.mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Error al importar: $e"),
@@ -224,7 +213,6 @@ class HomeImportHelper {
     );
 
     if (!context.mounted) return null;
-
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -232,24 +220,18 @@ class HomeImportHelper {
         final controller = TextEditingController(text: initialSuggestion);
         String? errorText;
         bool saving = false;
-
         Future<void> submit(StateSetter setState) async {
           final raw = controller.text.trim();
-
           if (raw.isEmpty) {
             setState(() => errorText = 'El nombre no puede estar vacío.');
             return;
           }
-
           setState(() {
             saving = true;
             errorText = null;
           });
-
           final exists = await _deckNameExists(ref, raw);
-
           if (!ctx.mounted) return;
-
           if (exists) {
             setState(() {
               saving = false;
@@ -257,7 +239,6 @@ class HomeImportHelper {
             });
             return;
           }
-
           Navigator.pop(ctx, raw);
         }
 
@@ -311,11 +292,8 @@ class HomeImportHelper {
         required String baseName,
       }) async {
     final base = baseName.trim().isEmpty ? 'Mazo importado' : baseName.trim();
-
     if (!await _deckNameExists(ref, base)) return base;
-
     const suffixes = [' (copia)', ' (nuevo)', ' (2)'];
-
     for (final suffix in suffixes) {
       final candidate = '$base$suffix';
       if (!await _deckNameExists(ref, candidate)) return candidate;
@@ -332,13 +310,10 @@ class HomeImportHelper {
   static Future<bool> _deckNameExists(WidgetRef ref, String packName) async {
     final normalized = packName.trim();
     if (normalized.isEmpty) return false;
-
     final isar = await ref.read(isarDbProvider.future);
-
     final dsCount =
     await isar.deckSettings.filter().packNameEqualTo(normalized).count();
     if (dsCount > 0) return true;
-
     final fcCount =
     await isar.flashcards.filter().packNameEqualTo(normalized).count();
     return fcCount > 0;

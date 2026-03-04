@@ -1,40 +1,25 @@
 import 'dart:async';
-
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/features/importer/importer_service.dart';
-
 part 'importer_provider.g.dart';
 
 @riverpod
 ImporterService importerService(ImporterServiceRef ref) {
-  // ✅ No usar requireValue aquí para evitar crash si la DB aún está cargando.
-  // Intentamos primero el provider async y, si no está listo, la instancia global.
   final asyncIsar = ref.watch(isarDbProvider);
   final isar = asyncIsar.valueOrNull ?? Isar.getInstance();
-
   if (isar == null) {
-    throw StateError(
-      'Isar DB aún no está inicializada. Espera a que termine de cargar antes de importar.',
-    );
+    throw StateError('Isar DB aún no está inicializada. Espera a que termine de cargar antes de importar.');
   }
-
   return ImporterService(isar);
 }
-
-/// Controlador de importación para UI:
-/// - expone loading/error
-/// - permite preview + import (legacy wrapper) + import avanzado
 @riverpod
 class ImporterController extends _$ImporterController {
   @override
   AsyncValue<void> build() {
     return const AsyncData(null);
   }
-
-  /// Preview del paquete para detectar conflicto de nombre antes de importar.
   Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
     final service = ref.read(importerServiceProvider);
 
@@ -49,17 +34,11 @@ class ImporterController extends _$ImporterController {
     }
   }
 
-  /// Importación "legacy" (compatibilidad):
-  /// - Si el ImporterService tiene `importFlashcardPackage()`, la usa.
-  /// - Si no existe (tu caso), usa `importFlashcardPackageAdvanced(createNew)` como fallback.
   Future<void> importFlashcardPackage(String zipFilePath) async {
     final service = ref.read(importerServiceProvider);
-
     state = const AsyncLoading();
     try {
       final dyn = service as dynamic;
-
-      // Intentar el método antiguo si existe
       try {
         await dyn.importFlashcardPackage(zipFilePath);
       } on NoSuchMethodError {
@@ -69,7 +48,6 @@ class ImporterController extends _$ImporterController {
           options: const ImportExecutionOptions.createNew(),
         );
       }
-
       state = const AsyncData(null);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -77,13 +55,11 @@ class ImporterController extends _$ImporterController {
     }
   }
 
-  /// Importación avanzada con resolución de conflicto explícita.
   Future<ImportSummary> importFlashcardPackageAdvanced(
       String zipFilePath, {
         required ImportExecutionOptions options,
       }) async {
     final service = ref.read(importerServiceProvider);
-
     state = const AsyncLoading();
     try {
       final summary = await service.importFlashcardPackageAdvanced(
@@ -97,8 +73,6 @@ class ImporterController extends _$ImporterController {
       rethrow;
     }
   }
-
-  /// Limpia estado de error/loading para dejar el controlador "neutral".
   void resetState() {
     state = const AsyncData(null);
   }

@@ -1,9 +1,7 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
-
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
@@ -16,11 +14,9 @@ import 'package:flashcards_app/features/stats/stats_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final decksAsync = ref.watch(decksStreamProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Anki Flutter"),
@@ -73,27 +69,17 @@ class HomePage extends ConsumerWidget {
             itemBuilder: (context, index) {
               final deck = decks[index];
               final firstStepDue = deck.firstStepDue;
-
               return Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   leading: _DeckIcon(iconUri: deck.iconUri),
-                  title: Text(
-                    deck.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                  title: Text(deck.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   subtitle: Row(
                     children: [
                       if (deck.newCardsDue > 0)
-                        Text(
-                          "Nuevas: ${deck.newCardsDue}  ",
+                        Text("Nuevas: ${deck.newCardsDue}  ",
                           style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,
@@ -234,11 +220,8 @@ class HomePage extends ConsumerWidget {
         ],
       ),
     );
-
     if (confirm != true) return;
-
     await ref.read(deleteDeckProvider(packName).future);
-
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Mazo eliminado")),
@@ -251,7 +234,6 @@ class HomePage extends ConsumerWidget {
       String oldName,
       ) async {
     final controller = TextEditingController(text: oldName);
-
     final newName = await showDialog<String?>(
       context: context,
       builder: (ctx) {
@@ -284,14 +266,12 @@ class HomePage extends ConsumerWidget {
 
     final trimmed = newName?.trim() ?? '';
     if (trimmed.isEmpty || trimmed == oldName) return;
-
     if (!context.mounted) return;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
-
     try {
       await ref.read(renameDeckProvider(oldName, trimmed).future);
       if (!context.mounted) return;
@@ -313,9 +293,7 @@ class HomePage extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Máquina del Tiempo"),
-        content: const Text(
-          "Esto mueve todas las tarjetas 1 día hacia atrás (para que queden vencidas).",
-        ),
+        content: const Text("Esto mueve todas las tarjetas 1 día hacia atrás (para que queden vencidas)."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -340,15 +318,12 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _applyTimeTravel(WidgetRef ref) async {
     final isar = await ref.read(isarDbProvider.future);
-
     final allCards = await isar.flashcards.where().findAll();
-
     await isar.writeTxn(() async {
       for (final card in allCards) {
         card.nextReview = card.nextReview.subtract(const Duration(days: 1));
         await isar.flashcards.put(card);
       }
-
       final allSettings = await isar.deckSettings.where().findAll();
       for (final s in allSettings) {
         s.newCardsSeenToday = 0;
@@ -361,7 +336,6 @@ class HomePage extends ConsumerWidget {
 class _DeckIcon extends StatelessWidget {
   final String? iconUri;
   final double size;
-
   const _DeckIcon({
     required this.iconUri,
     this.size = 52,
@@ -381,13 +355,10 @@ class _DeckIcon extends StatelessWidget {
 
     final uriStr = iconUri?.trim();
     if (uriStr == null || uriStr.isEmpty) return fallback;
-
     try {
       final uri = Uri.parse(uriStr);
       final file = uri.scheme == 'file' ? File.fromUri(uri) : File(uriStr);
-
       if (!file.existsSync()) return fallback;
-
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.file(
