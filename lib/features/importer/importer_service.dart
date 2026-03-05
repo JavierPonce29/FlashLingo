@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:isar/isar.dart';
@@ -177,7 +177,8 @@ class ImporterService {
       final sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
       try {
         final rows = await sqliteDb.rawQuery('SELECT COUNT(*) AS c FROM flashcards');
-        final sqliteRows = (rows.isNotEmpty ? (rows.first['c'] as int?) : null) ?? 0;
+        final sqliteRows =
+            rows.isNotEmpty ? _asInt(rows.first['c'], fallback: 0) : 0;
         final exists = await _deckExistsByName(prepared.packName);
         return ImportPreviewResult(
           zipFilePath: zipFilePath,
@@ -311,21 +312,21 @@ class ImporterService {
       final name = entry.name.replaceAll('\\', '/');
       if (name.startsWith('__MACOSX/')) continue;
       realFileEntries++;
-      final normalized = p.normalize(name);
-      if (normalized.contains('..')) {
-        print("⚠️ Entrada sospechosa (zip-slip) ignorada: $name");
+      final safeOutPath =
+          _resolveSafeExtractPath(extractRoot: extractDir.path, entryName: name);
+      if (safeOutPath == null) {
+        print("WARNING suspicious zip entry ignored: $name");
         continue;
       }
-      final outPath = p.join(extractDir.path, normalized);
-      final outFile = File(outPath);
+      final outFile = File(safeOutPath);
       await outFile.parent.create(recursive: true);
-      // Evitar overwrite silencioso: renombrar si ya existe
-      var finalPath = outPath;
+      // Evitar overwrite silencioso: renombrar si ya existe.
+      var finalPath = safeOutPath;
       int counter = 1;
-      while (File(finalPath).existsSync()) {
-        final dir = p.dirname(outPath);
-        final base = p.basenameWithoutExtension(outPath);
-        final ext = p.extension(outPath);
+      while (await File(finalPath).exists()) {
+        final dir = p.dirname(safeOutPath);
+        final base = p.basenameWithoutExtension(safeOutPath);
+        final ext = p.extension(safeOutPath);
         finalPath = p.join(dir, "${base}_$counter$ext");
         counter++;
       }
@@ -336,7 +337,7 @@ class ImporterService {
     // Encontrar manifest.json
     final manifestFile = File(p.join(extractDir.path, 'manifest.json'));
     if (!manifestFile.existsSync()) {
-      throw StateError("No se encontró manifest.json en el paquete.");
+      throw StateError("No se encontro manifest.json en el paquete.");
     }
     final manifestData =
     jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
@@ -344,12 +345,12 @@ class ImporterService {
     final packName = (manifestData['pack_name'] ?? '').toString().trim();
     final dbFilename = (manifestData['db_filename'] ?? '').toString().trim();
     if (isoCode.isEmpty || packName.isEmpty || dbFilename.isEmpty) {
-      throw StateError("manifest.json inválido: faltan campos requeridos.");
+      throw StateError("manifest.json invalido: faltan campos requeridos.");
     }
     final packageRoot = Directory(extractDir.path);
     final dbFile = File(p.join(extractDir.path, dbFilename));
     if (!dbFile.existsSync()) {
-      throw StateError("No se encontró la base de datos '$dbFilename' en el paquete.");
+      throw StateError("No se encontro la base de datos '$dbFilename' en el paquete.");
     }
 
     MediaIndex? mediaIndex;
@@ -388,6 +389,36 @@ class ImporterService {
     } catch (_) {}
   }
 
+  String? _resolveSafeExtractPath({
+    required String extractRoot,
+    required String entryName,
+  }) {
+    final normalized = p.normalize(entryName.replaceAll('\\', '/'));
+    if (normalized.isEmpty || normalized == '.' || normalized == p.separator) {
+      return null;
+    }
+    if (p.isAbsolute(normalized)) {
+      return null;
+    }
+    final segments = p.split(normalized);
+    if (segments.any((s) => s.contains(':') || s == '..' || s == '.')) {
+      return null;
+    }
+
+    final candidate = p.normalize(p.join(extractRoot, normalized));
+    return _isInsideRoot(extractRoot, candidate) ? candidate : null;
+  }
+
+  bool _isInsideRoot(String root, String path) {
+    final rootNorm = p.normalize(root);
+    final pathNorm = p.normalize(path);
+    final rootLc = rootNorm.toLowerCase();
+    final pathLc = pathNorm.toLowerCase();
+    if (pathLc == rootLc) return true;
+    final prefix = '$rootLc${p.separator}';
+    return pathLc.startsWith(prefix);
+  }
+
   // ============================================================
   //  Multimedia processing -> media_assets
   // ============================================================
@@ -402,12 +433,13 @@ class ImporterService {
     int count = 0;
     int skipped = 0;
     int dupKeys = 0;
-    final entities = extractDir
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((f) => !p.basename(f.path).toLowerCase().endsWith('.db'))
-        .where((f) => p.basename(f.path).toLowerCase() != 'manifest.json')
-        .toList();
+    final entities = <File>[];
+    await for (final entity in extractDir.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final basename = p.basename(entity.path).toLowerCase();
+      if (basename.endsWith('.db') || basename == 'manifest.json') continue;
+      entities.add(entity);
+    }
     for (final entity in entities) {
       final ext = p.extension(entity.path);
       if (ext.isEmpty) {
@@ -460,7 +492,7 @@ class ImporterService {
         }
       }
     }
-    print("✅ Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)");
+    print("Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)");
 
     return MediaIndex(
       exactMap,
@@ -486,6 +518,41 @@ class ImporterService {
     final s = value.toString().trim();
     if (s.isEmpty) return null;
     return s;
+  }
+
+  int _asInt(dynamic value, {required int fallback}) {
+    if (value == null) return fallback;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString().trim()) ?? fallback;
+  }
+
+  double _asDouble(dynamic value, {required double fallback}) {
+    if (value == null) return fallback;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    final raw = value.toString().trim().replaceAll(',', '.');
+    return double.tryParse(raw) ?? fallback;
+  }
+
+  bool _asBool(dynamic value, {required bool fallback}) {
+    if (value == null) return fallback;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final s = value.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes' || s == 'si' || s == 'sí') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return fallback;
+  }
+
+  List<double> _asDoubleList(dynamic value, {required List<double> fallback}) {
+    if (value is! List) return fallback;
+    final out = <double>[];
+    for (final e in value) {
+      final parsed = _asDouble(e, fallback: double.nan);
+      if (!parsed.isNaN && parsed > 0) out.add(parsed);
+    }
+    return out.isEmpty ? fallback : out;
   }
 
   String? _extractDeckIconRef(Map<String, dynamic> manifestData) {
@@ -514,7 +581,7 @@ class ImporterService {
   }
 
   // ============================================================
-  //  MIGRACIÓN SQLITE -> ISAR (nuevo / actualización)
+  //  MIGRACION SQLITE -> ISAR (nuevo / actualizacion)
   // ============================================================
 
   Future<_MergeImportSummary> _migrateDataToIsar(
@@ -527,7 +594,7 @@ class ImporterService {
         required ImportExecutionOptions options,
         required bool targetDeckExistedBeforeImport,
       }) async {
-    // 1) SETTINGS
+    // 1) SETTINGS (preparar, pero persistir junto con tarjetas en una sola txn)
     final importedSettings = _buildDeckSettingsFromManifest(
       packName: targetPackName,
       manifestData: manifestData,
@@ -539,41 +606,43 @@ class ImporterService {
     bool deckSettingsUpdated = false;
     bool deckSettingsPreserved = false;
     final existingSettings =
-    await isar.deckSettings.filter().packNameEqualTo(targetPackName).findFirst();
-    await isar.writeTxn(() async {
-      if (existingSettings == null) {
-        importedSettings.deckIconUri = iconUri;
-        await isar.deckSettings.putByIndex('packName', importedSettings);
-        deckSettingsCreated = true;
-      } else {
-        final bool preserveUserSettings =
-            (options.action == ImportDeckConflictAction.updateExistingDeck &&
-                !options.updateDeckSettingsFromManifest) ||
+        await isar.deckSettings.filter().packNameEqualTo(targetPackName).findFirst();
+
+    final bool preserveUserSettings =
+        existingSettings != null &&
+            ((options.action == ImportDeckConflictAction.updateExistingDeck &&
+                    !options.updateDeckSettingsFromManifest) ||
                 (options.action == ImportDeckConflictAction.createNewDeck &&
-                    targetDeckExistedBeforeImport);
-        if (preserveUserSettings) {
-          deckSettingsPreserved = true;
-          if (iconUri != null && iconUri != existingSettings.deckIconUri) {
-            existingSettings.deckIconUri = iconUri;
-            await isar.deckSettings.put(existingSettings);
-          }
-        } else {
-          importedSettings.id = existingSettings.id;
-          importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
-          importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
-          importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
-          await isar.deckSettings.putByIndex('packName', importedSettings);
-          deckSettingsUpdated = true;
-        }
+                    targetDeckExistedBeforeImport));
+
+    DeckSettings? settingsToPersist;
+    if (existingSettings == null) {
+      importedSettings.deckIconUri = iconUri;
+      settingsToPersist = importedSettings;
+      deckSettingsCreated = true;
+    } else if (preserveUserSettings) {
+      deckSettingsPreserved = true;
+      if (iconUri != null && iconUri != existingSettings.deckIconUri) {
+        existingSettings.deckIconUri = iconUri;
+        settingsToPersist = existingSettings;
       }
-    });
+    } else {
+      importedSettings.id = existingSettings.id;
+      importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
+      importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
+      importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
+      settingsToPersist = importedSettings;
+      deckSettingsUpdated = true;
+    }
 
     // 2) Leer filas SQLite
     final rows = await db.query('flashcards');
-    print("🗄️ Importando ${rows.length} registros de la base de datos...");
-    final double initialNtValue = importedSettings.initialNt;
+    print("Importando ${rows.length} registros de la base de datos...");
+    final double initialNtValue = preserveUserSettings && existingSettings != null
+        ? existingSettings.initialNt
+        : importedSettings.initialNt;
 
-    // 3) Si es actualización, cargar tarjetas existentes del mazo una vez
+    // 3) Si es actualizacion, cargar tarjetas existentes del mazo una vez
     final Map<String, Flashcard> existingByLogicalKey = {};
     if (options.action == ImportDeckConflictAction.updateExistingDeck) {
       final existingCards =
@@ -581,7 +650,7 @@ class ImporterService {
       for (final c in existingCards) {
         existingByLogicalKey[_logicalKey(c.originalId, c.cardType)] = c;
       }
-      print("🔎 Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.");
+      print("Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.");
     }
     final List<Flashcard> toInsert = [];
     final List<Flashcard> toUpdate = [];
@@ -604,19 +673,19 @@ class ImporterService {
       if (wordAudioRef != null && audioPath == null) {
         missingWordAudio++;
         if (missingWordAudio <= 20) {
-          print("⚠️ Audio palabra faltante fila ${i + 1}: '$wordAudioRef'");
+          print("Audio palabra faltante fila ${i + 1}: '$wordAudioRef'");
         }
       }
       if (sentenceAudioRef != null && sentenceAudioPath == null) {
         missingSentenceAudio++;
         if (missingSentenceAudio <= 20) {
-          print("⚠️ Audio oración faltante fila ${i + 1}: '$sentenceAudioRef'");
+          print("Audio oracion faltante fila ${i + 1}: '$sentenceAudioRef'");
         }
       }
       if (imageRef != null && imagePath == null) {
         missingImages++;
         if (missingImages <= 20) {
-          print("⚠️ Imagen faltante fila ${i + 1}: '$imageRef'");
+          print("Imagen faltante fila ${i + 1}: '$imageRef'");
         }
       }
       final originalId = (row['ID'] ?? '').toString().trim();
@@ -660,8 +729,11 @@ class ImporterService {
       }
     }
 
-    // Persistir cambios
+    // Persistir cambios (settings + tarjetas en una sola transacción)
     await isar.writeTxn(() async {
+      if (settingsToPersist != null) {
+        await isar.deckSettings.putByIndex('packName', settingsToPersist!);
+      }
       if (toInsert.isNotEmpty) {
         await isar.flashcards.putAll(toInsert);
       }
@@ -741,53 +813,43 @@ class ImporterService {
       ..initialNt = 0.015
       ..learningSteps = [1.0, 4.0]
       ..newCardMinCorrectReps =
-          int.tryParse((manifestData['new_card_min_correct_reps'] ?? '2').toString()) ?? 2
+          _asInt(manifestData['new_card_min_correct_reps'], fallback: 2)
       ..newCardIntraDayMinutes =
-          int.tryParse((manifestData['new_card_intra_day_minutes'] ?? '10').toString()) ?? 10
+          _asInt(manifestData['new_card_intra_day_minutes'], fallback: 10)
       ..enableWriteMode = false
       ..writeModeThreshold = 80
       ..writeModeMaxReps = 0;
 
     if (manifestData.containsKey('settings') && manifestData['settings'] is Map) {
       final Map<String, dynamic> custom =
-      Map<String, dynamic>.from(manifestData['settings'] as Map);
-      print("⚙️ Aplicando configuraciones personalizadas del mazo...");
-      if (custom['new_cards_per_day'] != null) {
-        settings.newCardsPerDay = (custom['new_cards_per_day'] as num).toInt();
-      }
-      if (custom['max_reviews_per_day'] != null) {
-        settings.maxReviewsPerDay = (custom['max_reviews_per_day'] as num).toInt();
-      }
-      if (custom['lapse_tolerance'] != null) {
-        settings.lapseTolerance = (custom['lapse_tolerance'] as num).toInt();
-      }
-      if (custom['use_fixed_interval_on_lapse'] != null) {
-        settings.useFixedIntervalOnLapse = custom['use_fixed_interval_on_lapse'] as bool;
-      }
-      if (custom['lapse_fixed_interval'] != null) {
-        settings.lapseFixedInterval = (custom['lapse_fixed_interval'] as num).toDouble();
-      }
-      if (custom['p_min'] != null) settings.pMin = (custom['p_min'] as num).toDouble();
-      if (custom['alpha'] != null) settings.alpha = (custom['alpha'] as num).toDouble();
-      if (custom['beta'] != null) settings.beta = (custom['beta'] as num).toDouble();
-      if (custom['offset'] != null) settings.offset = (custom['offset'] as num).toDouble();
-      if (custom['initial_nt'] != null) {
-        settings.initialNt = (custom['initial_nt'] as num).toDouble();
-      }
-      if (custom['learning_steps'] != null && custom['learning_steps'] is List) {
-        settings.learningSteps = (custom['learning_steps'] as List)
-            .map((e) => (e as num).toDouble())
-            .toList();
-      }
-      if (custom['enable_write_mode'] != null) {
-        settings.enableWriteMode = custom['enable_write_mode'] as bool;
-      }
-      if (custom['write_mode_threshold'] != null) {
-        settings.writeModeThreshold = (custom['write_mode_threshold'] as num).toInt();
-      }
-      if (custom['write_mode_max_reps'] != null) {
-        settings.writeModeMaxReps = (custom['write_mode_max_reps'] as num).toInt();
-      }
+          Map<String, dynamic>.from(manifestData['settings'] as Map);
+      print("Aplicando configuraciones personalizadas del mazo...");
+
+      settings.newCardsPerDay =
+          _asInt(custom['new_cards_per_day'], fallback: settings.newCardsPerDay);
+      settings.maxReviewsPerDay =
+          _asInt(custom['max_reviews_per_day'], fallback: settings.maxReviewsPerDay);
+      settings.lapseTolerance =
+          _asInt(custom['lapse_tolerance'], fallback: settings.lapseTolerance);
+      settings.useFixedIntervalOnLapse = _asBool(
+        custom['use_fixed_interval_on_lapse'],
+        fallback: settings.useFixedIntervalOnLapse,
+      );
+      settings.lapseFixedInterval =
+          _asDouble(custom['lapse_fixed_interval'], fallback: settings.lapseFixedInterval);
+      settings.pMin = _asDouble(custom['p_min'], fallback: settings.pMin);
+      settings.alpha = _asDouble(custom['alpha'], fallback: settings.alpha);
+      settings.beta = _asDouble(custom['beta'], fallback: settings.beta);
+      settings.offset = _asDouble(custom['offset'], fallback: settings.offset);
+      settings.initialNt = _asDouble(custom['initial_nt'], fallback: settings.initialNt);
+      settings.learningSteps =
+          _asDoubleList(custom['learning_steps'], fallback: settings.learningSteps);
+      settings.enableWriteMode =
+          _asBool(custom['enable_write_mode'], fallback: settings.enableWriteMode);
+      settings.writeModeThreshold =
+          _asInt(custom['write_mode_threshold'], fallback: settings.writeModeThreshold);
+      settings.writeModeMaxReps =
+          _asInt(custom['write_mode_max_reps'], fallback: settings.writeModeMaxReps);
     }
     return settings;
   }
@@ -882,18 +944,18 @@ class MediaIndex {
       final decoded = Uri.decodeFull(clean);
       if (exactMap.containsKey(decoded)) return exactMap[decoded];
     } catch (_) {}
-    // 3) minúsculas
+    // 3) minusculas
     final lower = clean.toLowerCase();
     if (lowerCaseMap.containsKey(lower)) return lowerCaseMap[lower];
-    // 4) minúsculas decodificado
+    // 4) minusculas decodificado
     try {
       final decodedLower = Uri.decodeFull(clean).toLowerCase();
       if (lowerCaseMap.containsKey(decodedLower)) return lowerCaseMap[decodedLower];
     } catch (_) {}
-    // 5) stem (ignora extensión)
+    // 5) stem (ignora extension)
     final stem = p.basenameWithoutExtension(clean).toLowerCase();
     if (stemMap.containsKey(stem)) return stemMap[stem];
-    // 6) stem por basename si venía con ruta
+    // 6) stem por basename si venia con ruta
     final baseStem = p.basenameWithoutExtension(p.basename(clean)).toLowerCase();
     if (stemMap.containsKey(baseStem)) return stemMap[baseStem];
     return null;

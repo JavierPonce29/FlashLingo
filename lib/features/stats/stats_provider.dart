@@ -1,3 +1,5 @@
+﻿import 'dart:async';
+
 import 'package:isar/isar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
@@ -12,9 +14,9 @@ class DeckStatsData {
   final int learningCards;
   final int reviewCards;
   final int relearningCards;
-  /// Para gráfico de barras (futuro): 0..14 días desde hoy -> cantidad de repasos programados
+  /// Para grafico de barras (futuro): 0..14 dias desde hoy -> cantidad de repasos programados.
   final Map<int, int> futureReviews;
-  /// Para mapa de calor (pasado): fecha (normalizada a día) -> cantidad de repasos
+  /// Para mapa de calor (pasado): fecha (normalizada a dia) -> cantidad de repasos.
   final Map<DateTime, int> heatmapData;
   DeckStatsData({
     required this.totalCards,
@@ -27,15 +29,14 @@ class DeckStatsData {
   });
 }
 
-final deckStatsProvider =
-FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
-  final isar = await ref.watch(isarDbProvider.future);
+Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
   final now = DateTime.now();
   final settings = await isar.deckSettings
-      .filter()
-      .packNameEqualTo(packName)
-      .findFirst() ??
+          .filter()
+          .packNameEqualTo(packName)
+          .findFirst() ??
       (DeckSettings()..packName = packName);
+
   final startOfStudyDay = StudyDay.start(now, settings);
   final labelToday = StudyDay.label(now, settings);
 
@@ -68,13 +69,11 @@ FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
       .count();
 
   // =========================
-  // 2) FORECAST (0..14 días)
-  //    Solo cartas NO nuevas
+  // 2) FORECAST (0..14 dias)
+  //    Incluye atrasadas en bucket 0 (hoy)
   // =========================
   final Map<int, int> forecast = {for (int i = 0; i <= 14; i++) i: 0};
-
-  final forecastEnd =
-  startOfStudyDay.add(const Duration(days: 15)); // hoy..hoy+14 (15 excl.)
+  final forecastEnd = startOfStudyDay.add(const Duration(days: 15));
 
   final upcomingCards = await isar.flashcards
       .filter()
@@ -83,25 +82,24 @@ FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
       .stateEqualTo(CardState.newCard)
       .and()
       .nextReviewBetween(
-    startOfStudyDay,
-    forecastEnd,
-    includeLower: true,
-    includeUpper: false,
-  )
+        DateTime.fromMillisecondsSinceEpoch(0),
+        forecastEnd,
+        includeLower: true,
+        includeUpper: false,
+      )
       .findAll();
 
   for (final card in upcomingCards) {
-    final d = card.nextReview;
-    final dateOnly = StudyDay.label(d, settings);
-    final diff = dateOnly.difference(labelToday).inDays;
-
-    if (diff >= 0 && diff <= 14) {
+    final dateOnly = StudyDay.label(card.nextReview, settings);
+    int diff = dateOnly.difference(labelToday).inDays;
+    if (diff < 0) diff = 0;
+    if (diff <= 14) {
       forecast[diff] = (forecast[diff] ?? 0) + 1;
     }
   }
 
   // =========================
-  // 3) HEATMAP (últimos 60 días)
+  // 3) HEATMAP (ultimos 60 dias)
   // =========================
   final heatmapStart = startOfStudyDay.subtract(const Duration(days: 60));
   final heatmapEnd = startOfStudyDay.add(const Duration(days: 1));
@@ -110,17 +108,16 @@ FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
       .filter()
       .packNameEqualTo(packName)
       .timestampBetween(
-    heatmapStart,
-    heatmapEnd,
-    includeLower: true,
-    includeUpper: false,
-  )
+        heatmapStart,
+        heatmapEnd,
+        includeLower: true,
+        includeUpper: false,
+      )
       .findAll();
 
   final Map<DateTime, int> heatmap = {};
   for (final ReviewLog log in logs) {
-    final t = log.timestamp;
-    final dateKey = StudyDay.label(t, settings);
+    final dateKey = StudyDay.label(log.timestamp, settings);
     heatmap[dateKey] = (heatmap[dateKey] ?? 0) + 1;
   }
 
@@ -133,4 +130,35 @@ FutureProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async {
     futureReviews: forecast,
     heatmapData: heatmap,
   );
+}
+
+final deckStatsProvider =
+    StreamProvider.family.autoDispose<DeckStatsData, String>((ref, packName) async* {
+  final isar = await ref.watch(isarDbProvider.future);
+
+  Future<DeckStatsData> compute() => _computeDeckStats(isar, packName);
+
+  yield await compute();
+
+  final controller = StreamController<void>(sync: true);
+  final sub1 = isar.flashcards.watchLazy().listen((_) {
+    if (!controller.isClosed) controller.add(null);
+  });
+  final sub2 = isar.reviewLogs.watchLazy().listen((_) {
+    if (!controller.isClosed) controller.add(null);
+  });
+  final sub3 = isar.deckSettings.watchLazy().listen((_) {
+    if (!controller.isClosed) controller.add(null);
+  });
+
+  ref.onDispose(() async {
+    await sub1.cancel();
+    await sub2.cancel();
+    await sub3.cancel();
+    await controller.close();
+  });
+
+  await for (final _ in controller.stream) {
+    yield await compute();
+  }
 });

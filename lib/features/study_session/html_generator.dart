@@ -1,7 +1,96 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flashcards_app/data/models/flashcard.dart';
 
 class HtmlGenerator {
+  static const Set<String> _allowedHtmlTags = {
+    'a', 'b', 'big', 'blockquote', 'br', 'code', 'div', 'em', 'font', 'hr', 'i', 'img', 'kbd', 'li', 'mark', 'ol',
+    'p', 'pre', 'rp', 'rt', 'ruby', 's', 'small', 'span', 'strike', 'strong', 'sub', 'sup',
+    'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+  };
+
+  static String _safeHtml(String? input) {
+    if (input == null || input.isEmpty) return '';
+    var html = input.replaceAll('\u0000', '');
+    html = html.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+    html = html.replaceAll(
+      RegExp(
+        r'<\s*(script|style|iframe|object|embed|link|meta|base)\b[^>]*>[\s\S]*?<\s*/\s*\1\s*>',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    html = html.replaceAll(
+      RegExp(
+        r'<\s*(script|style|iframe|object|embed|link|meta|base)\b[^>]*\/?\s*>',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    html = html.replaceAllMapped(RegExp(r'<[^>]+>'), (m) => _sanitizeTag(m.group(0)!));
+    return html;
+  }
+
+  static String _sanitizeTag(String tag) {
+    final match = RegExp(r'^<\s*/?\s*([a-zA-Z0-9]+)').firstMatch(tag);
+    if (match == null) return '';
+    final tagName = match.group(1)!.toLowerCase();
+    if (!_allowedHtmlTags.contains(tagName)) return '';
+
+    var sanitized = tag;
+    sanitized = sanitized.replaceAll(
+      RegExp(r'\son[a-zA-Z0-9_-]+\s*=\s*(".*?"|\x27.*?\x27|[^\s>]+)', caseSensitive: false),
+      '',
+    );
+    sanitized = sanitized.replaceAll(
+      RegExp(
+        r'\s(src|href)\s*=\s*("|\x27)\s*(javascript:|data:text/html)[^"\x27]*\2',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    sanitized = sanitized.replaceAllMapped(
+      RegExp(r'\sstyle\s*=\s*(".*?"|\x27.*?\x27)', caseSensitive: false),
+      (m) {
+        final raw = m.group(1)!;
+        if (raw.length < 2) return '';
+        final quote = raw.substring(0, 1);
+        final value = raw.substring(1, raw.length - 1);
+        final clean = _sanitizeInlineStyle(value);
+        if (clean.isEmpty) return '';
+        return ' style=' + quote + clean + quote;
+      },
+    );
+    return sanitized;
+  }
+
+  static String _sanitizeInlineStyle(String value) {
+    var clean = value;
+    clean = clean.replaceAll(RegExp(r'expression\s*\([^)]*\)', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r'url\s*\(\s*["\x27]?\s*javascript:[^)]*\)', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r'-moz-binding\s*:[^;]+;?', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r'@import', caseSensitive: false), '');
+    return clean.trim();
+  }
+
+  static String _safeAttr(String? input) {
+    if (input == null || input.isEmpty) return '';
+    return input
+        .replaceAll('&', '&amp;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+  }
+
+  static String _imageHtml(String? src) {
+    if (src == null || src.trim().isEmpty) return '';
+    final normalized = src.trim();
+    final lower = normalized.toLowerCase();
+    if (lower.startsWith('javascript:') || lower.startsWith('data:text/html')) {
+      return '';
+    }
+    return '<img src="${_safeAttr(normalized)}" class="card-img" />';
+  }
   static String generateContent(Flashcard card, {bool writeMode = false}) {
     Map<String, dynamic> extraData = {};
     final rawExtra = card.extraDataJson;
@@ -116,7 +205,7 @@ class HtmlGenerator {
         var label = targetSegments.length > 1 ? (i + 1) + ". " : "";
         html += '<div class="write-group">';
         if(label) html += '<span class="write-index">' + label + '</span>';
-        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="Escribe aquí..."></textarea>';
+        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="Escribe aqui..."></textarea>';
         html += '</div>';
       }
       container.innerHTML = html;
@@ -175,7 +264,7 @@ class HtmlGenerator {
         qView.style.display = 'none';
         aView.style.display = 'block';
 
-        // ✅ clave: pequeño delay para asegurar DOM listo antes de play()
+        // clave: pequeno delay para asegurar DOM listo antes de play()
         var hasAudio = aView.querySelector('audio');
         if (hasAudio) {
           setTimeout(function() {
@@ -232,20 +321,24 @@ class HtmlGenerator {
   }
 
   static String _generateSimpleRecogBody(Flashcard card, Map<String, dynamic> extra) {
-    final String formas = (extra['forms'] ?? '').toString();
+    final String questionHtml = _safeHtml(card.question);
+    final String answerHtml = _safeHtml(card.answer);
+    final String sentenceHtml = _safeHtml(card.sentence);
+    final String translationHtml = _safeHtml(card.translation);
+    final String formas = _safeHtml((extra['forms'] ?? '').toString());
     final String awSrc = card.audioPath ?? '';
     final String asSrc = card.sentenceAudioPath ?? '';
-    final String imgHtml = card.imagePath != null ? '<img src="${card.imagePath}" class="card-img" />' : '';
+    final String imgHtml = _imageHtml(card.imagePath);
 
     final String questionView = """
 <div id="q-view">
   <div class="row-main">
-    <div class="word-text">${card.question}</div>
+    <div class="word-text">$questionHtml</div>
     ${_playBtn('audio-word-q', awSrc.isNotEmpty)}
   </div>
   <div class="separator"></div>
   <div class="row-sent">
-    <div class="sentence-text">${card.sentence ?? ''}</div>
+    <div class="sentence-text">$sentenceHtml</div>
     ${_playBtn('audio-sent-q', asSrc.isNotEmpty)}
   </div>
   $imgHtml
@@ -257,19 +350,19 @@ class HtmlGenerator {
     final String answerView = """
 <div id="a-view" style="display:none;">
   <div class="row-main">
-    <div class="word-text">${card.question}</div>
+    <div class="word-text">$questionHtml</div>
     ${_playBtn('audio-word-a', awSrc.isNotEmpty)}
   </div>
   <div class="separator"></div>
-  <div class="meaning-text">${card.answer}</div>
+  <div class="meaning-text">$answerHtml</div>
   ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
   <div class="row-sent" style="margin-top: 15px;">
-    <div class="sentence-text">${card.sentence ?? ''}</div>
+    <div class="sentence-text">$sentenceHtml</div>
     ${_playBtn('audio-sent-a', asSrc.isNotEmpty)}
   </div>
   <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
-    ${card.translation ?? ''}
+    $translationHtml
   </div>
   $imgHtml
   ${_audioHtml('audio-word-a', awSrc, 'audio-w')}
@@ -281,15 +374,19 @@ class HtmlGenerator {
   }
 
   static String _generateProdBody(Flashcard card, Map<String, dynamic> extra, bool writeMode) {
-    final String formas = (extra['forms'] ?? '').toString();
-    final String reading = (extra['target_reading'] ?? '').toString();
+    final String questionHtml = _safeHtml(card.question);
+    final String answerHtml = _safeHtml(card.answer);
+    final String sentenceHtml = _safeHtml(card.sentence);
+    final String translationHtml = _safeHtml(card.translation);
+    final String formas = _safeHtml((extra['forms'] ?? '').toString());
+    final String reading = _safeHtml((extra['target_reading'] ?? '').toString());
     final String awSrc = card.audioPath ?? '';
     final String asSrc = card.sentenceAudioPath ?? '';
-    final String imgHtml = card.imagePath != null ? '<img src="${card.imagePath}" class="card-img" />' : '';
+    final String imgHtml = _imageHtml(card.imagePath);
 
     String inputHtml = "";
     String sentenceArea = """
-<div class="sentence-text">${card.translation ?? ''}</div>
+<div class="sentence-text">$translationHtml</div>
 """;
 
     if (writeMode) {
@@ -297,7 +394,7 @@ class HtmlGenerator {
 <div class="write-section">
   <div class="write-label">Escribe la(s) oración(es):</div>
   <div id="dynamic-write-area"></div>
-  <div id="target-hidden-raw" style="display:none;">${card.translation ?? ''}</div>
+  <div id="target-hidden-raw" style="display:none;">$translationHtml</div>
 </div>
 """;
 
@@ -311,15 +408,15 @@ class HtmlGenerator {
 </div>
 
 <div class="sentence-text" style="font-size:0.9em; color:#888; margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;">
-  Correcto:<br/>${card.translation ?? ''}
+  Correcto:<br/>$translationHtml
 </div>
 """;
     }
 
     final String questionView = """
 <div id="q-view">
-  <div class="meaning-prod">${card.question}</div>
-  <div class="sentence-trans-prod">${card.sentence ?? ''}</div>
+  <div class="meaning-prod">$questionHtml</div>
+  <div class="sentence-trans-prod">$sentenceHtml</div>
   $inputHtml
 </div>
 """;
@@ -328,7 +425,7 @@ class HtmlGenerator {
 <div id="a-view" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
-      <div class="word-text">${card.answer}</div>
+      <div class="word-text">$answerHtml</div>
       ${reading.isNotEmpty ? '<div class="reading-sub">$reading</div>' : ''}
     </div>
     ${_playBtn('audio-word-a', awSrc.isNotEmpty)}
@@ -336,7 +433,7 @@ class HtmlGenerator {
 
   <div class="separator"></div>
 
-  <div class="meaning-text" style="color: #555;">${card.question}</div>
+  <div class="meaning-text" style="color: #555;">$questionHtml</div>
   ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
 
   <div class="row-sent" style="margin-top: 15px; display:block;">
@@ -350,7 +447,7 @@ class HtmlGenerator {
 
   <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
-    ${card.sentence ?? ''}
+    $sentenceHtml
   </div>
 
   ${_audioHtml('audio-word-a', awSrc, 'audio-w')}
@@ -362,13 +459,17 @@ class HtmlGenerator {
   }
 
   static String _generateComplexRecogBody(Flashcard card, Map<String, dynamic> extra) {
-    final String formas = (extra['forms'] ?? '').toString();
+    final String questionHtml = _safeHtml(card.question);
+    final String answerHtml = _safeHtml(card.answer);
+    final String sentenceHtml = _safeHtml(card.sentence);
+    final String translationHtml = _safeHtml(card.translation);
+    final String formas = _safeHtml((extra['forms'] ?? '').toString());
     final String awSrc = card.audioPath ?? '';
     final String asSrc = card.sentenceAudioPath ?? '';
-    final String imgHtml = card.imagePath != null ? '<img src="${card.imagePath}" class="card-img" />' : '';
+    final String imgHtml = _imageHtml(card.imagePath);
 
-    final String readingWord = (extra['reading'] ?? '').toString();
-    final String readingSent = (extra['sentence_reading'] ?? '').toString();
+    final String readingWord = _safeHtml((extra['reading'] ?? '').toString());
+    final String readingSent = _safeHtml((extra['sentence_reading'] ?? '').toString());
 
     final String btnWordWrapperQ = awSrc.isNotEmpty
         ? '<div class="delayed-btn" style="visibility:hidden; opacity:0; transition: opacity 0.3s;">${_playBtn('audio-word-q', true)}</div>'
@@ -388,7 +489,7 @@ class HtmlGenerator {
 <div id="q-view">
   <div class="row-main">
     <div class="ruby-block">
-      <div class="word-text">${card.question}</div>
+      <div class="word-text">$questionHtml</div>
       <div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>
     </div>
     $btnWordWrapperQ
@@ -398,7 +499,7 @@ class HtmlGenerator {
 
   <div class="row-sent">
     <div class="ruby-block">
-      <div class="sentence-text">${card.sentence ?? ''}</div>
+      <div class="sentence-text">$sentenceHtml</div>
       <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
     </div>
     $btnSentWrapperQ
@@ -414,7 +515,7 @@ class HtmlGenerator {
 <div id="a-view" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
-      <div class="word-text">${card.question}</div>
+      <div class="word-text">$questionHtml</div>
       <div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>
     </div>
     $btnWordWrapperA
@@ -422,12 +523,12 @@ class HtmlGenerator {
 
   <div class="separator"></div>
 
-  <div class="meaning-text">${card.answer}</div>
+  <div class="meaning-text">$answerHtml</div>
   ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
 
   <div class="row-sent" style="margin-top: 15px;">
     <div class="ruby-block">
-      <div class="sentence-text">${card.sentence ?? ''}</div>
+      <div class="sentence-text">$sentenceHtml</div>
       <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
     </div>
     $btnSentWrapperA
@@ -435,7 +536,7 @@ class HtmlGenerator {
 
   <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
-    ${card.translation ?? ''}
+    $translationHtml
   </div>
 
   $imgHtml
@@ -448,8 +549,13 @@ class HtmlGenerator {
   }
 
   static String _audioHtml(String id, String src, String classType) {
-    if (src.isEmpty) return '';
-    return '<audio id="$id" class="$classType" src="$src" preload="auto"></audio>';
+    final normalized = src.trim();
+    if (normalized.isEmpty) return '';
+    final lower = normalized.toLowerCase();
+    if (lower.startsWith('javascript:') || lower.startsWith('data:text/html')) {
+      return '';
+    }
+    return '<audio id="$id" class="$classType" src="${_safeAttr(normalized)}" preload="auto"></audio>';
   }
 
   static String _playBtn(String id, bool exists) {

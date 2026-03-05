@@ -55,7 +55,7 @@ class DeckOverviewPage extends ConsumerWidget {
   Future<void> _startSession(BuildContext context, WidgetRef ref) async {
     final isar = await ref.read(isarDbProvider.future);
     final now = DateTime.now();
-    // 1) Cargar configuración
+    // 1) Cargar configuracion
     DeckSettings? settings = await isar.deckSettings
         .filter()
         .packNameEqualTo(packName)
@@ -66,7 +66,7 @@ class DeckOverviewPage extends ConsumerWidget {
         await isar.deckSettings.put(settings!);
       });
     }
-    // --- GESTIÓN DE LÍMITE DIARIO ---
+    // --- GESTION DE LIMITE DIARIO ---
     final currentLabel = StudyDay.label(now, settings);
     final last = settings.lastNewCardStudyDate;
     final lastLabel = last == null ? null : StudyDay.label(last, settings);
@@ -77,13 +77,14 @@ class DeckOverviewPage extends ConsumerWidget {
 
     if (!isSameStudyDay) {
       settings.newCardsSeenToday = 0;
-      settings.lastNewCardStudyDate = currentLabel;
+      // Guardamos timestamp real; luego se etiqueta con StudyDay.label().
+      settings.lastNewCardStudyDate = now;
 
       await isar.writeTxn(() async {
         await isar.deckSettings.put(settings!);
       });
     }
-    // 2) Si existe una sesión guardada DEL MISMO DÍA (de estudio), reanudarla.
+    // 2) Si existe una sesion guardada DEL MISMO DIA (de estudio), reanudarla.
     final existingSession =
     await isar.studySessions.filter().packNameEqualTo(packName).findFirst();
 
@@ -91,28 +92,31 @@ class DeckOverviewPage extends ConsumerWidget {
       if (_isSameDay(existingSession.sessionDay, currentLabel)) {
         final resumedCards =
         await _loadCardsFromSession(isar, existingSession.queueCardIds);
-        // Si la sesión quedó vacía/corrupta, la eliminamos y continuamos con una nueva.
+        // Si la sesion queda vacia/corrupta, la eliminamos y continuamos con una nueva.
         if (resumedCards.isNotEmpty) {
-          final safeIndex =
-          _clampIndex(existingSession.currentIndex, resumedCards.length);
-          if (!context.mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StudyPage(
-                packName: packName,
-                cards: resumedCards,
-                initialIndex: safeIndex,
+          final savedIndex = existingSession.currentIndex;
+          final canResume = savedIndex >= 0 && savedIndex < resumedCards.length;
+          if (canResume) {
+            if (!context.mounted) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StudyPage(
+                  packName: packName,
+                  cards: resumedCards,
+                  initialIndex: savedIndex,
+                ),
               ),
-            ),
-          );
-          return;
+            );
+            return;
+          }
         }
+        // Session finished or corrupted: remove and build a fresh one.
         await isar.writeTxn(() async {
           await isar.studySessions.delete(existingSession.id);
         });
       } else {
-        // Sesión vieja: eliminar para evitar mezclar días de estudio.
+        // Sesion vieja: eliminar para evitar mezclar dias de estudio.
         await isar.writeTxn(() async {
           await isar.studySessions.delete(existingSession.id);
         });
@@ -149,7 +153,7 @@ class DeckOverviewPage extends ConsumerWidget {
       newCardsRaw.where((c) => c.cardType.endsWith('prod')).toList();
       newCardsOrdered = [...newRecog, ...newProd];
     }
-    // 6) Unir sesión según configuración de mezcla
+    // 6) Unir sesion segun configuracion de mezcla
     final sessionCards = _buildSessionCards(
       settings: settings,
       reviews: reviews,
@@ -157,9 +161,9 @@ class DeckOverviewPage extends ConsumerWidget {
     );
     if (!context.mounted) return;
     if (sessionCards.isEmpty) {
-      String message = "¡Todo al día! No hay cartas pendientes.";
+      String message = "Todo al dia! No hay cartas pendientes.";
       if (remainingQuota == 0 && settings.newCardsPerDay > 0) {
-        message = "¡Límite diario de nuevas alcanzado!";
+        message = "Limite diario de nuevas alcanzado!";
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.green),
@@ -249,12 +253,6 @@ class DeckOverviewPage extends ConsumerWidget {
   }
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
-  int _clampIndex(int idx, int len) {
-    if (len <= 0) return 0;
-    if (idx < 0) return 0;
-    if (idx >= len) return len - 1;
-    return idx;
-  }
 
   Future<List<Flashcard>> _loadCardsFromSession(
       Isar isar,
@@ -276,3 +274,4 @@ class DeckOverviewPage extends ConsumerWidget {
     return ordered;
   }
 }
+

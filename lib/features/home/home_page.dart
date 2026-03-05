@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
@@ -24,7 +24,7 @@ class HomePage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.history_toggle_off),
-            tooltip: "Simular paso del tiempo (+1 día)",
+            tooltip: "Simular paso del tiempo (+1 dia)",
             onPressed: () => _showTimeMachineDialog(context, ref),
           ),
           IconButton(
@@ -46,7 +46,7 @@ class HomePage extends ConsumerWidget {
                   const Icon(Icons.library_books, size: 64, color: Colors.grey),
                   const SizedBox(height: 10),
                   const Text(
-                    "No hay mazos aún.\nImporta uno para empezar.",
+                    "No hay mazos.\nImporta uno para empezar.",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
@@ -76,10 +76,13 @@ class HomePage extends ConsumerWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   leading: _DeckIcon(iconUri: deck.iconUri),
                   title: Text(deck.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Row(
+                  subtitle: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       if (deck.newCardsDue > 0)
-                        Text("Nuevas: ${deck.newCardsDue}  ",
+                        Text(
+                          "Nuevas: ${deck.newCardsDue}",
                           style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,
@@ -87,7 +90,7 @@ class HomePage extends ConsumerWidget {
                         ),
                       if (firstStepDue > 0)
                         Text(
-                          "Paso 1: $firstStepDue  ",
+                          "Paso 1: $firstStepDue",
                           style: const TextStyle(
                             color: Colors.orange,
                             fontWeight: FontWeight.bold,
@@ -104,7 +107,7 @@ class HomePage extends ConsumerWidget {
                       if (deck.newCardsDue == 0 &&
                           firstStepDue == 0 &&
                           deck.reviewCardsDue == 0)
-                        const Text("¡Al día!", style: TextStyle(color: Colors.grey)),
+                        const Text("Al dia!", style: TextStyle(color: Colors.grey)),
                     ],
                   ),
                   onTap: () {
@@ -149,7 +152,7 @@ class HomePage extends ConsumerWidget {
                         value: 'settings',
                         child: ListTile(
                           leading: Icon(Icons.tune),
-                          title: Text('Configuración'),
+                          title: Text('Configuracion'),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
@@ -165,7 +168,7 @@ class HomePage extends ConsumerWidget {
                         value: 'stats',
                         child: ListTile(
                           leading: Icon(Icons.bar_chart),
-                          title: Text('Estadísticas'),
+                          title: Text('Estadisticas'),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
@@ -206,7 +209,7 @@ class HomePage extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Eliminar mazo"),
-        content: Text("¿Seguro que quieres eliminar el mazo '$packName'?"),
+        content: Text("Seguro que quieres eliminar el mazo '$packName'?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -292,8 +295,8 @@ class HomePage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Máquina del Tiempo"),
-        content: const Text("Esto mueve todas las tarjetas 1 día hacia atrás (para que queden vencidas)."),
+        title: const Text("Maquina del Tiempo"),
+        content: const Text("Esto mueve todas las tarjetas 1 dia hacia atras (para que queden vencidas)."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -305,11 +308,11 @@ class HomePage extends ConsumerWidget {
               await _applyTimeTravel(ref);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("¡Viajaste 1 día al futuro!")),
+                  const SnackBar(content: Text("Viajaste 1 dia al futuro!")),
                 );
               }
             },
-            child: const Text("Viajar +1 Día"),
+            child: const Text("Viajar +1 Dia"),
           ),
         ],
       ),
@@ -358,7 +361,6 @@ class _DeckIcon extends StatelessWidget {
     try {
       final uri = Uri.parse(uriStr);
       final file = uri.scheme == 'file' ? File.fromUri(uri) : File(uriStr);
-      if (!file.existsSync()) return fallback;
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.file(

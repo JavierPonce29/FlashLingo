@@ -1,30 +1,32 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+﻿import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-
-import 'package:flashcards_app/main.dart';
+import 'package:flashcards_app/data/models/deck_settings.dart';
+import 'package:flashcards_app/data/utils/study_day.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('StudyDay', () {
+    test('usa el dia anterior cuando la hora es antes del cutoff', () {
+      final settings = DeckSettings()
+        ..packName = 'demo'
+        ..dayCutoffHour = 4
+        ..dayCutoffMinute = 0;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      final dt = DateTime(2026, 3, 5, 2, 30);
+      final label = StudyDay.label(dt, settings);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(label, DateTime(2026, 3, 4));
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('usa el mismo dia cuando la hora es despues del cutoff', () {
+      final settings = DeckSettings()
+        ..packName = 'demo'
+        ..dayCutoffHour = 4
+        ..dayCutoffMinute = 0;
+
+      final dt = DateTime(2026, 3, 5, 5, 0);
+      final label = StudyDay.label(dt, settings);
+
+      expect(label, DateTime(2026, 3, 5));
+    });
   });
 }

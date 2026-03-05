@@ -130,7 +130,7 @@ class _StudyPageState extends State<StudyPage> {
     return WillPopScope(
       onWillPop: () async {
         if (_isFinished) {
-          await _clearStudySession();
+          await _completeSessionIfNeeded();
         } else {
           await _persistStudySession();
         }
@@ -141,20 +141,16 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildFinished() {
-    if (!_sessionCleared) {
-      _sessionCleared = true;
-      _clearStudySession();
-    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Sesión Finalizada")),
+      appBar: AppBar(title: const Text("Sesion Finalizada")),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.check_circle_outline, size: 80, color: Colors.green),
             const SizedBox(height: 20),
-            const Text("¡Has terminado por ahora!", style: TextStyle(fontSize: 20)),
+            const Text("Has terminado por ahora!", style: TextStyle(fontSize: 20)),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
@@ -178,7 +174,7 @@ class _StudyPageState extends State<StudyPage> {
         actions: [
           if (_undoEnabled && _lastUndo != null)
             IconButton(
-              tooltip: "Deshacer último (Undo)",
+              tooltip: "Deshacer ultimo (Undo)",
               onPressed: _performUndo,
               icon: const Icon(Icons.undo),
             ),
@@ -337,7 +333,7 @@ class _StudyPageState extends State<StudyPage> {
     final reviewLog = ReviewLog()
       ..packName = card.packName
       ..timestamp = now
-      ..cardOriginalId = card.originalId
+      ..cardOriginalId = '${card.originalId}::${card.cardType}'
       ..rating = isCorrect ? 3 : 1
       ..scheduledDays = daysInterval;
 
@@ -362,7 +358,8 @@ class _StudyPageState extends State<StudyPage> {
             latest.newCardsSeenToday = 0;
           }
           latest.newCardsSeenToday += 1;
-          latest.lastNewCardStudyDate = currentLabel;
+          // Guardamos timestamp real; luego se etiqueta con StudyDay.label().
+          latest.lastNewCardStudyDate = now;
           await isar.deckSettings.put(latest);
           _currentDeckSettings = latest;
         }
@@ -385,7 +382,7 @@ class _StudyPageState extends State<StudyPage> {
       undo.didAppendToQueue = true;
     }
 
-    _nextCard();
+    await _nextCard();
     await _persistStudySession();
 
     if (_undoEnabled) {
@@ -401,7 +398,7 @@ class _StudyPageState extends State<StudyPage> {
     final isar = Isar.getInstance();
     if (action == null || settings == null || isar == null) return;
     if (!_undoEnabled) return;
-    // Si se re-encoló por repeatToday, revertir UNA ocurrencia
+    // Si se re-encolar por repeatToday, revertir UNA ocurrencia
     if (action.didAppendToQueue) {
       for (int i = studyQueue.length - 1; i >= 0; i--) {
         if (studyQueue[i].id == action.cardId && i != action.prevIndex) {
@@ -453,7 +450,7 @@ class _StudyPageState extends State<StudyPage> {
     await _persistStudySession();
   }
 
-  void _nextCard() {
+  Future<void> _nextCard() async {
     if (currentIndex < studyQueue.length - 1) {
       setState(() {
         currentIndex++;
@@ -464,10 +461,21 @@ class _StudyPageState extends State<StudyPage> {
       _recomputeCurrentCardState(reloadHtml: true);
     } else {
       setState(() => currentIndex++);
+      await _completeSessionIfNeeded();
     }
   }
 
+  Future<void> _completeSessionIfNeeded() async {
+    if (_sessionCleared) return;
+    _sessionCleared = true;
+    await _clearStudySession();
+  }
+
   Future<void> _persistStudySession() async {
+    if (_isFinished) {
+      await _completeSessionIfNeeded();
+      return;
+    }
     final isar = Isar.getInstance();
     if (isar == null) return;
     final now = DateTime.now();

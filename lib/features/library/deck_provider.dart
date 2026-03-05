@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -44,7 +44,8 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           lastLabel.day == currentLabel.day;
       if (!sameStudyDay) {
         s.newCardsSeenToday = 0;
-        s.lastNewCardStudyDate = currentLabel;
+        // Guardamos timestamp real; luego se etiqueta con StudyDay.label().
+        s.lastNewCardStudyDate = now;
         await isar.writeTxn(() async {
           await isar.deckSettings.put(s);
         });
@@ -63,7 +64,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           .count()
           : 0;
 
-      // ========== NARANJA (primer paso TOTAL, aunque no esté vencido) ==========
+      // ========== NARANJA (primer paso TOTAL, aunque no esta vencido) ==========
       final firstStepTotal = await isar.flashcards
           .filter()
           .packNameEqualTo(s.packName)
@@ -147,10 +148,10 @@ Future<void> renameDeck(
   final newName = newPackName.trim();
 
   if (oldName.isEmpty) {
-    throw ArgumentError('El nombre actual del mazo es inválido.');
+    throw ArgumentError('El nombre actual del mazo es invalido.');
   }
   if (newName.isEmpty) {
-    throw ArgumentError('El nuevo nombre no puede estar vacío.');
+    throw ArgumentError('El nuevo nombre no puede estar vacio.');
   }
   if (oldName == newName) return;
 
@@ -180,7 +181,7 @@ Future<void> renameDeck(
         .findFirst();
 
     if (settings == null) {
-      throw StateError("No se encontró el mazo '$oldName'.");
+      throw StateError("No se encontro el mazo '$oldName'.");
     }
 
     // 1) DeckSettings
@@ -216,3 +217,4 @@ Future<void> renameDeck(
     }
   });
 }
+
