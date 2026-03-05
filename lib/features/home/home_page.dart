@@ -1,10 +1,12 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/features/home/home_import_helper.dart';
 import 'package:flashcards_app/features/library/deck_overview_page.dart';
 import 'package:flashcards_app/features/library/deck_provider.dart';
@@ -71,11 +73,22 @@ class HomePage extends ConsumerWidget {
               final firstStepDue = deck.firstStepDue;
               return Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   leading: _DeckIcon(iconUri: deck.iconUri),
-                  title: Text(deck.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  title: Text(
+                    deck.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
                   subtitle: Wrap(
                     spacing: 8,
                     runSpacing: 4,
@@ -107,7 +120,10 @@ class HomePage extends ConsumerWidget {
                       if (deck.newCardsDue == 0 &&
                           firstStepDue == 0 &&
                           deck.reviewCardsDue == 0)
-                        const Text("Al dia!", style: TextStyle(color: Colors.grey)),
+                        const Text(
+                          "Al dia!",
+                          style: TextStyle(color: Colors.grey),
+                        ),
                     ],
                   ),
                   onTap: () {
@@ -124,14 +140,16 @@ class HomePage extends ConsumerWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => DeckSettingsPage(packName: deck.name),
+                            builder: (_) =>
+                                DeckSettingsPage(packName: deck.name),
                           ),
                         );
                       } else if (value == 'browse') {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => FlashcardBrowserPage(packName: deck.name),
+                            builder: (_) =>
+                                FlashcardBrowserPage(packName: deck.name),
                           ),
                         );
                       } else if (value == 'stats') {
@@ -141,6 +159,8 @@ class HomePage extends ConsumerWidget {
                             builder: (_) => StatsPage(packName: deck.name),
                           ),
                         );
+                      } else if (value == 'advance') {
+                        _promptBringReviewsToToday(context, ref, deck.name);
                       } else if (value == 'rename') {
                         _showRenameDeckDialog(context, ref, deck.name);
                       } else if (value == 'delete') {
@@ -173,6 +193,14 @@ class HomePage extends ConsumerWidget {
                         ),
                       ),
                       PopupMenuItem<String>(
+                        value: 'advance',
+                        child: ListTile(
+                          leading: Icon(Icons.today),
+                          title: Text('Adelantar repasos'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem<String>(
                         value: 'rename',
                         child: ListTile(
                           leading: Icon(Icons.edit),
@@ -185,7 +213,10 @@ class HomePage extends ConsumerWidget {
                         value: 'delete',
                         child: ListTile(
                           leading: Icon(Icons.delete, color: Colors.red),
-                          title: Text('Borrar', style: TextStyle(color: Colors.red)),
+                          title: Text(
+                            'Borrar',
+                            style: TextStyle(color: Colors.red),
+                          ),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
@@ -201,10 +232,10 @@ class HomePage extends ConsumerWidget {
   }
 
   Future<void> _confirmDelete(
-      BuildContext context,
-      WidgetRef ref,
-      String packName,
-      ) async {
+    BuildContext context,
+    WidgetRef ref,
+    String packName,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -226,16 +257,142 @@ class HomePage extends ConsumerWidget {
     if (confirm != true) return;
     await ref.read(deleteDeckProvider(packName).future);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Mazo eliminado")),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Mazo eliminado")));
+  }
+
+  Future<void> _promptBringReviewsToToday(
+    BuildContext context,
+    WidgetRef ref,
+    String packName,
+  ) async {
+    final available = await _countFutureReviews(ref, packName);
+    if (!context.mounted) return;
+    if (available <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay repasos futuros para adelantar.')),
+      );
+      return;
+    }
+
+    String inputCount = (available > 20 ? 20 : available).toString();
+    final rawCount = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Adelantar repasos'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Repasos futuros disponibles: $available"),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: inputCount,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (value) => inputCount = value,
+                decoration: InputDecoration(
+                  labelText: 'Cantidad a adelantar',
+                  hintText: '1 - $available',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, inputCount),
+            child: const Text('Adelantar'),
+          ),
+        ],
+      ),
     );
+    if (rawCount == null) return;
+    if (!context.mounted) return;
+    final requested = int.tryParse(rawCount.trim());
+    if (requested == null || requested <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa un numero valido mayor a 0.')),
+      );
+      return;
+    }
+
+    final moved = await _bringDeckReviewsToToday(ref, packName, requested);
+    if (!context.mounted) return;
+    final message = moved > 0
+        ? 'Se adelantaron $moved repaso(s) a hoy.'
+        : 'No habia repasos futuros para adelantar.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<int> _countFutureReviews(WidgetRef ref, String packName) async {
+    final normalizedPackName = packName.trim();
+    if (normalizedPackName.isEmpty) return 0;
+
+    final isar = await ref.read(isarDbProvider.future);
+    final now = DateTime.now();
+    return isar.flashcards
+        .filter()
+        .packNameEqualTo(normalizedPackName)
+        .not()
+        .stateEqualTo(CardState.newCard)
+        .and()
+        .nextReviewGreaterThan(now)
+        .count();
+  }
+
+  Future<int> _bringDeckReviewsToToday(
+    WidgetRef ref,
+    String packName,
+    int maxToAdvance,
+  ) async {
+    final normalizedPackName = packName.trim();
+    if (normalizedPackName.isEmpty || maxToAdvance <= 0) return 0;
+
+    final isar = await ref.read(isarDbProvider.future);
+    final now = DateTime.now();
+
+    final cardsToAdvance = await isar.flashcards
+        .filter()
+        .packNameEqualTo(normalizedPackName)
+        .not()
+        .stateEqualTo(CardState.newCard)
+        .and()
+        .nextReviewGreaterThan(now)
+        .sortByNextReview()
+        .limit(maxToAdvance)
+        .findAll();
+
+    if (cardsToAdvance.isEmpty) return 0;
+
+    await isar.writeTxn(() async {
+      for (final card in cardsToAdvance) {
+        card.nextReview = now;
+      }
+      await isar.flashcards.putAll(cardsToAdvance);
+      await isar.studySessions
+          .filter()
+          .packNameEqualTo(normalizedPackName)
+          .deleteAll();
+    });
+
+    return cardsToAdvance.length;
   }
 
   Future<void> _showRenameDeckDialog(
-      BuildContext context,
-      WidgetRef ref,
-      String oldName,
-      ) async {
+    BuildContext context,
+    WidgetRef ref,
+    String oldName,
+  ) async {
     final controller = TextEditingController(text: oldName);
     final newName = await showDialog<String?>(
       context: context,
@@ -279,15 +436,15 @@ class HomePage extends ConsumerWidget {
       await ref.read(renameDeckProvider(oldName, trimmed).future);
       if (!context.mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Mazo renombrado a '$trimmed'")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Mazo renombrado a '$trimmed'")));
     } catch (e) {
       if (!context.mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("No se pudo renombrar: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("No se pudo renombrar: $e")));
     }
   }
 
@@ -296,7 +453,9 @@ class HomePage extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Maquina del Tiempo"),
-        content: const Text("Esto mueve todas las tarjetas 1 dia hacia atras (para que queden vencidas)."),
+        content: const Text(
+          "Esto mueve todas las tarjetas 1 dia hacia atras (para que queden vencidas).",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -339,10 +498,7 @@ class HomePage extends ConsumerWidget {
 class _DeckIcon extends StatelessWidget {
   final String? iconUri;
   final double size;
-  const _DeckIcon({
-    required this.iconUri,
-    this.size = 52,
-  });
+  const _DeckIcon({required this.iconUri, this.size = 52});
 
   @override
   Widget build(BuildContext context) {

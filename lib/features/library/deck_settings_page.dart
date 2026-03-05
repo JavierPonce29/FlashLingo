@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
-import 'package:flashcards_app/data/models/study_session.dart';
 
 class DeckSettingsPage extends ConsumerStatefulWidget {
   final String packName;
@@ -47,7 +46,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   DeckSettings? _loadedSettings;
   bool get _isInterleaveMode =>
       _studyMixMode == DeckStudyMixMode.interleaveReviewsThenNew ||
-          _studyMixMode == DeckStudyMixMode.interleaveNewThenReviews;
+      _studyMixMode == DeckStudyMixMode.interleaveNewThenReviews;
 
   @override
   void initState() {
@@ -124,8 +123,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     // Learning steps en DÍAS (admite fracciones)
     _learningStepsController.text = settings.learningSteps.join(', ');
     // Nuevas: mínimo de aciertos antes de pasar a otro día
-    _newMinCorrectRepsController.text = settings.newCardMinCorrectReps.toString();
-    _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes.toString();
+    _newMinCorrectRepsController.text = settings.newCardMinCorrectReps
+        .toString();
+    _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes
+        .toString();
     _lapseToleranceController.text = settings.lapseTolerance.toString();
     _lapseFixedIntervalController.text = settings.lapseFixedInterval.toString();
     _enableWriteMode = settings.enableWriteMode;
@@ -138,8 +139,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
         ? settings.studyMixMode
         : DeckStudyMixMode.reviewsFirst;
-    _interleaveReviewsCountController.text = settings.interleaveReviewsCount.toString();
-    _interleaveNewCardsCountController.text = settings.interleaveNewCardsCount.toString();
+    _interleaveReviewsCountController.text = settings.interleaveReviewsCount
+        .toString();
+    _interleaveNewCardsCountController.text = settings.interleaveNewCardsCount
+        .toString();
     if (!mounted) return;
     setState(() => _isLoading = false);
   }
@@ -152,20 +155,36 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final revLimit = int.parse(_reviewsLimitController.text.trim());
     final tolerance = int.parse(_lapseToleranceController.text.trim());
     final lapseDays = _useFixedIntervalOnLapse
-        ? double.parse(_lapseFixedIntervalController.text.trim().replaceAll(',', '.'))
+        ? double.parse(
+            _lapseFixedIntervalController.text.trim().replaceAll(',', '.'),
+          )
         : 1.0;
     final pMin = double.parse(_pMinController.text.trim().replaceAll(',', '.'));
-    final alpha = double.parse(_alphaController.text.trim().replaceAll(',', '.'));
+    final alpha = double.parse(
+      _alphaController.text.trim().replaceAll(',', '.'),
+    );
     final beta = double.parse(_betaController.text.trim().replaceAll(',', '.'));
-    final offset = double.parse(_offsetController.text.trim().replaceAll(',', '.'));
-    final initialNt = double.parse(_initialNtController.text.trim().replaceAll(',', '.'));
+    final offset = double.parse(
+      _offsetController.text.trim().replaceAll(',', '.'),
+    );
+    final initialNt = double.parse(
+      _initialNtController.text.trim().replaceAll(',', '.'),
+    );
     final learningSteps = _parseLearningSteps(_learningStepsController.text);
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
-    final writeThres = _enableWriteMode ? int.parse(_writeThresholdController.text.trim()) : 80;
-    final writeReps = _enableWriteMode ? int.parse(_writeMaxRepsController.text.trim()) : 0;
-    final interleaveReviewsCount = int.parse(_interleaveReviewsCountController.text.trim());
-    final interleaveNewCount = int.parse(_interleaveNewCardsCountController.text.trim());
+    final writeThres = _enableWriteMode
+        ? int.parse(_writeThresholdController.text.trim())
+        : 80;
+    final writeReps = _enableWriteMode
+        ? int.parse(_writeMaxRepsController.text.trim())
+        : 0;
+    final interleaveReviewsCount = int.parse(
+      _interleaveReviewsCountController.text.trim(),
+    );
+    final interleaveNewCount = int.parse(
+      _interleaveNewCardsCountController.text.trim(),
+    );
     final newCutoffHour = _dayCutoffHour.clamp(0, 23);
     final newCutoffMinute = _dayCutoffMinute.clamp(0, 59);
 
@@ -176,9 +195,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
             .packNameEqualTo(widget.packName)
             .findFirst();
 
-        final oldCutoffHour = (existing?.dayCutoffHour ?? 4).clamp(0, 23);
-        final oldCutoffMinute = (existing?.dayCutoffMinute ?? 0).clamp(0, 59);
-        final settingsToSave = existing ?? (DeckSettings()..packName = widget.packName);
+        final settingsToSave =
+            existing ?? (DeckSettings()..packName = widget.packName);
 
         settingsToSave
           ..packName = widget.packName
@@ -206,10 +224,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..interleaveNewCardsCount = interleaveNewCount;
 
         await isar.deckSettings.put(settingsToSave);
-
-        if (oldCutoffHour != newCutoffHour || oldCutoffMinute != newCutoffMinute) {
-          await isar.studySessions.filter().packNameEqualTo(widget.packName).deleteAll();
-        }
 
         _loadedSettings = settingsToSave;
       });
@@ -261,11 +275,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   }
 
   String? _validateDouble(
-      String? v, {
-        required String label,
-        double? min,
-        double? max,
-      }) {
+    String? v, {
+    required String label,
+    double? min,
+    double? max,
+  }) {
     final s0 = (v ?? '').trim();
     if (s0.isEmpty) return 'Requerido';
     final s = s0.replaceAll(',', '.');
@@ -324,454 +338,484 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // --- LÍMITES ---
-              _buildSectionTitle("Límites Diarios"),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _newCardsLimitController,
-                      label: "Nuevas/día",
-                      inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      validator: (v) => _validateInt(
-                        v,
-                        label: 'Nuevas/día',
-                        min: 0,
-                        max: 10000,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _reviewsLimitController,
-                      label: "Máx. Repasos/día",
-                      inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      validator: (v) => _validateInt(
-                        v,
-                        label: 'Máx. Repasos/día',
-                        min: 0,
-                        max: 100000,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // --- DAY CUTOFF ---
-              _buildSectionTitle("Day Cutoff (inicio del día de estudio)"),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blueGrey.shade200),
-                ),
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Define desde qué hora empieza tu 'día de estudio'.\n"
-                          "Ej: 04:00 => lo que estudies a las 02:00 cuenta como el día anterior.",
-                      style: TextStyle(fontSize: 12, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 12),
+                    // --- LÍMITES ---
+                    _buildSectionTitle("Límites Diarios"),
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<int>(
-                            value: _dayCutoffHour,
-                            decoration: const InputDecoration(
-                              labelText: "Hora",
-                              border: OutlineInputBorder(),
+                          child: _buildTextField(
+                            controller: _newCardsLimitController,
+                            label: "Nuevas/día",
+                            inputType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) => _validateInt(
+                              v,
+                              label: 'Nuevas/día',
+                              min: 0,
+                              max: 10000,
                             ),
-                            items: List.generate(
-                              24,
-                                  (h) => DropdownMenuItem(
-                                value: h,
-                                child: Text(h.toString().padLeft(2, '0')),
-                              ),
-                            ),
-                            onChanged: (v) =>
-                                setState(() => _dayCutoffHour = v ?? 4),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 15),
                         Expanded(
-                          child: DropdownButtonFormField<int>(
-                            value: _dayCutoffMinute,
-                            decoration: const InputDecoration(
-                              labelText: "Minuto",
-                              border: OutlineInputBorder(),
+                          child: _buildTextField(
+                            controller: _reviewsLimitController,
+                            label: "Máx. Repasos/día",
+                            inputType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) => _validateInt(
+                              v,
+                              label: 'Máx. Repasos/día',
+                              min: 0,
+                              max: 100000,
                             ),
-                            items: List.generate(
-                              60,
-                                  (m) => DropdownMenuItem(
-                                value: m,
-                                child: Text(m.toString().padLeft(2, '0')),
-                              ),
-                            ),
-                            onChanged: (v) =>
-                                setState(() => _dayCutoffMinute = v ?? 0),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Cutoff actual: ${_dayCutoffHour.toString().padLeft(2, '0')}:${_dayCutoffMinute.toString().padLeft(2, '0')}",
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    const SizedBox(height: 20),
+                    // --- DAY CUTOFF ---
+                    _buildSectionTitle(
+                      "Day Cutoff (inicio del día de estudio)",
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // --- ORDEN / MEZCLA ---
-              _buildSectionTitle("Orden del Estudio / Mezcla"),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.teal.shade200),
-                ),
-                child: Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _studyMixMode,
-                      decoration: const InputDecoration(
-                        labelText: "Modo de mezcla",
-                        border: OutlineInputBorder(),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blueGrey.shade200),
                       ),
-                      items: DeckStudyMixMode.values
-                          .map(
-                            (mode) => DropdownMenuItem<String>(
-                          value: mode,
-                          child: Text(_mixModeLabel(mode)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Define desde qué hora empieza tu 'día de estudio'.\n"
+                            "Ej: 04:00 => lo que estudies a las 02:00 cuenta como el día anterior.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<int>(
+                                  value: _dayCutoffHour,
+                                  decoration: const InputDecoration(
+                                    labelText: "Hora",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: List.generate(
+                                    24,
+                                    (h) => DropdownMenuItem(
+                                      value: h,
+                                      child: Text(h.toString().padLeft(2, '0')),
+                                    ),
+                                  ),
+                                  onChanged: (v) =>
+                                      setState(() => _dayCutoffHour = v ?? 4),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: DropdownButtonFormField<int>(
+                                  value: _dayCutoffMinute,
+                                  decoration: const InputDecoration(
+                                    labelText: "Minuto",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: List.generate(
+                                    60,
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(m.toString().padLeft(2, '0')),
+                                    ),
+                                  ),
+                                  onChanged: (v) =>
+                                      setState(() => _dayCutoffMinute = v ?? 0),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Cutoff actual: ${_dayCutoffHour.toString().padLeft(2, '0')}:${_dayCutoffMinute.toString().padLeft(2, '0')}",
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- ORDEN / MEZCLA ---
+                    _buildSectionTitle("Orden del Estudio / Mezcla"),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: _studyMixMode,
+                            decoration: const InputDecoration(
+                              labelText: "Modo de mezcla",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: DeckStudyMixMode.values
+                                .map(
+                                  (mode) => DropdownMenuItem<String>(
+                                    value: mode,
+                                    child: Text(_mixModeLabel(mode)),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() => _studyMixMode = value);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "Los cambios se guardan al instante. "
+                              "En una sesión ya iniciada, el modo escritura y parametros de revisión se actualizan al continuar.",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                          if (_isInterleaveMode) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller:
+                                        _interleaveReviewsCountController,
+                                    label: "Repasos por bloque",
+                                    helper: "Ej: 2",
+                                    inputType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                    validator: (v) => _validateInterleaveCount(
+                                      v,
+                                      label: 'Repasos por bloque',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller:
+                                        _interleaveNewCardsCountController,
+                                    label: "Nuevas por bloque",
+                                    helper: "Ej: 1",
+                                    inputType: TextInputType.number,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                    validator: (v) => _validateInterleaveCount(
+                                      v,
+                                      label: 'Nuevas por bloque',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- MODO ESCRITURA ---
+                    _buildSectionTitle("Modo Escritura (Producción)"),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.deepPurple.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                              "Activar escritura (Rev-Anv)",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: const Text(
+                              "Obliga a escribir la oración en el idioma objetivo.",
+                            ),
+                            value: _enableWriteMode,
+                            activeColor: Colors.deepPurple,
+                            onChanged: (val) =>
+                                setState(() => _enableWriteMode = val),
+                          ),
+                          if (_enableWriteMode) ...[
+                            const SizedBox(height: 10),
+                            _buildTextField(
+                              controller: _writeThresholdController,
+                              label: "Exactitud Mínima (%)",
+                              helper:
+                                  "Si no llegas a este % se bloquea el botón 'Bien'.",
+                              inputType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              validator: (v) => _validateInt(
+                                v,
+                                label: 'Exactitud mínima',
+                                min: 0,
+                                max: 100,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _buildTextField(
+                              controller: _writeMaxRepsController,
+                              label: "Límite de Repasos (0 = Siempre)",
+                              helper:
+                                  "0 = siempre activo. >0 = se desactiva tras N aciertos en esa carta.",
+                              inputType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              validator: (v) => _validateInt(
+                                v,
+                                label: 'Límite de repaso',
+                                min: 0,
+                                max: 1000000,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- UNDO ---
+                    _buildSectionTitle("Botón Deshacer"),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          "Permitir deshacer (Undo)",
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                      )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _studyMixMode = value);
-                      },
+                        subtitle: const Text(
+                          "Revertir SOLO la última respuesta (Bien/Mal) durante el estudio.",
+                        ),
+                        value: _enableUndo,
+                        activeColor: Colors.orange,
+                        onChanged: (val) => setState(() => _enableUndo = val),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // --- APRENDIZAJE ---
+                    _buildSectionTitle("Fase de Aprendizaje"),
+                    _buildTextField(
+                      controller: _learningStepsController,
+                      label: "Pasos (DÍAS)",
+                      helper:
+                          "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: _validateLearningSteps,
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        "Nuevas: mínimo 2 vistas (primer día)",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _newMinCorrectRepsController,
+                            label: "Aciertos mínimos",
+                            helper:
+                                "Ej: 2 = una tarjeta nueva debe acertarse 2 veces antes de pasar a otro día.",
+                            inputType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) => _validateInt(
+                              v,
+                              label: 'Aciertos mínimos',
+                              min: 1,
+                              max: 20,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _newIntraDayMinutesController,
+                            label: "Minutos intra-día",
+                            helper:
+                                "Intervalo guardado en nextReview tras el 1er \"Bien\" (no fuerza espera).",
+                            inputType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) => _validateInt(
+                              v,
+                              label: 'Minutos intra-día',
+                              min: 1,
+                              max: 1440,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // --- ALGORITMO ---
+                    _buildSectionTitle("Algoritmo Ebbinghaus"),
+                    _buildTextField(
+                      controller: _pMinController,
+                      label: "P_min",
+                      helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (v) => _validateDouble(
+                        v,
+                        label: 'P_min',
+                        min: 0.000001,
+                        max: 0.999999,
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Esta configuración se aplica al crear una sesión nueva. "
-                            "Si reanudas una sesión guardada del mismo día, se mantiene el orden ya guardado.",
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                    _buildTextField(
+                      controller: _alphaController,
+                      label: "Alpha",
+                      helper: "Correcto: nt = nt * (1 - alpha).",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (v) =>
+                          _validateDouble(v, label: 'Alpha', min: 0),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTextField(
+                      controller: _betaController,
+                      label: "Beta",
+                      helper: "Incorrecto: nt = nt * (1 + beta).",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (v) =>
+                          _validateDouble(v, label: 'Beta', min: 0),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTextField(
+                      controller: _offsetController,
+                      label: "Offset (días)",
+                      helper: "Se resta al intervalo final.",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (v) => _validateDouble(v, label: 'Offset'),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildTextField(
+                      controller: _initialNtController,
+                      label: "Nt inicial",
+                      helper: "Decaimiento inicial.",
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (v) => _validateDouble(
+                        v,
+                        label: 'Nt inicial',
+                        min: 0.000001,
                       ),
                     ),
-                    if (_isInterleaveMode) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _interleaveReviewsCountController,
-                              label: "Repasos por bloque",
-                              helper: "Ej: 2",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInterleaveCount(
-                                v,
-                                label: 'Repasos por bloque',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _interleaveNewCardsCountController,
-                              label: "Nuevas por bloque",
-                              helper: "Ej: 1",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInterleaveCount(
-                                v,
-                                label: 'Nuevas por bloque',
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 20),
+                    // --- LAPSES ---
+                    _buildSectionTitle("Lapses"),
+                    _buildTextField(
+                      controller: _lapseToleranceController,
+                      label: "Tolerancia (lapses)",
+                      helper:
+                          "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
+                      inputType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (v) => _validateInt(
+                        v,
+                        label: 'Tolerancia',
+                        min: 0,
+                        max: 1000,
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // --- MODO ESCRITURA ---
-              _buildSectionTitle("Modo Escritura (Producción)"),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.deepPurple.shade200),
-                ),
-                child: Column(
-                  children: [
+                    ),
+                    const SizedBox(height: 10),
                     SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        "Activar escritura (Rev-Anv)",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      title: const Text("Usar intervalo fijo en lapse"),
                       subtitle: const Text(
-                        "Obliga a escribir la oración en el idioma objetivo.",
+                        "Si está activo, un lapse programa un intervalo fijo.",
                       ),
-                      value: _enableWriteMode,
-                      activeColor: Colors.deepPurple,
-                      onChanged: (val) => setState(() => _enableWriteMode = val),
+                      value: _useFixedIntervalOnLapse,
+                      onChanged: (v) =>
+                          setState(() => _useFixedIntervalOnLapse = v),
                     ),
-                    if (_enableWriteMode) ...[
-                      const SizedBox(height: 10),
+                    if (_useFixedIntervalOnLapse) ...[
                       _buildTextField(
-                        controller: _writeThresholdController,
-                        label: "Exactitud Mínima (%)",
-                        helper: "Si no llegas a este % se bloquea el botón 'Bien'.",
-                        inputType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        validator: (v) => _validateInt(
-                          v,
-                          label: 'Exactitud mínima',
-                          min: 0,
-                          max: 100,
+                        controller: _lapseFixedIntervalController,
+                        label: "Intervalo fijo (días)",
+                        helper: "Ej: 1.0",
+                        inputType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildTextField(
-                        controller: _writeMaxRepsController,
-                        label: "Límite de Repasos (0 = Siempre)",
-                        helper:
-                        "0 = siempre activo. >0 = se desactiva tras N aciertos en esa carta.",
-                        inputType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        validator: (v) => _validateInt(
+                        validator: (v) => _validateDouble(
                           v,
-                          label: 'Límite de repaso',
-                          min: 0,
-                          max: 1000000,
+                          label: 'Intervalo fijo',
+                          min: 0.000001,
                         ),
                       ),
                     ],
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.save),
+                        label: const Text("Guardar"),
+                        onPressed: _saveSettings,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              // --- UNDO ---
-              _buildSectionTitle("Botón Deshacer"),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    "Permitir deshacer (Undo)",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    "Revertir SOLO la última respuesta (Bien/Mal) durante el estudio.",
-                  ),
-                  value: _enableUndo,
-                  activeColor: Colors.orange,
-                  onChanged: (val) => setState(() => _enableUndo = val),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // --- APRENDIZAJE ---
-              _buildSectionTitle("Fase de Aprendizaje"),
-              _buildTextField(
-                controller: _learningStepsController,
-                label: "Pasos (DÍAS)",
-                helper:
-                "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: _validateLearningSteps,
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  "Nuevas: mínimo 2 vistas (primer día)",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _newMinCorrectRepsController,
-                      label: "Aciertos mínimos",
-                      helper:
-                      "Ej: 2 = una tarjeta nueva debe acertarse 2 veces antes de pasar a otro día.",
-                      inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      validator: (v) => _validateInt(
-                        v,
-                        label: 'Aciertos mínimos',
-                        min: 1,
-                        max: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _newIntraDayMinutesController,
-                      label: "Minutos intra-día",
-                      helper:
-                      "Intervalo guardado en nextReview tras el 1er \"Bien\" (no fuerza espera).",
-                      inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      validator: (v) => _validateInt(
-                        v,
-                        label: 'Minutos intra-día',
-                        min: 1,
-                        max: 1440,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // --- ALGORITMO ---
-              _buildSectionTitle("Algoritmo Ebbinghaus"),
-              _buildTextField(
-                controller: _pMinController,
-                label: "P_min",
-                helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => _validateDouble(
-                  v,
-                  label: 'P_min',
-                  min: 0.000001,
-                  max: 0.999999,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: _alphaController,
-                label: "Alpha",
-                helper: "Correcto: nt = nt * (1 - alpha).",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => _validateDouble(v, label: 'Alpha', min: 0),
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: _betaController,
-                label: "Beta",
-                helper: "Incorrecto: nt = nt * (1 + beta).",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => _validateDouble(v, label: 'Beta', min: 0),
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: _offsetController,
-                label: "Offset (días)",
-                helper: "Se resta al intervalo final.",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => _validateDouble(v, label: 'Offset'),
-              ),
-              const SizedBox(height: 10),
-              _buildTextField(
-                controller: _initialNtController,
-                label: "Nt inicial",
-                helper: "Decaimiento inicial.",
-                inputType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) => _validateDouble(
-                  v,
-                  label: 'Nt inicial',
-                  min: 0.000001,
-                ),
-              ),
-              const SizedBox(height: 20),
-              // --- LAPSES ---
-              _buildSectionTitle("Lapses"),
-              _buildTextField(
-                controller: _lapseToleranceController,
-                label: "Tolerancia (lapses)",
-                helper: "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
-                inputType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                validator: (v) => _validateInt(
-                  v,
-                  label: 'Tolerancia',
-                  min: 0,
-                  max: 1000,
-                ),
-              ),
-              const SizedBox(height: 10),
-              SwitchListTile(
-                title: const Text("Usar intervalo fijo en lapse"),
-                subtitle: const Text("Si está activo, un lapse programa un intervalo fijo."),
-                value: _useFixedIntervalOnLapse,
-                onChanged: (v) => setState(() => _useFixedIntervalOnLapse = v),
-              ),
-              if (_useFixedIntervalOnLapse) ...[
-                _buildTextField(
-                  controller: _lapseFixedIntervalController,
-                  label: "Intervalo fijo (días)",
-                  helper: "Ej: 1.0",
-                  inputType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) => _validateDouble(
-                    v,
-                    label: 'Intervalo fijo',
-                    min: 0.000001,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: const Text("Guardar"),
-                  onPressed: _saveSettings,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 

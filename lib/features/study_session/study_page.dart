@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -40,32 +41,53 @@ class _StudyPageState extends State<StudyPage> {
   bool _pendingReloadAfterSettings = false;
   bool _sessionCleared = false;
   _UndoAction? _lastUndo;
+  StreamSubscription<void>? _deckSettingsSubscription;
   @override
   void initState() {
     super.initState();
     studyQueue = List.from(widget.cards);
     currentIndex = widget.initialIndex.clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1).toInt();
-    _loadDeckSettings();
+    _startDeckSettingsWatcher();
+    _refreshDeckSettingsFromDb();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _persistStudySession();
       _recomputeCurrentCardState();
     });
   }
 
+  @override
+  void dispose() {
+    _deckSettingsSubscription?.cancel();
+    super.dispose();
+  }
+
   bool get _isFinished => currentIndex >= studyQueue.length;
   bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
-  Future<void> _loadDeckSettings() async {
+
+  void _startDeckSettingsWatcher() {
     final isar = Isar.getInstance();
     if (isar == null) return;
+    _deckSettingsSubscription?.cancel();
+    _deckSettingsSubscription = isar.deckSettings.watchLazy().listen((_) {
+      _refreshDeckSettingsFromDb(reloadHtml: true);
+    });
+  }
+
+  Future<DeckSettings?> _refreshDeckSettingsFromDb({bool reloadHtml = false}) async {
+    final isar = Isar.getInstance();
+    if (isar == null) return _currentDeckSettings;
     final settings = await isar.deckSettings
         .filter()
         .packNameEqualTo(widget.packName)
         .findFirst();
-    if (!mounted) return;
+    if (!mounted) return settings;
     setState(() {
       _currentDeckSettings = settings;
     });
-    _recomputeCurrentCardState(reloadHtml: true);
+    if (reloadHtml) {
+      _recomputeCurrentCardState(reloadHtml: true);
+    }
+    return settings;
   }
 
   void _reloadCurrentHtml() {
@@ -311,7 +333,7 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Future<void> _submitAnswer(Flashcard card, bool isCorrect) async {
-    final settings = _currentDeckSettings;
+    final settings = await _refreshDeckSettingsFromDb();
     final isar = Isar.getInstance();
     if (settings == null || isar == null) return;
     final now = DateTime.now();
@@ -394,9 +416,8 @@ class _StudyPageState extends State<StudyPage> {
 
   Future<void> _performUndo() async {
     final action = _lastUndo;
-    final settings = _currentDeckSettings;
     final isar = Isar.getInstance();
-    if (action == null || settings == null || isar == null) return;
+    if (action == null || isar == null) return;
     if (!_undoEnabled) return;
     // Si se re-encolar por repeatToday, revertir UNA ocurrencia
     if (action.didAppendToQueue) {

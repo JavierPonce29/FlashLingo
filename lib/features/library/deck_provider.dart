@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -29,12 +29,14 @@ class DeckSummary {
 @Riverpod(keepAlive: true)
 Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
   final isar = await ref.watch(isarDbProvider.future);
+
   Future<List<DeckSummary>> compute() async {
     final now = DateTime.now();
     final decks = await isar.deckSettings.where().findAll();
     final summaries = <DeckSummary>[];
+
     for (final s in decks) {
-      // Reset diario newCardsSeenToday (basado en cutoff configurable)
+      // Keep this read-only: writing here can race with deletions and recreate rows.
       final currentLabel = StudyDay.label(now, s);
       final last = s.lastNewCardStudyDate;
       final lastLabel = last == null ? null : StudyDay.label(last, s);
@@ -42,29 +44,22 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           lastLabel.year == currentLabel.year &&
           lastLabel.month == currentLabel.month &&
           lastLabel.day == currentLabel.day;
-      if (!sameStudyDay) {
-        s.newCardsSeenToday = 0;
-        // Guardamos timestamp real; luego se etiqueta con StudyDay.label().
-        s.lastNewCardStudyDate = now;
-        await isar.writeTxn(() async {
-          await isar.deckSettings.put(s);
-        });
-      }
+      final effectiveNewCardsSeenToday = sameStudyDay ? s.newCardsSeenToday : 0;
 
-      // ========== AZUL (nuevas que pueden entrar hoy) ==========
+      // Blue: new cards allowed by today's quota.
       final remainingQuota =
-      (s.newCardsPerDay - s.newCardsSeenToday).clamp(0, 999999);
+          (s.newCardsPerDay - effectiveNewCardsSeenToday).clamp(0, 999999);
 
       final newCount = remainingQuota > 0
           ? await isar.flashcards
-          .filter()
-          .packNameEqualTo(s.packName)
-          .stateEqualTo(CardState.newCard)
-          .limit(remainingQuota)
-          .count()
+              .filter()
+              .packNameEqualTo(s.packName)
+              .stateEqualTo(CardState.newCard)
+              .limit(remainingQuota)
+              .count()
           : 0;
 
-      // ========== NARANJA (primer paso TOTAL, aunque no esta vencido) ==========
+      // Orange: first learning step total (not only due).
       final firstStepTotal = await isar.flashcards
           .filter()
           .packNameEqualTo(s.packName)
@@ -73,14 +68,14 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           .learningStepEqualTo(0)
           .count();
 
-      // ========== VERDE (repasos vencidos, excluyendo primer paso vencido) ==========
+      // Green: due non-new cards, excluding first-step due.
       final dueNonNew = await isar.flashcards
           .filter()
           .packNameEqualTo(s.packName)
           .not()
           .stateEqualTo(CardState.newCard)
           .and()
-          .nextReviewLessThan(now.add(const Duration(seconds: 1))) // inclusivo
+          .nextReviewLessThan(now.add(const Duration(seconds: 1)))
           .limit(s.maxReviewsPerDay)
           .findAll();
 
@@ -102,6 +97,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
         ),
       );
     }
+
     return summaries;
   }
 
@@ -128,20 +124,23 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
 @Riverpod(keepAlive: true)
 Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
   final isar = await ref.watch(isarDbProvider.future);
+  final normalizedPackName = packName.trim();
+  if (normalizedPackName.isEmpty) return;
+
   await isar.writeTxn(() async {
-    await isar.flashcards.filter().packNameEqualTo(packName).deleteAll();
-    await isar.reviewLogs.filter().packNameEqualTo(packName).deleteAll();
-    await isar.deckSettings.filter().packNameEqualTo(packName).deleteAll();
-    await isar.studySessions.filter().packNameEqualTo(packName).deleteAll();
+    await isar.flashcards.filter().packNameEqualTo(normalizedPackName).deleteAll();
+    await isar.reviewLogs.filter().packNameEqualTo(normalizedPackName).deleteAll();
+    await isar.deckSettings.filter().packNameEqualTo(normalizedPackName).deleteAll();
+    await isar.studySessions.filter().packNameEqualTo(normalizedPackName).deleteAll();
   });
 }
 
 @Riverpod(keepAlive: true)
 Future<void> renameDeck(
-    RenameDeckRef ref,
-    String oldPackName,
-    String newPackName,
-    ) async {
+  RenameDeckRef ref,
+  String oldPackName,
+  String newPackName,
+) async {
   final isar = await ref.watch(isarDbProvider.future);
 
   final oldName = oldPackName.trim();
@@ -157,7 +156,7 @@ Future<void> renameDeck(
 
   // Evitar colisiones
   final existingSettings =
-  await isar.deckSettings.filter().packNameEqualTo(newName).findFirst();
+      await isar.deckSettings.filter().packNameEqualTo(newName).findFirst();
   if (existingSettings != null) {
     throw StateError("Ya existe un mazo con el nombre '$newName'.");
   }
@@ -170,15 +169,13 @@ Future<void> renameDeck(
   if (existingGhost > 0) {
     throw StateError(
       "Ya existen tarjetas con el packName '$newName'. "
-          "Elige otro nombre o elimina ese mazo primero.",
+      'Elige otro nombre o elimina ese mazo primero.',
     );
   }
 
   await isar.writeTxn(() async {
-    final settings = await isar.deckSettings
-        .filter()
-        .packNameEqualTo(oldName)
-        .findFirst();
+    final settings =
+        await isar.deckSettings.filter().packNameEqualTo(oldName).findFirst();
 
     if (settings == null) {
       throw StateError("No se encontro el mazo '$oldName'.");
@@ -189,8 +186,7 @@ Future<void> renameDeck(
     await isar.deckSettings.put(settings);
 
     // 2) Flashcards
-    final cards =
-    await isar.flashcards.filter().packNameEqualTo(oldName).findAll();
+    final cards = await isar.flashcards.filter().packNameEqualTo(oldName).findAll();
     for (final c in cards) {
       c.packName = newName;
     }
@@ -199,8 +195,7 @@ Future<void> renameDeck(
     }
 
     // 3) ReviewLogs
-    final logs =
-    await isar.reviewLogs.filter().packNameEqualTo(oldName).findAll();
+    final logs = await isar.reviewLogs.filter().packNameEqualTo(oldName).findAll();
     for (final l in logs) {
       l.packName = newName;
     }
@@ -210,11 +205,10 @@ Future<void> renameDeck(
 
     // 4) StudySession
     final session =
-    await isar.studySessions.filter().packNameEqualTo(oldName).findFirst();
+        await isar.studySessions.filter().packNameEqualTo(oldName).findFirst();
     if (session != null) {
       session.packName = newName;
       await isar.studySessions.put(session);
     }
   });
 }
-
