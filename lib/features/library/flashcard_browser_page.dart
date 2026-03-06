@@ -1,46 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class FlashcardBrowserPage extends ConsumerStatefulWidget {
   final String packName;
+
   const FlashcardBrowserPage({super.key, required this.packName});
+
   @override
-  ConsumerState<FlashcardBrowserPage> createState() =>
-      _FlashcardBrowserPageState();
+  ConsumerState<FlashcardBrowserPage> createState() => _FlashcardBrowserPageState();
 }
 
 class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   String _query = '';
   bool _showRecog = true;
   bool _showProd = true;
-  CardState? _stateFilter; // null = todos
+  CardState? _stateFilter;
 
-  String _stateLabel(CardState s) {
-    switch (s) {
+  String _stateLabel(AppLocalizations l10n, CardState state) {
+    switch (state) {
       case CardState.newCard:
-        return 'Nueva';
+        return l10n.tr('state_new');
       case CardState.learning:
-        return 'Learning';
+        return l10n.tr('state_learning');
       case CardState.review:
-        return 'Review';
+        return l10n.tr('state_review');
       case CardState.relearning:
-        return 'Relearning';
+        return l10n.tr('state_relearning');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final isarAsync = ref.watch(isarDbProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text("Explorar: ${widget.packName}")),
+      appBar: AppBar(
+        title: Text(
+          l10n.tr('browser_title', params: <String, Object?>{'packName': widget.packName}),
+        ),
+      ),
       body: isarAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text("Error DB: $e")),
+        error: (error, _) => Center(
+          child: Text(
+            l10n.tr('browser_db_error', params: <String, Object?>{'error': error}),
+          ),
+        ),
         data: (isar) {
           final watchStream = isar.flashcards
               .filter()
@@ -64,26 +76,20 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
                   final all = snap.data!;
                   final q = _query.trim().toLowerCase();
 
-                  final filtered = all.where((c) {
-                    if (!_showRecog && c.cardType.endsWith('recog')) {
-                      return false;
-                    }
-                    if (!_showProd && c.cardType.endsWith('prod')) return false;
-                    if (_stateFilter != null && c.state != _stateFilter) {
-                      return false;
-                    }
+                  final filtered = all.where((card) {
+                    if (!_showRecog && card.cardType.endsWith('recog')) return false;
+                    if (!_showProd && card.cardType.endsWith('prod')) return false;
+                    if (_stateFilter != null && card.state != _stateFilter) return false;
 
                     if (q.isEmpty) return true;
-
-                    final a = c.question.toLowerCase();
-                    final b = c.answer.toLowerCase();
-                    final s = (c.sentence ?? '').toLowerCase();
-                    final t = (c.translation ?? '').toLowerCase();
-
-                    return a.contains(q) ||
-                        b.contains(q) ||
-                        s.contains(q) ||
-                        t.contains(q);
+                    final question = card.question.toLowerCase();
+                    final answer = card.answer.toLowerCase();
+                    final sentence = (card.sentence ?? '').toLowerCase();
+                    final translation = (card.translation ?? '').toLowerCase();
+                    return question.contains(q) ||
+                        answer.contains(q) ||
+                        sentence.contains(q) ||
+                        translation.contains(q);
                   }).toList();
 
                   return Column(
@@ -91,14 +97,14 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
                       _buildFilters(context),
                       Expanded(
                         child: filtered.isEmpty
-                            ? const Center(child: Text("No hay resultados."))
+                            ? Center(child: Text(l10n.tr('browser_no_results')))
                             : ListView.builder(
                                 itemCount: filtered.length,
-                                itemBuilder: (context, i) {
-                                  final c = filtered[i];
+                                itemBuilder: (context, index) {
+                                  final card = filtered[index];
                                   return _FlashcardTile(
-                                    card: c,
-                                    stateLabel: _stateLabel(c.state),
+                                    card: card,
+                                    stateLabel: _stateLabel(l10n, card.state),
                                   );
                                 },
                               ),
@@ -115,6 +121,7 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   }
 
   Widget _buildFilters(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
       child: Column(
@@ -122,55 +129,55 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
           TextField(
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
-              hintText: "Buscar (pregunta, respuesta, oración...)",
+              hintText: l10n.tr('browser_search_hint'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               isDense: true,
             ),
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: (value) => setState(() => _query = value),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               FilterChip(
-                label: const Text("Recog"),
+                label: Text(l10n.tr('browser_filter_recog')),
                 selected: _showRecog,
-                onSelected: (v) => setState(() => _showRecog = v),
+                onSelected: (value) => setState(() => _showRecog = value),
               ),
               const SizedBox(width: 8),
               FilterChip(
-                label: const Text("Prod"),
+                label: Text(l10n.tr('browser_filter_prod')),
                 selected: _showProd,
-                onSelected: (v) => setState(() => _showProd = v),
+                onSelected: (value) => setState(() => _showProd = value),
               ),
               const Spacer(),
               DropdownButton<CardState?>(
                 value: _stateFilter,
                 underline: const SizedBox.shrink(),
-                items: const [
+                items: [
                   DropdownMenuItem<CardState?>(
                     value: null,
-                    child: Text("Todos"),
+                    child: Text(l10n.tr('common_all')),
                   ),
                   DropdownMenuItem<CardState?>(
                     value: CardState.newCard,
-                    child: Text("Nuevas"),
+                    child: Text(l10n.tr('state_new')),
                   ),
                   DropdownMenuItem<CardState?>(
                     value: CardState.learning,
-                    child: Text("Learning"),
+                    child: Text(l10n.tr('state_learning')),
                   ),
                   DropdownMenuItem<CardState?>(
                     value: CardState.review,
-                    child: Text("Review"),
+                    child: Text(l10n.tr('state_review')),
                   ),
                   DropdownMenuItem<CardState?>(
                     value: CardState.relearning,
-                    child: Text("Relearning"),
+                    child: Text(l10n.tr('state_relearning')),
                   ),
                 ],
-                onChanged: (v) => setState(() => _stateFilter = v),
+                onChanged: (value) => setState(() => _stateFilter = value),
               ),
             ],
           ),
@@ -195,12 +202,15 @@ class _FlashcardTileState extends State<_FlashcardTile> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final muted = AppUiColors.mutedText(context);
-    final c = widget.card;
+    final card = widget.card;
 
-    final type = c.cardType.endsWith('recog')
-        ? 'Recog'
-        : (c.cardType.endsWith('prod') ? 'Prod' : c.cardType);
+    final type = card.cardType.endsWith('recog')
+        ? l10n.tr('browser_filter_recog')
+        : (card.cardType.endsWith('prod')
+            ? l10n.tr('browser_filter_prod')
+            : card.cardType);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -221,9 +231,9 @@ class _FlashcardTileState extends State<_FlashcardTile> {
                     visualDensity: VisualDensity.compact,
                   ),
                   const Spacer(),
-                  if ((c.audioPath ?? '').isNotEmpty)
+                  if ((card.audioPath ?? '').isNotEmpty)
                     const Icon(Icons.volume_up, size: 18),
-                  if ((c.imagePath ?? '').isNotEmpty) ...[
+                  if ((card.imagePath ?? '').isNotEmpty) ...[
                     const SizedBox(width: 6),
                     const Icon(Icons.image, size: 18),
                   ],
@@ -231,32 +241,38 @@ class _FlashcardTileState extends State<_FlashcardTile> {
               ),
               const SizedBox(height: 8),
               Text(
-                c.question,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+                card.question,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
               if (_expanded) ...[
                 const SizedBox(height: 10),
-                Text(c.answer, style: const TextStyle(fontSize: 15)),
-                if ((c.sentence ?? '').trim().isNotEmpty) ...[
+                Text(card.answer, style: const TextStyle(fontSize: 15)),
+                if ((card.sentence ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    "Oración: ${c.sentence}",
+                    l10n.tr(
+                      'browser_sentence',
+                      params: <String, Object?>{'value': card.sentence},
+                    ),
                     style: TextStyle(color: muted),
                   ),
                 ],
-                if ((c.translation ?? '').trim().isNotEmpty) ...[
+                if ((card.translation ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
-                    "Traducción: ${c.translation}",
+                    l10n.tr(
+                      'browser_translation',
+                      params: <String, Object?>{'value': card.translation},
+                    ),
                     style: TextStyle(color: muted),
                   ),
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  "Next review: ${c.nextReview}",
+                  l10n.tr(
+                    'browser_next_review',
+                    params: <String, Object?>{'value': card.nextReview},
+                  ),
                   style: TextStyle(fontSize: 12, color: muted),
                 ),
               ],

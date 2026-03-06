@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   #Gestion de estado
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.5

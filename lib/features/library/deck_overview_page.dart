@@ -1,20 +1,26 @@
-import 'package:isar/isar.dart';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
+
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class DeckOverviewPage extends ConsumerWidget {
   final String packName;
+
   const DeckOverviewPage({super.key, required this.packName});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final muted = AppUiColors.mutedText(context);
 
@@ -30,21 +36,18 @@ class DeckOverviewPage extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            Text("Preparado para estudiar", style: TextStyle(color: muted)),
+            Text(l10n.tr('deck_overview_ready'), style: TextStyle(color: muted)),
             const SizedBox(height: 40),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 50,
-                  vertical: 20,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
                 backgroundColor: scheme.primary,
                 foregroundColor: scheme.onPrimary,
               ),
               onPressed: () => _startSession(context, ref),
-              child: const Text(
-                "EMPEZAR A ESTUDIAR",
-                style: TextStyle(fontSize: 18),
+              child: Text(
+                l10n.tr('deck_overview_start'),
+                style: const TextStyle(fontSize: 18),
               ),
             ),
           ],
@@ -54,9 +57,10 @@ class DeckOverviewPage extends ConsumerWidget {
   }
 
   Future<void> _startSession(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final isar = await ref.read(isarDbProvider.future);
     final now = DateTime.now();
-    // 1) Cargar configuracion
+
     DeckSettings? settings = await isar.deckSettings
         .filter()
         .packNameEqualTo(packName)
@@ -67,26 +71,23 @@ class DeckOverviewPage extends ConsumerWidget {
         await isar.deckSettings.put(settings!);
       });
     }
-    // --- GESTION DE LIMITE DIARIO ---
+
     final currentLabel = StudyDay.label(now, settings);
     final last = settings.lastNewCardStudyDate;
     final lastLabel = last == null ? null : StudyDay.label(last, settings);
-    final bool isSameStudyDay =
-        lastLabel != null &&
+    final isSameStudyDay = lastLabel != null &&
         lastLabel.year == currentLabel.year &&
         lastLabel.month == currentLabel.month &&
         lastLabel.day == currentLabel.day;
 
     if (!isSameStudyDay) {
       settings.newCardsSeenToday = 0;
-      // Guardamos timestamp real; luego se etiqueta con StudyDay.label().
       settings.lastNewCardStudyDate = now;
-
       await isar.writeTxn(() async {
         await isar.deckSettings.put(settings!);
       });
     }
-    // 2) Si existe una sesion guardada DEL MISMO DIA (de estudio), reanudarla.
+
     final existingSession = await isar.studySessions
         .filter()
         .packNameEqualTo(packName)
@@ -98,7 +99,6 @@ class DeckOverviewPage extends ConsumerWidget {
           isar,
           existingSession.queueCardIds,
         );
-        // Si la sesion queda vacia/corrupta, la eliminamos y continuamos con una nueva.
         if (resumedCards.isNotEmpty) {
           final savedIndex = existingSession.currentIndex;
           final canResume = savedIndex >= 0 && savedIndex < resumedCards.length;
@@ -117,23 +117,19 @@ class DeckOverviewPage extends ConsumerWidget {
             return;
           }
         }
-        // Session finished or corrupted: remove and build a fresh one.
         await isar.writeTxn(() async {
           await isar.studySessions.delete(existingSession.id);
         });
       } else {
-        // Sesion vieja: eliminar para evitar mezclar dias de estudio.
         await isar.writeTxn(() async {
           await isar.studySessions.delete(existingSession.id);
         });
       }
     }
-    // 3) Calcular CUPO RESTANTE de nuevas
-    final int remainingQuota = max(
-      0,
-      settings.newCardsPerDay - settings.newCardsSeenToday,
-    );
-    // 4) Obtener REPASOS (Limitados) (inclusivo)
+
+    final remainingQuota =
+        max(0, settings.newCardsPerDay - settings.newCardsSeenToday);
+
     final reviews = await isar.flashcards
         .filter()
         .packNameEqualTo(packName)
@@ -144,7 +140,7 @@ class DeckOverviewPage extends ConsumerWidget {
         .limit(settings.maxReviewsPerDay)
         .findAll();
     reviews.shuffle();
-    // 5) Obtener NUEVAS (Solo si queda cupo)
+
     List<Flashcard> newCardsOrdered = [];
     if (remainingQuota > 0) {
       final newCardsRaw = await isar.flashcards
@@ -154,16 +150,12 @@ class DeckOverviewPage extends ConsumerWidget {
           .sortByOriginalId()
           .limit(remainingQuota)
           .findAll();
-      // Ordenar Recog -> Prod
-      final newRecog = newCardsRaw
-          .where((c) => c.cardType.endsWith('recog'))
-          .toList();
-      final newProd = newCardsRaw
-          .where((c) => c.cardType.endsWith('prod'))
-          .toList();
+
+      final newRecog = newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
+      final newProd = newCardsRaw.where((c) => c.cardType.endsWith('prod')).toList();
       newCardsOrdered = [...newRecog, ...newProd];
     }
-    // 6) Unir sesion segun configuracion de mezcla
+
     final sessionCards = _buildSessionCards(
       settings: settings,
       reviews: reviews,
@@ -171,9 +163,9 @@ class DeckOverviewPage extends ConsumerWidget {
     );
     if (!context.mounted) return;
     if (sessionCards.isEmpty) {
-      String message = "Todo al dia! No hay cartas pendientes.";
+      String message = l10n.tr('deck_overview_all_done');
       if (remainingQuota == 0 && settings.newCardsPerDay > 0) {
-        message = "Limite diario de nuevas alcanzado!";
+        message = l10n.tr('deck_overview_new_limit');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -183,7 +175,7 @@ class DeckOverviewPage extends ConsumerWidget {
       );
       return;
     }
-    // 7) Crear StudySession persistida
+
     final session = StudySession()
       ..packName = packName
       ..queueCardIds = sessionCards.map((c) => c.id).toList()
@@ -193,6 +185,7 @@ class DeckOverviewPage extends ConsumerWidget {
     await isar.writeTxn(() async {
       await isar.studySessions.put(session);
     });
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -214,10 +207,8 @@ class DeckOverviewPage extends ConsumerWidget {
     switch (mode) {
       case DeckStudyMixMode.newFirst:
         return [...newCards, ...reviews];
-
       case DeckStudyMixMode.reviewsFirst:
         return [...reviews, ...newCards];
-
       case DeckStudyMixMode.interleaveReviewsThenNew:
         return _interleaveChunks(
           first: reviews,
@@ -274,14 +265,14 @@ class DeckOverviewPage extends ConsumerWidget {
     final uniqueIds = <int>{...queueIds}.toList();
     final cards = await isar.flashcards.getAll(uniqueIds);
     final map = <int, Flashcard>{};
-    for (final c in cards) {
-      if (c != null) map[c.id] = c;
+    for (final card in cards) {
+      if (card != null) map[card.id] = card;
     }
-    // Reconstruir en el orden original (permitiendo duplicados)
+
     final ordered = <Flashcard>[];
     for (final id in queueIds) {
-      final c = map[id];
-      if (c != null) ordered.add(c);
+      final card = map[id];
+      if (card != null) ordered.add(card);
     }
     return ordered;
   }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flashcards_app/features/home/home_page.dart';
+import 'package:flashcards_app/features/settings/app_language_controller.dart';
 import 'package:flashcards_app/features/settings/app_theme_mode_controller.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,10 +19,19 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(appThemeModeProvider);
+    final locale = ref.watch(appLocaleProvider);
 
     return MaterialApp(
-      title: 'FlashLingo',
+      onGenerateTitle: (context) => context.l10n.tr('app_name'),
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       themeMode: themeMode,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       darkTheme: ThemeData(

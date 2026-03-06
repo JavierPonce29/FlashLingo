@@ -1,21 +1,25 @@
-import 'package:isar/isar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
+
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class DeckSettingsPage extends ConsumerStatefulWidget {
   final String packName;
+
   const DeckSettingsPage({super.key, required this.packName});
+
   @override
   ConsumerState<DeckSettingsPage> createState() => _DeckSettingsPageState();
 }
 
 class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   final _formKey = GlobalKey<FormState>();
-  // --- CONTROLADORES EXISTENTES ---
+
   late final TextEditingController _newCardsLimitController;
   late final TextEditingController _reviewsLimitController;
   late final TextEditingController _pMinController;
@@ -24,27 +28,23 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   late final TextEditingController _offsetController;
   late final TextEditingController _initialNtController;
   late final TextEditingController _learningStepsController;
-  // --- NUEVAS (mínimo 2 vistas el primer día) ---
   late final TextEditingController _newMinCorrectRepsController;
   late final TextEditingController _newIntraDayMinutesController;
   late final TextEditingController _lapseToleranceController;
   late final TextEditingController _lapseFixedIntervalController;
-  bool _useFixedIntervalOnLapse = true;
-  // --- MODO ESCRITURA ---
   late final TextEditingController _writeThresholdController;
   late final TextEditingController _writeMaxRepsController;
-  bool _enableWriteMode = false;
-  // --- UNDO ---
-  bool _enableUndo = true;
-  // --- ORDEN / MEZCLA ---
-  String _studyMixMode = DeckStudyMixMode.reviewsFirst;
   late final TextEditingController _interleaveReviewsCountController;
   late final TextEditingController _interleaveNewCardsCountController;
-  // --- DAY CUTOFF (inicio del día de estudio) ---
+
+  bool _useFixedIntervalOnLapse = true;
+  bool _enableWriteMode = false;
+  bool _enableUndo = true;
+  String _studyMixMode = DeckStudyMixMode.reviewsFirst;
   int _dayCutoffHour = 4;
   int _dayCutoffMinute = 0;
   bool _isLoading = true;
-  DeckSettings? _loadedSettings;
+
   bool get _isInterleaveMode =>
       _studyMixMode == DeckStudyMixMode.interleaveReviewsThenNew ||
       _studyMixMode == DeckStudyMixMode.interleaveNewThenReviews;
@@ -92,10 +92,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     super.dispose();
   }
 
-  // =========================
-  // Load / Save
-  // =========================
-
   Future<void> _loadSettings() async {
     final isar = await ref.read(isarDbProvider.future);
     var settings = await isar.deckSettings
@@ -109,11 +105,8 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       });
     }
 
-    _loadedSettings = settings;
-    // Day cutoff
     _dayCutoffHour = (settings.dayCutoffHour ?? 4).clamp(0, 23);
     _dayCutoffMinute = (settings.dayCutoffMinute ?? 0).clamp(0, 59);
-    // Cargar valores
     _newCardsLimitController.text = settings.newCardsPerDay.toString();
     _reviewsLimitController.text = settings.maxReviewsPerDay.toString();
     _pMinController.text = settings.pMin.toString();
@@ -121,35 +114,28 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _betaController.text = settings.beta.toString();
     _offsetController.text = settings.offset.toString();
     _initialNtController.text = settings.initialNt.toString();
-    // Learning steps en DÍAS (admite fracciones)
     _learningStepsController.text = settings.learningSteps.join(', ');
-    // Nuevas: mínimo de aciertos antes de pasar a otro día
-    _newMinCorrectRepsController.text = settings.newCardMinCorrectReps
-        .toString();
-    _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes
-        .toString();
+    _newMinCorrectRepsController.text = settings.newCardMinCorrectReps.toString();
+    _newIntraDayMinutesController.text = settings.newCardIntraDayMinutes.toString();
     _lapseToleranceController.text = settings.lapseTolerance.toString();
     _lapseFixedIntervalController.text = settings.lapseFixedInterval.toString();
     _enableWriteMode = settings.enableWriteMode;
     _writeThresholdController.text = settings.writeModeThreshold.toString();
     _writeMaxRepsController.text = settings.writeModeMaxReps.toString();
     _useFixedIntervalOnLapse = settings.useFixedIntervalOnLapse;
-    // Undo
     _enableUndo = settings.enableUndo;
-    // Orden / mezcla
     _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
         ? settings.studyMixMode
         : DeckStudyMixMode.reviewsFirst;
-    _interleaveReviewsCountController.text = settings.interleaveReviewsCount
-        .toString();
-    _interleaveNewCardsCountController.text = settings.interleaveNewCardsCount
-        .toString();
+    _interleaveReviewsCountController.text =
+        settings.interleaveReviewsCount.toString();
+    _interleaveNewCardsCountController.text =
+        settings.interleaveNewCardsCount.toString();
     if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
   Future<void> _saveSettings() async {
-    // Validar primero
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final isar = await ref.read(isarDbProvider.future);
     final newLimit = int.parse(_newCardsLimitController.text.trim());
@@ -161,37 +147,30 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           )
         : 1.0;
     final pMin = double.parse(_pMinController.text.trim().replaceAll(',', '.'));
-    final alpha = double.parse(
-      _alphaController.text.trim().replaceAll(',', '.'),
-    );
+    final alpha = double.parse(_alphaController.text.trim().replaceAll(',', '.'));
     final beta = double.parse(_betaController.text.trim().replaceAll(',', '.'));
-    final offset = double.parse(
-      _offsetController.text.trim().replaceAll(',', '.'),
-    );
-    final initialNt = double.parse(
-      _initialNtController.text.trim().replaceAll(',', '.'),
-    );
+    final offset = double.parse(_offsetController.text.trim().replaceAll(',', '.'));
+    final initialNt =
+        double.parse(_initialNtController.text.trim().replaceAll(',', '.'));
     final learningSteps = _parseLearningSteps(_learningStepsController.text);
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
-    final writeThres = _enableWriteMode
+    final writeThreshold = _enableWriteMode
         ? int.parse(_writeThresholdController.text.trim())
         : 80;
     final writeReps = _enableWriteMode
         ? int.parse(_writeMaxRepsController.text.trim())
         : 0;
-    final interleaveReviewsCount = int.parse(
-      _interleaveReviewsCountController.text.trim(),
-    );
-    final interleaveNewCount = int.parse(
-      _interleaveNewCardsCountController.text.trim(),
-    );
+    final interleaveReviewsCount =
+        int.parse(_interleaveReviewsCountController.text.trim());
+    final interleaveNewCount =
+        int.parse(_interleaveNewCardsCountController.text.trim());
     final newCutoffHour = _dayCutoffHour.clamp(0, 23);
     final newCutoffMinute = _dayCutoffMinute.clamp(0, 59);
 
     try {
       await isar.writeTxn(() async {
-        DeckSettings? existing = await isar.deckSettings
+        final existing = await isar.deckSettings
             .filter()
             .packNameEqualTo(widget.packName)
             .findFirst();
@@ -217,7 +196,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..newCardMinCorrectReps = newMinReps
           ..newCardIntraDayMinutes = newMinutes
           ..enableWriteMode = _enableWriteMode
-          ..writeModeThreshold = writeThres
+          ..writeModeThreshold = writeThreshold
           ..writeModeMaxReps = writeReps
           ..enableUndo = _enableUndo
           ..studyMixMode = _studyMixMode
@@ -225,32 +204,26 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..interleaveNewCardsCount = interleaveNewCount;
 
         await isar.deckSettings.put(settingsToSave);
-
-        _loadedSettings = settingsToSave;
       });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("¡Configuración guardada!"),
+          content: Text(context.l10n.tr('deck_settings_saved')),
           backgroundColor: AppUiColors.success(context),
         ),
       );
       Navigator.pop(context);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Error guardando: $e"),
+          content: Text(context.l10n.tr('deck_settings_save_error')),
           backgroundColor: AppUiColors.danger(context),
         ),
       );
     }
   }
-
-  // =========================
-  // Parsing + Validators
-  // =========================
 
   List<double> _parseLearningSteps(String raw) {
     final parts = raw
@@ -258,77 +231,108 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty);
     final list = <double>[];
-    for (final p in parts) {
-      final v = double.tryParse(p.replaceAll(',', '.'));
-      if (v != null && v > 0) list.add(v);
+    for (final part in parts) {
+      final value = double.tryParse(part.replaceAll(',', '.'));
+      if (value != null && value > 0) list.add(value);
     }
     return list.isEmpty ? [1.0, 4.0] : list;
   }
 
-  String? _validateInt(String? v, {required String label, int? min, int? max}) {
-    final s = (v ?? '').trim();
-    if (s.isEmpty) return 'Requerido';
-    final n = int.tryParse(s);
-    if (n == null) return 'Número inválido';
-    if (min != null && n < min) return '$label debe ser ≥ $min';
-    if (max != null && n > max) return '$label debe ser ≤ $max';
+  String? _validateInt(
+    String? value, {
+    required String label,
+    int? min,
+    int? max,
+  }) {
+    final l10n = context.l10n;
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return l10n.tr('common_required');
+    final parsed = int.tryParse(text);
+    if (parsed == null) return l10n.tr('common_invalid_number');
+    if (min != null && parsed < min) {
+      return l10n.tr(
+        'validation_min_int',
+        params: <String, Object?>{'label': label, 'value': min},
+      );
+    }
+    if (max != null && parsed > max) {
+      return l10n.tr(
+        'validation_max_int',
+        params: <String, Object?>{'label': label, 'value': max},
+      );
+    }
     return null;
   }
 
   String? _validateDouble(
-    String? v, {
+    String? value, {
     required String label,
     double? min,
     double? max,
   }) {
-    final s0 = (v ?? '').trim();
-    if (s0.isEmpty) return 'Requerido';
-    final s = s0.replaceAll(',', '.');
-    final n = double.tryParse(s);
-    if (n == null) return 'Número inválido';
-    if (min != null && n < min) return '$label debe ser ≥ $min';
-    if (max != null && n > max) return '$label debe ser ≤ $max';
+    final l10n = context.l10n;
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return l10n.tr('common_required');
+    final parsed = double.tryParse(raw.replaceAll(',', '.'));
+    if (parsed == null) return l10n.tr('common_invalid_number');
+    if (min != null && parsed < min) {
+      return l10n.tr(
+        'validation_min_double',
+        params: <String, Object?>{'label': label, 'value': min},
+      );
+    }
+    if (max != null && parsed > max) {
+      return l10n.tr(
+        'validation_max_double',
+        params: <String, Object?>{'label': label, 'value': max},
+      );
+    }
     return null;
   }
 
-  String? _validateLearningSteps(String? v) {
-    final raw = (v ?? '').trim();
-    if (raw.isEmpty) return 'Requerido';
+  String? _validateLearningSteps(String? value) {
+    final l10n = context.l10n;
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return l10n.tr('validation_steps_required');
     final list = _parseLearningSteps(raw);
-    if (list.isEmpty) return 'Ingresa al menos 1 paso válido';
-    if (list.any((x) => x <= 0)) return 'Los pasos deben ser > 0';
+    if (list.isEmpty) return l10n.tr('validation_steps_invalid');
+    if (list.any((x) => x <= 0)) return l10n.tr('validation_steps_positive');
     return null;
   }
 
-  String? _validateInterleaveCount(String? v, {required String label}) {
+  String? _validateInterleaveCount(String? value, {required String label}) {
     if (!_isInterleaveMode) return null;
-    return _validateInt(v, label: label, min: 1, max: 9999);
+    return _validateInt(value, label: label, min: 1, max: 9999);
   }
 
-  String _mixModeLabel(String mode) {
+  String _mixModeLabel(AppLocalizations l10n, String mode) {
     switch (mode) {
       case DeckStudyMixMode.newFirst:
-        return 'Nuevas primero, luego repasos';
+        return l10n.tr('deck_settings_mix_new_first');
       case DeckStudyMixMode.reviewsFirst:
-        return 'Repasos primero, luego nuevas';
+        return l10n.tr('deck_settings_mix_reviews_first');
       case DeckStudyMixMode.interleaveReviewsThenNew:
-        return 'Intercalado: X repasos, X nuevas';
+        return l10n.tr('deck_settings_mix_interleave_reviews_new');
       case DeckStudyMixMode.interleaveNewThenReviews:
-        return 'Intercalado: X nuevas, X repasos';
+        return l10n.tr('deck_settings_mix_interleave_new_reviews');
       default:
         return mode;
     }
   }
 
-  // =========================
-  // UI
-  // =========================
-
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final mixModes = DeckStudyMixMode.values.toList(growable: false);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text("Configurar: ${widget.packName}"),
+        title: Text(
+          l10n.tr(
+            'deck_settings_title',
+            params: <String, Object?>{'packName': widget.packName},
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -339,27 +343,24 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- LÍMITES ---
-                    _buildSectionTitle("Límites Diarios"),
+                    _buildSectionTitle(l10n.tr('deck_settings_daily_limits')),
                     Row(
                       children: [
                         Expanded(
                           child: _buildTextField(
                             controller: _newCardsLimitController,
-                            label: "Nuevas/día",
+                            label: l10n.tr('deck_settings_new_per_day'),
                             inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             validator: (v) => _validateInt(
                               v,
-                              label: 'Nuevas/día',
+                              label: l10n.tr('deck_settings_new_per_day'),
                               min: 0,
                               max: 10000,
                             ),
@@ -369,14 +370,12 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         Expanded(
                           child: _buildTextField(
                             controller: _reviewsLimitController,
-                            label: "Máx. Repasos/día",
+                            label: l10n.tr('deck_settings_reviews_per_day'),
                             inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             validator: (v) => _validateInt(
                               v,
-                              label: 'Máx. Repasos/día',
+                              label: l10n.tr('deck_settings_reviews_per_day'),
                               min: 0,
                               max: 100000,
                             ),
@@ -385,17 +384,11 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    // --- DAY CUTOFF ---
-                    _buildSectionTitle(
-                      "Day Cutoff (inicio del día de estudio)",
-                    ),
+                    _buildSectionTitle(l10n.tr('deck_settings_day_cutoff')),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppUiColors.panelFill(
-                          context,
-                          AppUiColors.info(context),
-                        ),
+                        color: AppUiColors.panelFill(context, AppUiColors.info(context)),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: AppUiColors.panelBorder(
@@ -408,8 +401,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Define desde qué hora empieza tu 'día de estudio'.\n"
-                            "Ej: 04:00 => lo que estudies a las 02:00 cuenta como el día anterior.",
+                            l10n.tr('deck_settings_day_cutoff_help'),
                             style: TextStyle(
                               fontSize: 12,
                               color: AppUiColors.mutedText(context),
@@ -420,10 +412,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<int>(
-                                  value: _dayCutoffHour,
-                                  decoration: const InputDecoration(
-                                    labelText: "Hora",
-                                    border: OutlineInputBorder(),
+                                  initialValue: _dayCutoffHour,
+                                  decoration: InputDecoration(
+                                    labelText: l10n.tr('deck_settings_hour'),
+                                    border: const OutlineInputBorder(),
                                   ),
                                   items: List.generate(
                                     24,
@@ -439,10 +431,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: DropdownButtonFormField<int>(
-                                  value: _dayCutoffMinute,
-                                  decoration: const InputDecoration(
-                                    labelText: "Minuto",
-                                    border: OutlineInputBorder(),
+                                  initialValue: _dayCutoffMinute,
+                                  decoration: InputDecoration(
+                                    labelText: l10n.tr('deck_settings_minute'),
+                                    border: const OutlineInputBorder(),
                                   ),
                                   items: List.generate(
                                     60,
@@ -459,22 +451,24 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            "Cutoff actual: ${_dayCutoffHour.toString().padLeft(2, '0')}:${_dayCutoffMinute.toString().padLeft(2, '0')}",
+                            l10n.tr(
+                              'deck_settings_cutoff_now',
+                              params: <String, Object?>{
+                                'time':
+                                    '${_dayCutoffHour.toString().padLeft(2, '0')}:${_dayCutoffMinute.toString().padLeft(2, '0')}',
+                              },
+                            ),
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // --- ORDEN / MEZCLA ---
-                    _buildSectionTitle("Orden del Estudio / Mezcla"),
+                    _buildSectionTitle(l10n.tr('deck_settings_mix_section')),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppUiColors.panelFill(
-                          context,
-                          AppUiColors.success(context),
-                        ),
+                        color: AppUiColors.panelFill(context, AppUiColors.success(context)),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: AppUiColors.panelBorder(
@@ -486,16 +480,33 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                       child: Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _studyMixMode,
-                            decoration: const InputDecoration(
-                              labelText: "Modo de mezcla",
-                              border: OutlineInputBorder(),
+                            isExpanded: true,
+                            initialValue: _studyMixMode,
+                            decoration: InputDecoration(
+                              labelText: l10n.tr('deck_settings_mix_mode'),
+                              border: const OutlineInputBorder(),
                             ),
-                            items: DeckStudyMixMode.values
+                            selectedItemBuilder: (_) => mixModes
+                                .map(
+                                  (mode) => Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _mixModeLabel(l10n, mode),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            items: mixModes
                                 .map(
                                   (mode) => DropdownMenuItem<String>(
                                     value: mode,
-                                    child: Text(_mixModeLabel(mode)),
+                                    child: Text(
+                                      _mixModeLabel(l10n, mode),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 )
                                 .toList(),
@@ -508,8 +519,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              "Los cambios se guardan al instante. "
-                              "En una sesión ya iniciada, el modo escritura y parametros de revisión se actualizan al continuar.",
+                              l10n.tr('deck_settings_mix_hint'),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppUiColors.mutedText(context),
@@ -522,34 +532,32 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                               children: [
                                 Expanded(
                                   child: _buildTextField(
-                                    controller:
-                                        _interleaveReviewsCountController,
-                                    label: "Repasos por bloque",
-                                    helper: "Ej: 2",
+                                    controller: _interleaveReviewsCountController,
+                                    label: l10n.tr('deck_settings_reviews_block'),
+                                    hint: '2',
                                     inputType: TextInputType.number,
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
                                     ],
                                     validator: (v) => _validateInterleaveCount(
                                       v,
-                                      label: 'Repasos por bloque',
+                                      label: l10n.tr('deck_settings_reviews_block'),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _buildTextField(
-                                    controller:
-                                        _interleaveNewCardsCountController,
-                                    label: "Nuevas por bloque",
-                                    helper: "Ej: 1",
+                                    controller: _interleaveNewCardsCountController,
+                                    label: l10n.tr('deck_settings_new_block'),
+                                    hint: '1',
                                     inputType: TextInputType.number,
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
                                     ],
                                     validator: (v) => _validateInterleaveCount(
                                       v,
-                                      label: 'Nuevas por bloque',
+                                      label: l10n.tr('deck_settings_new_block'),
                                     ),
                                   ),
                                 ),
@@ -560,302 +568,27 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // --- MODO ESCRITURA ---
-                    _buildSectionTitle("Modo Escritura (Producción)"),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppUiColors.panelFill(
-                          context,
-                          Theme.of(context).colorScheme.tertiary,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppUiColors.panelBorder(
-                            context,
-                            Theme.of(context).colorScheme.tertiary,
-                          ),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              "Activar escritura (Rev-Anv)",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: const Text(
-                              "Obliga a escribir la oración en el idioma objetivo.",
-                            ),
-                            value: _enableWriteMode,
-                            activeThumbColor: Theme.of(
-                              context,
-                            ).colorScheme.tertiary,
-                            activeTrackColor: AppUiColors.panelFill(
-                              context,
-                              Theme.of(context).colorScheme.tertiary,
-                              lightAlpha: 0.30,
-                              darkAlpha: 0.50,
-                            ),
-                            onChanged: (val) =>
-                                setState(() => _enableWriteMode = val),
-                          ),
-                          if (_enableWriteMode) ...[
-                            const SizedBox(height: 10),
-                            _buildTextField(
-                              controller: _writeThresholdController,
-                              label: "Exactitud Mínima (%)",
-                              helper:
-                                  "Si no llegas a este % se bloquea el botón 'Bien'.",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInt(
-                                v,
-                                label: 'Exactitud mínima',
-                                min: 0,
-                                max: 100,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            _buildTextField(
-                              controller: _writeMaxRepsController,
-                              label: "Límite de Repasos (0 = Siempre)",
-                              helper:
-                                  "0 = siempre activo. >0 = se desactiva tras N aciertos en esa carta.",
-                              inputType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              validator: (v) => _validateInt(
-                                v,
-                                label: 'Límite de repaso',
-                                min: 0,
-                                max: 1000000,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    _buildSectionTitle(l10n.tr('deck_settings_write_mode')),
+                    _buildWriteModeSection(context, l10n),
                     const SizedBox(height: 20),
-                    // --- UNDO ---
-                    _buildSectionTitle("Botón Deshacer"),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppUiColors.panelFill(
-                          context,
-                          AppUiColors.warning(context),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppUiColors.panelBorder(
-                            context,
-                            AppUiColors.warning(context),
-                          ),
-                        ),
-                      ),
-                      child: SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          "Permitir deshacer (Undo)",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text(
-                          "Revertir SOLO la última respuesta (Bien/Mal) durante el estudio.",
-                        ),
-                        value: _enableUndo,
-                        activeThumbColor: AppUiColors.warning(context),
-                        activeTrackColor: AppUiColors.panelFill(
-                          context,
-                          AppUiColors.warning(context),
-                          lightAlpha: 0.30,
-                          darkAlpha: 0.50,
-                        ),
-                        onChanged: (val) => setState(() => _enableUndo = val),
-                      ),
-                    ),
+                    _buildSectionTitle(l10n.tr('deck_settings_undo_section')),
+                    _buildUndoSection(context, l10n),
                     const SizedBox(height: 20),
-                    // --- APRENDIZAJE ---
-                    _buildSectionTitle("Fase de Aprendizaje"),
-                    _buildTextField(
-                      controller: _learningStepsController,
-                      label: "Pasos (DÍAS)",
-                      helper:
-                          "Ej: 1, 4  (días). Puedes usar fracciones: 0.00694 ≈ 10 minutos (10/1440).",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validateLearningSteps,
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(
-                        "Nuevas: mínimo 2 vistas (primer día)",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppUiColors.mutedText(context),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _newMinCorrectRepsController,
-                            label: "Aciertos mínimos",
-                            helper:
-                                "Ej: 2 = una tarjeta nueva debe acertarse 2 veces antes de pasar a otro día.",
-                            inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (v) => _validateInt(
-                              v,
-                              label: 'Aciertos mínimos',
-                              min: 1,
-                              max: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _newIntraDayMinutesController,
-                            label: "Minutos intra-día",
-                            helper:
-                                "Intervalo guardado en nextReview tras el 1er \"Bien\" (no fuerza espera).",
-                            inputType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            validator: (v) => _validateInt(
-                              v,
-                              label: 'Minutos intra-día',
-                              min: 1,
-                              max: 1440,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildSectionTitle(l10n.tr('deck_settings_learning_section')),
+                    _buildLearningSection(l10n),
                     const SizedBox(height: 20),
-                    // --- ALGORITMO ---
-                    _buildSectionTitle("Algoritmo Ebbinghaus"),
-                    _buildTextField(
-                      controller: _pMinController,
-                      label: "P_min",
-                      helper: "Probabilidad mínima (0 < P_min < 1). Ej: 0.90",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(
-                        v,
-                        label: 'P_min',
-                        min: 0.000001,
-                        max: 0.999999,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _alphaController,
-                      label: "Alpha",
-                      helper: "Correcto: nt = nt * (1 - alpha).",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) =>
-                          _validateDouble(v, label: 'Alpha', min: 0),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _betaController,
-                      label: "Beta",
-                      helper: "Incorrecto: nt = nt * (1 + beta).",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) =>
-                          _validateDouble(v, label: 'Beta', min: 0),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _offsetController,
-                      label: "Offset (días)",
-                      helper: "Se resta al intervalo final.",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(v, label: 'Offset'),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: _initialNtController,
-                      label: "Nt inicial",
-                      helper: "Decaimiento inicial.",
-                      inputType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) => _validateDouble(
-                        v,
-                        label: 'Nt inicial',
-                        min: 0.000001,
-                      ),
-                    ),
+                    _buildSectionTitle(l10n.tr('deck_settings_algorithm')),
+                    _buildAlgorithmSection(l10n),
                     const SizedBox(height: 20),
-                    // --- LAPSES ---
-                    _buildSectionTitle("Lapses"),
-                    _buildTextField(
-                      controller: _lapseToleranceController,
-                      label: "Tolerancia (lapses)",
-                      helper:
-                          "0 = desactivado. Ej: 3 => a la 3ra falla entra relearning.",
-                      inputType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) => _validateInt(
-                        v,
-                        label: 'Tolerancia',
-                        min: 0,
-                        max: 1000,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SwitchListTile(
-                      title: const Text("Usar intervalo fijo en lapse"),
-                      subtitle: const Text(
-                        "Si está activo, un lapse programa un intervalo fijo.",
-                      ),
-                      value: _useFixedIntervalOnLapse,
-                      onChanged: (v) =>
-                          setState(() => _useFixedIntervalOnLapse = v),
-                    ),
-                    if (_useFixedIntervalOnLapse) ...[
-                      _buildTextField(
-                        controller: _lapseFixedIntervalController,
-                        label: "Intervalo fijo (días)",
-                        helper: "Ej: 1.0",
-                        inputType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: (v) => _validateDouble(
-                          v,
-                          label: 'Intervalo fijo',
-                          min: 0.000001,
-                        ),
-                      ),
-                    ],
+                    _buildSectionTitle(l10n.tr('deck_settings_lapses')),
+                    _buildLapseSection(l10n),
                     const SizedBox(height: 40),
                     SizedBox(
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.save),
-                        label: const Text("Guardar"),
+                        label: Text(l10n.tr('common_save')),
                         onPressed: _saveSettings,
                       ),
                     ),
@@ -866,9 +599,256 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     );
   }
 
-  // =========================
-  // Helpers UI
-  // =========================
+  Widget _buildWriteModeSection(BuildContext context, AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppUiColors.panelFill(context, Theme.of(context).colorScheme.tertiary),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppUiColors.panelBorder(
+            context,
+            Theme.of(context).colorScheme.tertiary,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              l10n.tr('deck_settings_enable_write'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(l10n.tr('deck_settings_enable_write_hint')),
+            value: _enableWriteMode,
+            activeThumbColor: Theme.of(context).colorScheme.tertiary,
+            onChanged: (val) => setState(() => _enableWriteMode = val),
+          ),
+          if (_enableWriteMode) ...[
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _writeThresholdController,
+              label: l10n.tr('deck_settings_min_accuracy'),
+              helper: l10n.tr('deck_settings_min_accuracy_hint'),
+              inputType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              validator: (v) => _validateInt(
+                v,
+                label: l10n.tr('deck_settings_min_accuracy'),
+                min: 0,
+                max: 100,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _writeMaxRepsController,
+              label: l10n.tr('deck_settings_write_limit'),
+              helper: l10n.tr('deck_settings_write_limit_hint'),
+              inputType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              validator: (v) => _validateInt(
+                v,
+                label: l10n.tr('deck_settings_write_limit'),
+                min: 0,
+                max: 1000000,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUndoSection(BuildContext context, AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppUiColors.panelFill(context, AppUiColors.warning(context)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppUiColors.panelBorder(context, AppUiColors.warning(context)),
+        ),
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          l10n.tr('deck_settings_enable_undo'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(l10n.tr('deck_settings_enable_undo_hint')),
+        value: _enableUndo,
+        onChanged: (val) => setState(() => _enableUndo = val),
+      ),
+    );
+  }
+
+  Widget _buildLearningSection(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextField(
+          controller: _learningStepsController,
+          label: l10n.tr('deck_settings_steps'),
+          helper: l10n.tr('deck_settings_steps_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: _validateLearningSteps,
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            l10n.tr('deck_settings_new_first_day'),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppUiColors.mutedText(context),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextField(
+                controller: _newMinCorrectRepsController,
+                label: l10n.tr('deck_settings_min_correct'),
+                helper: l10n.tr('deck_settings_min_correct_hint'),
+                inputType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) => _validateInt(
+                  v,
+                  label: l10n.tr('deck_settings_min_correct'),
+                  min: 1,
+                  max: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: _buildTextField(
+                controller: _newIntraDayMinutesController,
+                label: l10n.tr('deck_settings_intra_minutes'),
+                helper: l10n.tr('deck_settings_intra_minutes_hint'),
+                inputType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) => _validateInt(
+                  v,
+                  label: l10n.tr('deck_settings_intra_minutes'),
+                  min: 1,
+                  max: 1440,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAlgorithmSection(AppLocalizations l10n) {
+    return Column(
+      children: [
+        _buildTextField(
+          controller: _pMinController,
+          label: l10n.tr('deck_settings_p_min'),
+          helper: l10n.tr('deck_settings_p_min_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) => _validateDouble(
+            v,
+            label: l10n.tr('deck_settings_p_min'),
+            min: 0.000001,
+            max: 0.999999,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildTextField(
+          controller: _alphaController,
+          label: l10n.tr('deck_settings_alpha'),
+          helper: l10n.tr('deck_settings_alpha_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) => _validateDouble(
+            v,
+            label: l10n.tr('deck_settings_alpha'),
+            min: 0,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildTextField(
+          controller: _betaController,
+          label: l10n.tr('deck_settings_beta'),
+          helper: l10n.tr('deck_settings_beta_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) => _validateDouble(
+            v,
+            label: l10n.tr('deck_settings_beta'),
+            min: 0,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildTextField(
+          controller: _offsetController,
+          label: l10n.tr('deck_settings_offset'),
+          helper: l10n.tr('deck_settings_offset_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) => _validateDouble(
+            v,
+            label: l10n.tr('deck_settings_offset'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildTextField(
+          controller: _initialNtController,
+          label: l10n.tr('deck_settings_initial_nt'),
+          helper: l10n.tr('deck_settings_initial_nt_hint'),
+          inputType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) => _validateDouble(
+            v,
+            label: l10n.tr('deck_settings_initial_nt'),
+            min: 0.000001,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLapseSection(AppLocalizations l10n) {
+    return Column(
+      children: [
+        _buildTextField(
+          controller: _lapseToleranceController,
+          label: l10n.tr('deck_settings_lapse_tolerance'),
+          helper: l10n.tr('deck_settings_lapse_tolerance_hint'),
+          inputType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          validator: (v) => _validateInt(
+            v,
+            label: l10n.tr('deck_settings_lapse_tolerance'),
+            min: 0,
+            max: 1000,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SwitchListTile(
+          title: Text(l10n.tr('deck_settings_fixed_on_lapse')),
+          subtitle: Text(l10n.tr('deck_settings_fixed_on_lapse_hint')),
+          value: _useFixedIntervalOnLapse,
+          onChanged: (v) => setState(() => _useFixedIntervalOnLapse = v),
+        ),
+        if (_useFixedIntervalOnLapse)
+          _buildTextField(
+            controller: _lapseFixedIntervalController,
+            label: l10n.tr('deck_settings_fixed_interval'),
+            helper: l10n.tr('deck_settings_fixed_interval_hint'),
+            inputType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) => _validateDouble(
+              v,
+              label: l10n.tr('deck_settings_fixed_interval'),
+              min: 0.000001,
+            ),
+          ),
+      ],
+    );
+  }
 
   Widget _buildSectionTitle(String title) {
     return Padding(

@@ -2,6 +2,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 import 'stats_provider.dart';
 
@@ -12,16 +14,25 @@ class StatsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final statsAsync = ref.watch(deckStatsProvider(packName));
 
     return Scaffold(
-      appBar: AppBar(title: Text('Estadisticas: $packName')),
+      appBar: AppBar(
+        title: Text(
+          l10n.tr('stats_title', params: <String, Object?>{'packName': packName}),
+        ),
+      ),
       body: statsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(
+          child: Text(
+            l10n.tr('common_error_with_detail', params: <String, Object?>{'error': err}),
+          ),
+        ),
         data: (stats) {
           if (stats.totalCards == 0) {
-            return const Center(child: Text('Este mazo esta vacio.'));
+            return Center(child: Text(l10n.tr('stats_empty')));
           }
 
           return SingleChildScrollView(
@@ -31,15 +42,15 @@ class StatsPage extends ConsumerWidget {
               children: [
                 _buildHeaderCard(context, stats),
                 const SizedBox(height: 30),
-                _sectionTitle(context, 'Actividad de estudio (heatmap)'),
+                _sectionTitle(context, l10n.tr('stats_activity')),
                 const SizedBox(height: 10),
                 _buildHeatmap(context, stats),
                 const SizedBox(height: 30),
-                _sectionTitle(context, 'Distribucion del mazo'),
+                _sectionTitle(context, l10n.tr('stats_distribution')),
                 const SizedBox(height: 20),
                 _buildDistributionChart(context, stats),
                 const SizedBox(height: 40),
-                _sectionTitle(context, 'Pronostico (proximos 14 dias)'),
+                _sectionTitle(context, l10n.tr('stats_forecast')),
                 const SizedBox(height: 20),
                 _buildForecastChart(context, stats),
                 const SizedBox(height: 40),
@@ -63,6 +74,7 @@ class StatsPage extends ConsumerWidget {
   }
 
   Widget _buildHeaderCard(BuildContext context, DeckStatsData stats) {
+    final l10n = context.l10n;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -71,16 +83,16 @@ class StatsPage extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _statItem(context, 'Total', '${stats.totalCards}'),
+            _statItem(context, l10n.tr('stats_total'), '${stats.totalCards}'),
             _statItem(
               context,
-              'Nuevas',
+              l10n.tr('stats_new'),
               '${stats.newCards}',
               AppUiColors.info(context),
             ),
             _statItem(
               context,
-              'Repaso',
+              l10n.tr('stats_review'),
               '${stats.reviewCards}',
               AppUiColors.success(context),
             ),
@@ -113,6 +125,7 @@ class StatsPage extends ConsumerWidget {
   }
 
   Widget _buildHeatmap(BuildContext context, DeckStatsData stats) {
+    final l10n = context.l10n;
     final color = AppUiColors.info(context);
     final muted = AppUiColors.mutedText(context);
 
@@ -139,7 +152,10 @@ class StatsPage extends ConsumerWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Repasos en esta fecha: ${stats.heatmapData[value] ?? 0}',
+                  l10n.tr(
+                    'stats_reviews_on_date',
+                    params: <String, Object?>{'count': stats.heatmapData[value] ?? 0},
+                  ),
                 ),
               ),
             );
@@ -150,6 +166,7 @@ class StatsPage extends ConsumerWidget {
   }
 
   Widget _buildDistributionChart(BuildContext context, DeckStatsData stats) {
+    final l10n = context.l10n;
     final total = stats.totalCards.toDouble();
     if (total == 0) {
       return const SizedBox.shrink();
@@ -194,9 +211,7 @@ class StatsPage extends ConsumerWidget {
                     _pieSection(
                       danger,
                       stats.relearningCards.toDouble(),
-                      ((stats.relearningCards / total) * 100).toStringAsFixed(
-                        0,
-                      ),
+                      ((stats.relearningCards / total) * 100).toStringAsFixed(0),
                     ),
                 ],
               ),
@@ -207,16 +222,24 @@ class StatsPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _legendItem(info, 'Nuevas (${stats.newCards})', textColor),
               _legendItem(
-                warning,
-                'Aprendiendo (${stats.learningCards})',
+                info,
+                '${l10n.tr('stats_new')} (${stats.newCards})',
                 textColor,
               ),
-              _legendItem(success, 'Repaso (${stats.reviewCards})', textColor),
+              _legendItem(
+                warning,
+                '${l10n.tr('stats_learning')} (${stats.learningCards})',
+                textColor,
+              ),
+              _legendItem(
+                success,
+                '${l10n.tr('stats_review')} (${stats.reviewCards})',
+                textColor,
+              ),
               _legendItem(
                 danger,
-                'Dificiles (${stats.relearningCards})',
+                '${l10n.tr('stats_difficult')} (${stats.relearningCards})',
                 textColor,
               ),
             ],
@@ -265,6 +288,7 @@ class StatsPage extends ConsumerWidget {
   }
 
   Widget _buildForecastChart(BuildContext context, DeckStatsData stats) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final info = AppUiColors.info(context);
     final warning = AppUiColors.warning(context);
@@ -272,13 +296,9 @@ class StatsPage extends ConsumerWidget {
 
     int maxY = 0;
     for (final count in stats.futureReviews.values) {
-      if (count > maxY) {
-        maxY = count;
-      }
+      if (count > maxY) maxY = count;
     }
-    if (maxY == 0) {
-      maxY = 5;
-    }
+    if (maxY == 0) maxY = 5;
 
     return SizedBox(
       height: 250,
@@ -289,32 +309,28 @@ class StatsPage extends ConsumerWidget {
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipColor: (_) => scheme.surfaceContainerHighest,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) =>
-                  BarTooltipItem(
-                    '${rod.toY.toInt()} repasos',
-                    TextStyle(
-                      color: scheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+                l10n.tr(
+                  'stats_tooltip_reviews',
+                  params: <String, Object?>{'count': rod.toY.toInt()},
+                ),
+                TextStyle(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
           titlesData: FlTitlesData(
             show: true,
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 30,
                 getTitlesWidget: (value, meta) {
-                  if (value == 0) {
-                    return const SizedBox.shrink();
-                  }
+                  if (value == 0) return const SizedBox.shrink();
                   return Text(
                     value.toInt().toString(),
                     style: TextStyle(fontSize: 10, color: muted),
@@ -329,7 +345,7 @@ class StatsPage extends ConsumerWidget {
                   final day = value.toInt();
                   if (day == 0) {
                     return Text(
-                      'Hoy',
+                      l10n.tr('stats_today'),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -339,7 +355,7 @@ class StatsPage extends ConsumerWidget {
                   }
                   if (day == 1) {
                     return Text(
-                      'Man',
+                      l10n.tr('stats_tomorrow'),
                       style: TextStyle(fontSize: 10, color: muted),
                     );
                   }

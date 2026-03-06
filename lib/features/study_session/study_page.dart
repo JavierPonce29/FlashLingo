@@ -10,6 +10,7 @@ import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
 import 'package:flashcards_app/features/study_session/srs_service.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class StudyPage extends StatefulWidget {
@@ -105,6 +106,7 @@ class _StudyPageState extends State<StudyPage> {
     webViewController!.loadData(
       data: HtmlGenerator.generateContent(
         card,
+        l10n: context.l10n,
         writeMode: isWriteModeActive,
         brightness: Theme.of(context).brightness,
       ),
@@ -175,8 +177,9 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildFinished() {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text("Sesion Finalizada")),
+      appBar: AppBar(title: Text(l10n.tr('study_finished_title'))),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -187,14 +190,11 @@ class _StudyPageState extends State<StudyPage> {
               color: AppUiColors.success(context),
             ),
             const SizedBox(height: 20),
-            const Text(
-              "Has terminado por ahora!",
-              style: TextStyle(fontSize: 20),
-            ),
+            Text(l10n.tr('study_finished_message'), style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Volver"),
+              child: Text(l10n.tr('common_back')),
             ),
           ],
         ),
@@ -203,10 +203,19 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildStudy() {
+    final l10n = context.l10n;
     final card = studyQueue[currentIndex];
     return Scaffold(
       appBar: AppBar(
-        title: Text("Estudiando (${currentIndex + 1}/${studyQueue.length})"),
+        title: Text(
+          l10n.tr(
+            'study_progress',
+            params: <String, Object?>{
+              'current': currentIndex + 1,
+              'total': studyQueue.length,
+            },
+          ),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
           child: Container(height: 4, color: _cardTypeColor(card)),
@@ -214,7 +223,7 @@ class _StudyPageState extends State<StudyPage> {
         actions: [
           if (_undoEnabled && _lastUndo != null)
             IconButton(
-              tooltip: "Deshacer ultimo (Undo)",
+              tooltip: l10n.tr('study_undo'),
               onPressed: _performUndo,
               icon: const Icon(Icons.undo),
             ),
@@ -232,6 +241,7 @@ class _StudyPageState extends State<StudyPage> {
               initialData: InAppWebViewInitialData(
                 data: HtmlGenerator.generateContent(
                   card,
+                  l10n: context.l10n,
                   writeMode: isWriteModeActive,
                   brightness: Theme.of(context).brightness,
                 ),
@@ -267,10 +277,11 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildControls(Flashcard card) {
+    final l10n = context.l10n;
     if (!isAnswerShown) {
       if (isComplexCard && !isReadingShown) {
         return _singleButton(
-          label: "Mostrar Lectura / Notas",
+          label: l10n.tr('study_show_reading'),
           color: AppUiColors.warning(context),
           onPressed: () {
             setState(() => isReadingShown = true);
@@ -281,7 +292,7 @@ class _StudyPageState extends State<StudyPage> {
       }
 
       return _singleButton(
-        label: "Mostrar Respuesta",
+        label: l10n.tr('study_show_answer'),
         color: AppUiColors.info(context),
         onPressed: () {
           setState(() => isAnswerShown = true);
@@ -293,7 +304,7 @@ class _StudyPageState extends State<StudyPage> {
 
     if (isComplexCard && !isReadingShown) {
       return _singleButton(
-        label: "Mostrar Lectura / Notas",
+        label: l10n.tr('study_show_reading'),
         color: AppUiColors.warning(context),
         onPressed: () {
           setState(() => isReadingShown = true);
@@ -310,13 +321,13 @@ class _StudyPageState extends State<StudyPage> {
       child: Row(
         children: [
           _ratingButton(
-            "Mal",
+            l10n.tr('study_bad'),
             AppUiColors.danger(context),
             () => _submitAnswer(card, false),
             true,
           ),
           _ratingButton(
-            "Bien",
+            l10n.tr('study_good'),
             AppUiColors.success(context),
             () => _submitAnswer(card, true),
             writePassed,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 
 class HtmlGenerator {
   static const Set<String> _allowedHtmlTags = {
@@ -98,6 +99,15 @@ class HtmlGenerator {
         .replaceAll('>', '&gt;');
   }
 
+  static String _safeJsString(String? input) {
+    if (input == null || input.isEmpty) return '';
+    return input
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", r"\'")
+        .replaceAll('\n', r'\n')
+        .replaceAll('\r', '');
+  }
+
   static String _imageHtml(String? src) {
     if (src == null || src.trim().isEmpty) return '';
     final normalized = src.trim();
@@ -110,6 +120,7 @@ class HtmlGenerator {
 
   static String generateContent(
     Flashcard card, {
+    required AppLocalizations l10n,
     bool writeMode = false,
     Brightness brightness = Brightness.light,
   }) {
@@ -144,16 +155,18 @@ class HtmlGenerator {
     }
 
     if (isComplexRecog) {
-      bodyContent = _generateComplexRecogBody(card, extraData);
+      bodyContent = _generateComplexRecogBody(card, extraData, l10n);
     } else if (isRecog) {
-      bodyContent = _generateSimpleRecogBody(card, extraData);
+      bodyContent = _generateSimpleRecogBody(card, extraData, l10n);
     } else {
-      bodyContent = _generateProdBody(card, extraData, writeMode);
+      bodyContent = _generateProdBody(card, extraData, writeMode, l10n);
     }
+
+    final writePlaceholder = _safeJsString(l10n.tr('html_write_placeholder'));
 
     return """
 <!DOCTYPE html>
-<html lang="es">
+<html lang="${l10n.languageCode}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -229,7 +242,7 @@ class HtmlGenerator {
         var label = targetSegments.length > 1 ? (i + 1) + ". " : "";
         html += '<div class="write-group">';
         if(label) html += '<span class="write-index">' + label + '</span>';
-        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="Escribe aqui..."></textarea>';
+        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="$writePlaceholder"></textarea>';
         html += '</div>';
       }
       container.innerHTML = html;
@@ -347,6 +360,7 @@ class HtmlGenerator {
   static String _generateSimpleRecogBody(
     Flashcard card,
     Map<String, dynamic> extra,
+    AppLocalizations l10n,
   ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
@@ -384,12 +398,12 @@ class HtmlGenerator {
   </div>
   <div class="separator"></div>
   <div class="meaning-text">$answerHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
+  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
   <div class="row-sent" style="margin-top: 15px;">
     <div class="sentence-text">$sentenceHtml</div>
     ${_playBtn('audio-sent-a', asSrc.isNotEmpty)}
   </div>
-  <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
+  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
     $translationHtml
   </div>
@@ -406,6 +420,7 @@ class HtmlGenerator {
     Flashcard card,
     Map<String, dynamic> extra,
     bool writeMode,
+    AppLocalizations l10n,
   ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
@@ -429,7 +444,7 @@ class HtmlGenerator {
       inputHtml =
           """
 <div class="write-section">
-  <div class="write-label">Escribe la(s) oración(es):</div>
+  <div class="write-label">${_safeHtml(l10n.tr('html_write_sentences'))}</div>
   <div id="dynamic-write-area"></div>
   <div id="target-hidden-raw" style="display:none;">$translationHtml</div>
 </div>
@@ -438,15 +453,15 @@ class HtmlGenerator {
       sentenceArea =
           """
 <div id="diff-results-box" class="diff-container"></div>
-<div class="small-note">(Verde: Bien / Rojo: Mal)</div>
+<div class="small-note">${_safeHtml(l10n.tr('html_note_good_bad'))}</div>
 
-<div class="toggle-link" onclick="toggleUserRaw()">Ver mi respuesta</div>
+<div class="toggle-link" onclick="toggleUserRaw()">${_safeHtml(l10n.tr('html_view_my_answer'))}</div>
 <div id="user-raw-container" style="display:none; margin-bottom:10px;">
   <div id="user-raw-text" class="user-raw-box"></div>
 </div>
 
 <div class="sentence-text answer-reference">
-  Correcto:<br/>$translationHtml
+  ${_safeHtml(l10n.tr('html_correct'))}:<br/>$translationHtml
 </div>
 """;
     }
@@ -474,7 +489,7 @@ class HtmlGenerator {
   <div class="separator"></div>
 
   <div class="meaning-text meaning-muted">$questionHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
+  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
 
   <div class="row-sent" style="margin-top: 15px; display:block;">
     $sentenceArea
@@ -485,7 +500,7 @@ class HtmlGenerator {
 
   $imgHtml
 
-  <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
+  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
     $sentenceHtml
   </div>
@@ -501,6 +516,7 @@ class HtmlGenerator {
   static String _generateComplexRecogBody(
     Flashcard card,
     Map<String, dynamic> extra,
+    AppLocalizations l10n,
   ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
@@ -571,7 +587,7 @@ class HtmlGenerator {
   <div class="separator"></div>
 
   <div class="meaning-text">$answerHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
+  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
 
   <div class="row-sent" style="margin-top: 15px;">
     <div class="ruby-block">
@@ -581,7 +597,7 @@ class HtmlGenerator {
     $btnSentWrapperA
   </div>
 
-  <div class="trans-toggle" onclick="toggleTranslation()">Ver Traducción ▼</div>
+  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
   <div id="hidden-trans" class="translation-text" style="display:none;">
     $translationHtml
   </div>
@@ -678,3 +694,4 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; text-align: center; backgrou
 """;
   }
 }
+

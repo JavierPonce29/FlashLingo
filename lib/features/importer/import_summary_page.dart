@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'package:flashcards_app/features/importer/importer_service.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class ImportSummaryPage extends StatelessWidget {
@@ -22,52 +24,43 @@ class ImportSummaryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final action = _try<ImportDeckConflictAction?>((s) => s.action);
     final zipFileName = _safeText(_try<String?>((s) => s.zipFileName));
-    final importedPackName = _safeText(
-      _try<String?>((s) => s.importedPackName),
-    );
+    final importedPackName = _safeText(_try<String?>((s) => s.importedPackName));
     final finalPackName = _safeText(
       _try<String?>((s) => s.finalPackName) ??
           _try<String?>((s) => s.targetPackName),
     );
     final isoCode = _safeText(_try<String?>((s) => s.isoCode));
 
-    final deckSettingsCreated =
-        _try<bool?>((s) => s.deckSettingsCreated) ?? false;
-    final deckSettingsUpdated =
-        _try<bool?>((s) => s.deckSettingsUpdated) ?? false;
+    final deckSettingsCreated = _try<bool?>((s) => s.deckSettingsCreated) ?? false;
+    final deckSettingsUpdated = _try<bool?>((s) => s.deckSettingsUpdated) ?? false;
     final deckSettingsPreserved =
         _try<bool?>((s) => s.deckSettingsPreserved) ?? false;
-    final targetDeckExistedBeforeImport = _try<bool?>(
-      (s) => s.targetDeckExistedBeforeImport,
-    );
+    final targetDeckExistedBeforeImport =
+        _try<bool?>((s) => s.targetDeckExistedBeforeImport);
 
     final isUpdate =
         action == ImportDeckConflictAction.updateExistingDeck ||
-        (action == null && (deckSettingsUpdated || deckSettingsPreserved));
+            (action == null && (deckSettingsUpdated || deckSettingsPreserved));
 
     final cardsCreated = _try<int?>((s) => s.cardsCreated) ?? 0;
     final cardsUpdated = _try<int?>((s) => s.cardsUpdated) ?? 0;
     final cardsUnchanged = _try<int?>((s) => s.cardsUnchanged) ?? 0;
-    final cardsProcessed =
-        _try<int?>((s) => s.cardsProcessed) ??
+    final cardsProcessed = _try<int?>((s) => s.cardsProcessed) ??
         (cardsCreated + cardsUpdated + cardsUnchanged);
 
     final sqliteRowsRead =
         _try<int?>((s) => s.sqliteRowsRead) ?? _try<int?>((s) => s.sqliteRows);
-    final duplicateLogicalCardsInImport = _try<int?>(
-      (s) => s.duplicateLogicalCardsInImport,
-    );
-    final existingCardsNotPresentInImport = _try<int?>(
-      (s) => s.existingCardsNotPresentInImport,
-    );
+    final duplicateLogicalCardsInImport =
+        _try<int?>((s) => s.duplicateLogicalCardsInImport);
+    final existingCardsNotPresentInImport =
+        _try<int?>((s) => s.existingCardsNotPresentInImport);
 
     final zipEntriesTotal =
-        _try<int?>((s) => s.zipEntriesTotal) ??
-        _try<int?>((s) => s.archiveEntriesTotal);
-    final zipRealFileEntries =
-        _try<int?>((s) => s.zipRealFileEntries) ??
+        _try<int?>((s) => s.zipEntriesTotal) ?? _try<int?>((s) => s.archiveEntriesTotal);
+    final zipRealFileEntries = _try<int?>((s) => s.zipRealFileEntries) ??
         _try<int?>((s) => s.archiveRealFileEntries);
     final extractedFilesWritten = _try<int?>((s) => s.extractedFilesWritten);
     final extractedDirsCreated = _try<int?>((s) => s.extractedDirsCreated);
@@ -78,8 +71,7 @@ class ImportSummaryPage extends StatelessWidget {
     final mediaFilesCopied = _try<int?>((s) => s.mediaFilesCopied);
     final mediaFilesSkipped = _try<int?>((s) => s.mediaFilesSkipped);
     final mediaDuplicateKeys =
-        _try<int?>((s) => s.mediaDuplicateKeys) ??
-        _try<int?>((s) => s.mediaKeyCollisions);
+        _try<int?>((s) => s.mediaDuplicateKeys) ?? _try<int?>((s) => s.mediaKeyCollisions);
 
     final missingWordAudio = _try<int?>((s) => s.missingWordAudio);
     final missingSentenceAudio = _try<int?>((s) => s.missingSentenceAudio);
@@ -88,7 +80,7 @@ class ImportSummaryPage extends StatelessWidget {
     final mutedTextColor = AppUiColors.mutedText(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Resumen de importacion')),
+      appBar: AppBar(title: Text(l10n.tr('import_summary_title'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -107,24 +99,26 @@ class ImportSummaryPage extends StatelessWidget {
                       Expanded(
                         child: Text(
                           isUpdate
-                              ? 'Actualizacion de mazo'
-                              : 'Importacion de mazo nuevo',
+                              ? l10n.tr('import_summary_update_title')
+                              : l10n.tr('import_summary_new_title'),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _kv('Archivo', zipFileName),
-                  _kv('Mazo importado', importedPackName),
-                  _kv('Mazo guardado', finalPackName),
-                  _kv('Idioma', isoCode),
+                  _kv(l10n.tr('import_summary_file'), zipFileName),
+                  _kv(l10n.tr('import_summary_imported_deck'), importedPackName),
+                  _kv(l10n.tr('import_summary_saved_deck'), finalPackName),
+                  _kv(l10n.tr('import_summary_language'), isoCode),
                   _kv(
-                    'Modo',
-                    isUpdate ? 'Actualizar existente' : 'Crear nuevo',
+                    l10n.tr('import_summary_mode'),
+                    isUpdate
+                        ? l10n.tr('import_summary_mode_update')
+                        : l10n.tr('import_summary_mode_create'),
                   ),
                   if (targetDeckExistedBeforeImport == true)
-                    _kv('Mazo previo', 'Si'),
+                    _kv(l10n.tr('import_summary_previous_deck'), l10n.tr('common_yes')),
                 ],
               ),
             ),
@@ -137,7 +131,7 @@ class ImportSummaryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Tarjetas',
+                    l10n.tr('import_summary_cards_section'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
@@ -147,25 +141,25 @@ class ImportSummaryPage extends StatelessWidget {
                     children: [
                       _metricChip(
                         context,
-                        label: 'Procesadas',
+                        label: l10n.tr('import_summary_processed'),
                         value: cardsProcessed.toString(),
                         color: Colors.blueGrey,
                       ),
                       _metricChip(
                         context,
-                        label: 'Creadas',
+                        label: l10n.tr('import_summary_created'),
                         value: cardsCreated.toString(),
                         color: AppUiColors.info(context),
                       ),
                       _metricChip(
                         context,
-                        label: 'Actualizadas',
+                        label: l10n.tr('import_summary_updated'),
                         value: cardsUpdated.toString(),
                         color: AppUiColors.warning(context),
                       ),
                       _metricChip(
                         context,
-                        label: 'Sin cambios',
+                        label: l10n.tr('import_summary_unchanged'),
                         value: cardsUnchanged.toString(),
                         color: AppUiColors.success(context),
                       ),
@@ -173,16 +167,23 @@ class ImportSummaryPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   if (sqliteRowsRead != null)
-                    _kv('Registros SQLite leidos', '$sqliteRowsRead'),
+                    _kv(l10n.tr('import_summary_sqlite_rows'), '$sqliteRowsRead'),
                   if (duplicateLogicalCardsInImport != null)
                     _kv(
-                      'Duplicadas dentro del archivo (logicas)',
+                      l10n.tr('import_summary_duplicates'),
                       '$duplicateLogicalCardsInImport',
                     ),
                   if (existingCardsNotPresentInImport != null)
-                    _kv(
-                      'Tarjetas existentes no presentes en el archivo',
-                      '$existingCardsNotPresentInImport (no eliminadas)',
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Text(
+                        l10n.tr(
+                          'import_summary_existing_missing',
+                          params: <String, Object?>{
+                            'count': existingCardsNotPresentInImport,
+                          },
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -196,18 +197,27 @@ class ImportSummaryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Configuracion del mazo',
+                    l10n.tr('import_summary_settings_section'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
-                  _kv('DeckSettings creado', deckSettingsCreated ? 'Si' : 'No'),
                   _kv(
-                    'DeckSettings actualizado',
-                    deckSettingsUpdated ? 'Si' : 'No',
+                    l10n.tr('import_summary_settings_created'),
+                    deckSettingsCreated
+                        ? l10n.tr('common_yes')
+                        : l10n.tr('common_no'),
                   ),
                   _kv(
-                    'DeckSettings preservado',
-                    deckSettingsPreserved ? 'Si' : 'No',
+                    l10n.tr('import_summary_settings_updated'),
+                    deckSettingsUpdated
+                        ? l10n.tr('common_yes')
+                        : l10n.tr('common_no'),
+                  ),
+                  _kv(
+                    l10n.tr('import_summary_settings_preserved'),
+                    deckSettingsPreserved
+                        ? l10n.tr('common_yes')
+                        : l10n.tr('common_no'),
                   ),
                 ],
               ),
@@ -221,31 +231,43 @@ class ImportSummaryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Multimedia y extraccion',
+                    l10n.tr('import_summary_media_section'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
                   if (zipEntriesTotal != null)
-                    _kv('Entradas ZIP totales', '$zipEntriesTotal'),
+                    _kv(l10n.tr('import_summary_zip_entries'), '$zipEntriesTotal'),
                   if (zipRealFileEntries != null)
-                    _kv('Archivos reales en ZIP', '$zipRealFileEntries'),
+                    _kv(l10n.tr('import_summary_zip_files'), '$zipRealFileEntries'),
                   if (extractedFilesWritten != null)
-                    _kv('Archivos extraidos', '$extractedFilesWritten'),
+                    _kv(
+                      l10n.tr('import_summary_extracted_files'),
+                      '$extractedFilesWritten',
+                    ),
                   if (extractedDirsCreated != null)
-                    _kv('Carpetas creadas', '$extractedDirsCreated'),
+                    _kv(l10n.tr('import_summary_created_dirs'), '$extractedDirsCreated'),
                   if (extractedCollisions != null)
-                    _kv('Colisiones renombradas', '$extractedCollisions'),
+                    _kv(l10n.tr('import_summary_collisions'), '$extractedCollisions'),
                   if (extractedSkipped != null)
-                    _kv('Omitidos en extraccion', '$extractedSkipped'),
+                    _kv(
+                      l10n.tr('import_summary_extracted_skipped'),
+                      '$extractedSkipped',
+                    ),
                   if (extractedErrors != null)
-                    _kv('Errores de extraccion', '$extractedErrors'),
+                    _kv(
+                      l10n.tr('import_summary_extracted_errors'),
+                      '$extractedErrors',
+                    ),
                   const Divider(height: 20),
                   if (mediaFilesCopied != null)
-                    _kv('Media copiada', '$mediaFilesCopied'),
+                    _kv(l10n.tr('import_summary_media_copied'), '$mediaFilesCopied'),
                   if (mediaFilesSkipped != null)
-                    _kv('Media omitida', '$mediaFilesSkipped'),
+                    _kv(l10n.tr('import_summary_media_skipped'), '$mediaFilesSkipped'),
                   if (mediaDuplicateKeys != null)
-                    _kv('Claves media duplicadas', '$mediaDuplicateKeys'),
+                    _kv(
+                      l10n.tr('import_summary_media_duplicate_keys'),
+                      '$mediaDuplicateKeys',
+                    ),
                   if (zipEntriesTotal == null &&
                       zipRealFileEntries == null &&
                       extractedFilesWritten == null &&
@@ -264,16 +286,22 @@ class ImportSummaryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Diagnostico de media en tarjetas',
+                    l10n.tr('import_summary_media_diag_section'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
                   if (missingWordAudio != null)
-                    _kv('Audio de palabra faltante', '$missingWordAudio'),
+                    _kv(
+                      l10n.tr('import_summary_missing_word_audio'),
+                      '$missingWordAudio',
+                    ),
                   if (missingSentenceAudio != null)
-                    _kv('Audio de oracion faltante', '$missingSentenceAudio'),
+                    _kv(
+                      l10n.tr('import_summary_missing_sentence_audio'),
+                      '$missingSentenceAudio',
+                    ),
                   if (missingImages != null)
-                    _kv('Imagenes faltantes', '$missingImages'),
+                    _kv(l10n.tr('import_summary_missing_images'), '$missingImages'),
                   if (missingWordAudio == null &&
                       missingSentenceAudio == null &&
                       missingImages == null)
@@ -288,7 +316,7 @@ class ImportSummaryPage extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('Volver'),
+                  label: Text(l10n.tr('common_back')),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),

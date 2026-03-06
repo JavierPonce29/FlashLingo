@@ -2,18 +2,23 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/features/importer/import_summary_page.dart';
 import 'package:flashcards_app/features/importer/importer_provider.dart';
 import 'package:flashcards_app/features/importer/importer_service.dart';
+import 'package:flashcards_app/l10n/app_localizations.dart';
 
 class HomeImportHelper {
   const HomeImportHelper._();
+
   static Future<void> pickAndImportFile(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     bool loaderOpen = false;
-    void showLoader([String message = 'Procesando...']) {
+
+    void showLoader([String? message]) {
       if (!context.mounted) return;
       loaderOpen = true;
       showDialog(
@@ -31,7 +36,7 @@ class HomeImportHelper {
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 ),
                 const SizedBox(width: 14),
-                Expanded(child: Text(message)),
+                Expanded(child: Text(message ?? l10n.tr('import_processing'))),
               ],
             ),
           ),
@@ -46,71 +51,71 @@ class HomeImportHelper {
       }
       loaderOpen = false;
     }
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'flashjp'],
       );
       if (result == null || result.files.single.path == null) return;
+
       final filePath = result.files.single.path!;
       final importerCtrl = ref.read(importerControllerProvider.notifier);
 
-      // 1) PREVIEW
       if (!context.mounted) return;
-      showLoader('Analizando paquete...');
+      showLoader(l10n.tr('import_analyzing'));
       final preview = await importerCtrl.previewFlashcardPackage(filePath);
       closeLoaderIfOpen();
-      // 2) Resolver conflicto (si existe)
+
       final options = await _resolveImportOptionsFromPreview(context, ref, preview);
       if (options == null) {
         importerCtrl.resetState();
-        return; // usuario canceló
+        return;
       }
-      // 3) IMPORTAR
+
       if (!context.mounted) return;
-      showLoader('Importando mazo...');
+      showLoader(l10n.tr('import_importing'));
       final summary = await importerCtrl.importFlashcardPackageAdvanced(
         filePath,
         options: options,
       );
       closeLoaderIfOpen();
       importerCtrl.resetState();
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("¡Importación completada!"),
+        SnackBar(
+          content: Text(l10n.tr('import_completed')),
           backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
 
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => ImportSummaryPage(summary: summary),
-        ),
+        MaterialPageRoute(builder: (_) => ImportSummaryPage(summary: summary)),
       );
     } on ImportConflictException catch (e) {
       closeLoaderIfOpen();
       if (!context.mounted) return;
-
-      // Poco probable porque ya hacemos preview, pero lo manejamos por seguridad.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Conflicto de nombre detectado: "${e.preview.importedPackName}". '
-                'Intenta de nuevo y elige actualizar o renombrar.',
+            l10n.tr(
+              'import_conflict_detected',
+              params: <String, Object?>{'name': e.preview.importedPackName},
+            ),
           ),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 4),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       closeLoaderIfOpen();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Error al importar: $e"),
+          content: Text(l10n.tr('import_error')),
           backgroundColor: Colors.red,
         ),
       );
@@ -118,11 +123,10 @@ class HomeImportHelper {
   }
 
   static Future<ImportExecutionOptions?> _resolveImportOptionsFromPreview(
-      BuildContext context,
-      WidgetRef ref,
-      ImportPreviewResult preview,
-      ) async {
-    // Si no existe conflicto, importar como mazo nuevo con el nombre original.
+    BuildContext context,
+    WidgetRef ref,
+    ImportPreviewResult preview,
+  ) async {
     if (!preview.deckNameExists) {
       return const ImportExecutionOptions.createNew();
     }
@@ -135,7 +139,6 @@ class HomeImportHelper {
         return const ImportExecutionOptions.updateExisting(
           updateDeckSettingsFromManifest: false,
         );
-
       case _ImportConflictDecision.createNewWithAnotherName:
         final customName = await _promptNewDeckName(
           context,
@@ -143,55 +146,54 @@ class HomeImportHelper {
           suggestedBaseName: preview.importedPackName,
         );
         if (customName == null) return null;
-
         return ImportExecutionOptions.createNew(customPackName: customName);
     }
   }
 
   static Future<_ImportConflictDecision?> _showImportConflictDialog(
-      BuildContext context,
-      ImportPreviewResult preview,
-      ) async {
+    BuildContext context,
+    ImportPreviewResult preview,
+  ) async {
+    final l10n = context.l10n;
     return showDialog<_ImportConflictDecision>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mazo ya existente'),
+        title: Text(l10n.tr('import_conflict_title')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Ya existe un mazo con el nombre:\n'
-                  '"${preview.importedPackName}"',
+              '${l10n.tr('import_conflict_line1')}\n"${preview.importedPackName}"',
             ),
             const SizedBox(height: 12),
             Text(
-              'Archivo: ${preview.zipFileName}\n'
-                  'Registros detectados: ${preview.sqliteRows}\n'
-                  'Tarjetas estimadas: ${preview.estimatedCardsToImport}',
+              '${l10n.tr('import_file_label')}: ${preview.zipFileName}\n'
+              '${l10n.tr('import_rows_label')}: ${preview.sqliteRows}\n'
+              '${l10n.tr('import_estimated_label')}: ${preview.estimatedCardsToImport}',
               style: Theme.of(ctx).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
-            const Text(
-              '¿Qué deseas hacer?',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            Text(
+              l10n.tr('import_conflict_question'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(l10n.tr('common_cancel')),
           ),
           OutlinedButton.icon(
             icon: const Icon(Icons.edit_note),
-            label: const Text('Actualizar mazo'),
+            label: Text(l10n.tr('import_update_action')),
             onPressed: () =>
                 Navigator.pop(ctx, _ImportConflictDecision.updateExisting),
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.copy),
-            label: const Text('Crear otro mazo'),
+            label: Text(l10n.tr('import_create_other_action')),
             onPressed: () => Navigator.pop(
               ctx,
               _ImportConflictDecision.createNewWithAnotherName,
@@ -203,11 +205,13 @@ class HomeImportHelper {
   }
 
   static Future<String?> _promptNewDeckName(
-      BuildContext context,
-      WidgetRef ref, {
-        required String suggestedBaseName,
-      }) async {
+    BuildContext context,
+    WidgetRef ref, {
+    required String suggestedBaseName,
+  }) async {
+    final l10n = context.l10n;
     final initialSuggestion = await _buildUniqueDeckNameSuggestion(
+      context,
       ref,
       baseName: suggestedBaseName,
     );
@@ -220,22 +224,24 @@ class HomeImportHelper {
         final controller = TextEditingController(text: initialSuggestion);
         String? errorText;
         bool saving = false;
+
         Future<void> submit(StateSetter setState) async {
           final raw = controller.text.trim();
           if (raw.isEmpty) {
-            setState(() => errorText = 'El nombre no puede estar vacío.');
+            setState(() => errorText = l10n.tr('import_name_empty'));
             return;
           }
           setState(() {
             saving = true;
             errorText = null;
           });
+
           final exists = await _deckNameExists(ref, raw);
           if (!ctx.mounted) return;
           if (exists) {
             setState(() {
               saving = false;
-              errorText = 'Ya existe un mazo con ese nombre.';
+              errorText = l10n.tr('import_name_exists');
             });
             return;
           }
@@ -244,20 +250,18 @@ class HomeImportHelper {
 
         return StatefulBuilder(
           builder: (ctx, setState) => AlertDialog(
-            title: const Text('Nombre del nuevo mazo'),
+            title: Text(l10n.tr('import_new_name_title')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Ingresa un nombre diferente para guardar este mazo.',
-                ),
+                Text(l10n.tr('import_new_name_description')),
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller,
                   autofocus: true,
                   enabled: !saving,
                   decoration: InputDecoration(
-                    labelText: 'Nombre del mazo',
+                    labelText: l10n.tr('import_deck_name_label'),
                     errorText: errorText,
                     border: const OutlineInputBorder(),
                   ),
@@ -268,17 +272,17 @@ class HomeImportHelper {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
+                child: Text(l10n.tr('common_cancel')),
               ),
               ElevatedButton(
                 onPressed: saving ? null : () => submit(setState),
                 child: saving
                     ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Text('Guardar'),
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.tr('common_save')),
               ),
             ],
           ),
@@ -288,12 +292,21 @@ class HomeImportHelper {
   }
 
   static Future<String> _buildUniqueDeckNameSuggestion(
-      WidgetRef ref, {
-        required String baseName,
-      }) async {
-    final base = baseName.trim().isEmpty ? 'Mazo importado' : baseName.trim();
+    BuildContext context,
+    WidgetRef ref, {
+    required String baseName,
+  }) async {
+    final l10n = context.l10n;
+    final base = baseName.trim().isEmpty
+        ? l10n.tr('import_default_deck_name')
+        : baseName.trim();
     if (!await _deckNameExists(ref, base)) return base;
-    const suffixes = [' (copia)', ' (nuevo)', ' (2)'];
+
+    final suffixes = <String>[
+      l10n.tr('import_copy_suffix'),
+      l10n.tr('import_new_suffix'),
+      ' (2)',
+    ];
     for (final suffix in suffixes) {
       final candidate = '$base$suffix';
       if (!await _deckNameExists(ref, candidate)) return candidate;
@@ -310,12 +323,18 @@ class HomeImportHelper {
   static Future<bool> _deckNameExists(WidgetRef ref, String packName) async {
     final normalized = packName.trim();
     if (normalized.isEmpty) return false;
+
     final isar = await ref.read(isarDbProvider.future);
-    final dsCount =
-    await isar.deckSettings.filter().packNameEqualTo(normalized).count();
+    final dsCount = await isar.deckSettings
+        .filter()
+        .packNameEqualTo(normalized)
+        .count();
     if (dsCount > 0) return true;
-    final fcCount =
-    await isar.flashcards.filter().packNameEqualTo(normalized).count();
+
+    final fcCount = await isar.flashcards
+        .filter()
+        .packNameEqualTo(normalized)
+        .count();
     return fcCount > 0;
   }
 }
