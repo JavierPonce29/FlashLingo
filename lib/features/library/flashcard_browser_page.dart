@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class FlashcardBrowserPage extends ConsumerStatefulWidget {
   final String packName;
@@ -92,15 +93,15 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
                         child: filtered.isEmpty
                             ? const Center(child: Text("No hay resultados."))
                             : ListView.builder(
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final c = filtered[i];
-                            return _FlashcardTile(
-                              card: c,
-                              stateLabel: _stateLabel(c.state),
-                            );
-                          },
-                        ),
+                                itemCount: filtered.length,
+                                itemBuilder: (context, i) {
+                                  final c = filtered[i];
+                                  return _FlashcardTile(
+                                    card: c,
+                                    stateLabel: _stateLabel(c.state),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   );
@@ -194,6 +195,7 @@ class _FlashcardTileState extends State<_FlashcardTile> {
 
   @override
   Widget build(BuildContext context) {
+    final muted = AppUiColors.mutedText(context);
     final c = widget.card;
 
     final type = c.cardType.endsWith('recog')
@@ -242,20 +244,20 @@ class _FlashcardTileState extends State<_FlashcardTile> {
                   const SizedBox(height: 8),
                   Text(
                     "Oración: ${c.sentence}",
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(color: muted),
                   ),
                 ],
                 if ((c.translation ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
                     "Traducción: ${c.translation}",
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(color: muted),
                   ),
                 ],
                 const SizedBox(height: 8),
                 Text(
                   "Next review: ${c.nextReview}",
-                  style: const TextStyle(fontSize: 12, color: Colors.black45),
+                  style: TextStyle(fontSize: 12, color: muted),
                 ),
               ],
               Align(

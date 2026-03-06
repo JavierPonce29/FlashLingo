@@ -1,11 +1,12 @@
-﻿import 'dart:convert';
+import 'dart:convert';
+import 'dart:ui';
 import 'package:flashcards_app/data/models/flashcard.dart';
 
 class HtmlGenerator {
   static const Set<String> _allowedHtmlTags = {
-    'a', 'b', 'big', 'blockquote', 'br', 'code', 'div', 'em', 'font', 'hr', 'i', 'img', 'kbd', 'li', 'mark', 'ol',
-    'p', 'pre', 'rp', 'rt', 'ruby', 's', 'small', 'span', 'strike', 'strong', 'sub', 'sup',
-    'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+    'a', 'b', 'big', 'blockquote', 'br', 'code', 'div', 'em', 'font', 'hr', 'i', 'img', 'kbd',
+    'li', 'mark', 'ol', 'p', 'pre', 'rp', 'rt', 'ruby', 's', 'small', 'span', 'strike',
+    'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
   };
 
   static String _safeHtml(String? input) {
@@ -26,7 +27,10 @@ class HtmlGenerator {
       ),
       '',
     );
-    html = html.replaceAllMapped(RegExp(r'<[^>]+>'), (m) => _sanitizeTag(m.group(0)!));
+    html = html.replaceAllMapped(
+      RegExp(r'<[^>]+>'),
+      (m) => _sanitizeTag(m.group(0)!),
+    );
     return html;
   }
 
@@ -38,7 +42,10 @@ class HtmlGenerator {
 
     var sanitized = tag;
     sanitized = sanitized.replaceAll(
-      RegExp(r'\son[a-zA-Z0-9_-]+\s*=\s*(".*?"|\x27.*?\x27|[^\s>]+)', caseSensitive: false),
+      RegExp(
+        r'\son[a-zA-Z0-9_-]+\s*=\s*(".*?"|\x27.*?\x27|[^\s>]+)',
+        caseSensitive: false,
+      ),
       '',
     );
     sanitized = sanitized.replaceAll(
@@ -65,9 +72,18 @@ class HtmlGenerator {
 
   static String _sanitizeInlineStyle(String value) {
     var clean = value;
-    clean = clean.replaceAll(RegExp(r'expression\s*\([^)]*\)', caseSensitive: false), '');
-    clean = clean.replaceAll(RegExp(r'url\s*\(\s*["\x27]?\s*javascript:[^)]*\)', caseSensitive: false), '');
-    clean = clean.replaceAll(RegExp(r'-moz-binding\s*:[^;]+;?', caseSensitive: false), '');
+    clean = clean.replaceAll(
+      RegExp(r'expression\s*\([^)]*\)', caseSensitive: false),
+      '',
+    );
+    clean = clean.replaceAll(
+      RegExp(r'url\s*\(\s*["\x27]?\s*javascript:[^)]*\)', caseSensitive: false),
+      '',
+    );
+    clean = clean.replaceAll(
+      RegExp(r'-moz-binding\s*:[^;]+;?', caseSensitive: false),
+      '',
+    );
     clean = clean.replaceAll(RegExp(r'@import', caseSensitive: false), '');
     return clean.trim();
   }
@@ -91,7 +107,12 @@ class HtmlGenerator {
     }
     return '<img src="${_safeAttr(normalized)}" class="card-img" />';
   }
-  static String generateContent(Flashcard card, {bool writeMode = false}) {
+
+  static String generateContent(
+    Flashcard card, {
+    bool writeMode = false,
+    Brightness brightness = Brightness.light,
+  }) {
     Map<String, dynamic> extraData = {};
     final rawExtra = card.extraDataJson;
     if (rawExtra != null && rawExtra.isNotEmpty) {
@@ -106,15 +127,18 @@ class HtmlGenerator {
     }
 
     final String readingWord = (extraData['reading'] ?? '').toString().trim();
-    final bool hasRealReading = readingWord.isNotEmpty && readingWord != card.question.trim();
+    final bool hasRealReading =
+        readingWord.isNotEmpty && readingWord != card.question.trim();
     final bool isRecog = card.cardType.endsWith('recog');
     final bool isComplexRecog = isRecog && hasRealReading;
 
-    final String css = _getBaseCss();
+    final String css = _getBaseCss(brightness);
     String bodyContent = "";
 
     // Autoplay SOLO en recog simple
-    String jsInit = (isRecog && !isComplexRecog) ? "playSequence('q-view');" : "";
+    String jsInit = (isRecog && !isComplexRecog)
+        ? "playSequence('q-view');"
+        : "";
     if (writeMode && !isRecog) {
       jsInit += " initWriteMode();";
     }
@@ -320,7 +344,10 @@ class HtmlGenerator {
 """;
   }
 
-  static String _generateSimpleRecogBody(Flashcard card, Map<String, dynamic> extra) {
+  static String _generateSimpleRecogBody(
+    Flashcard card,
+    Map<String, dynamic> extra,
+  ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
     final String sentenceHtml = _safeHtml(card.sentence);
@@ -330,7 +357,8 @@ class HtmlGenerator {
     final String asSrc = card.sentenceAudioPath ?? '';
     final String imgHtml = _imageHtml(card.imagePath);
 
-    final String questionView = """
+    final String questionView =
+        """
 <div id="q-view">
   <div class="row-main">
     <div class="word-text">$questionHtml</div>
@@ -347,7 +375,8 @@ class HtmlGenerator {
 </div>
 """;
 
-    final String answerView = """
+    final String answerView =
+        """
 <div id="a-view" style="display:none;">
   <div class="row-main">
     <div class="word-text">$questionHtml</div>
@@ -373,24 +402,32 @@ class HtmlGenerator {
     return questionView + answerView;
   }
 
-  static String _generateProdBody(Flashcard card, Map<String, dynamic> extra, bool writeMode) {
+  static String _generateProdBody(
+    Flashcard card,
+    Map<String, dynamic> extra,
+    bool writeMode,
+  ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
     final String sentenceHtml = _safeHtml(card.sentence);
     final String translationHtml = _safeHtml(card.translation);
     final String formas = _safeHtml((extra['forms'] ?? '').toString());
-    final String reading = _safeHtml((extra['target_reading'] ?? '').toString());
+    final String reading = _safeHtml(
+      (extra['target_reading'] ?? '').toString(),
+    );
     final String awSrc = card.audioPath ?? '';
     final String asSrc = card.sentenceAudioPath ?? '';
     final String imgHtml = _imageHtml(card.imagePath);
 
     String inputHtml = "";
-    String sentenceArea = """
+    String sentenceArea =
+        """
 <div class="sentence-text">$translationHtml</div>
 """;
 
     if (writeMode) {
-      inputHtml = """
+      inputHtml =
+          """
 <div class="write-section">
   <div class="write-label">Escribe la(s) oración(es):</div>
   <div id="dynamic-write-area"></div>
@@ -398,7 +435,8 @@ class HtmlGenerator {
 </div>
 """;
 
-      sentenceArea = """
+      sentenceArea =
+          """
 <div id="diff-results-box" class="diff-container"></div>
 <div class="small-note">(Verde: Bien / Rojo: Mal)</div>
 
@@ -407,13 +445,14 @@ class HtmlGenerator {
   <div id="user-raw-text" class="user-raw-box"></div>
 </div>
 
-<div class="sentence-text" style="font-size:0.9em; color:#888; margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;">
+<div class="sentence-text answer-reference">
   Correcto:<br/>$translationHtml
 </div>
 """;
     }
 
-    final String questionView = """
+    final String questionView =
+        """
 <div id="q-view">
   <div class="meaning-prod">$questionHtml</div>
   <div class="sentence-trans-prod">$sentenceHtml</div>
@@ -421,7 +460,8 @@ class HtmlGenerator {
 </div>
 """;
 
-    final String answerView = """
+    final String answerView =
+        """
 <div id="a-view" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
@@ -433,7 +473,7 @@ class HtmlGenerator {
 
   <div class="separator"></div>
 
-  <div class="meaning-text" style="color: #555;">$questionHtml</div>
+  <div class="meaning-text meaning-muted">$questionHtml</div>
   ${formas.isNotEmpty ? '<div class="forms-text">Formas: $formas</div>' : ''}
 
   <div class="row-sent" style="margin-top: 15px; display:block;">
@@ -458,7 +498,10 @@ class HtmlGenerator {
     return questionView + answerView;
   }
 
-  static String _generateComplexRecogBody(Flashcard card, Map<String, dynamic> extra) {
+  static String _generateComplexRecogBody(
+    Flashcard card,
+    Map<String, dynamic> extra,
+  ) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
     final String sentenceHtml = _safeHtml(card.sentence);
@@ -469,7 +512,9 @@ class HtmlGenerator {
     final String imgHtml = _imageHtml(card.imagePath);
 
     final String readingWord = _safeHtml((extra['reading'] ?? '').toString());
-    final String readingSent = _safeHtml((extra['sentence_reading'] ?? '').toString());
+    final String readingSent = _safeHtml(
+      (extra['sentence_reading'] ?? '').toString(),
+    );
 
     final String btnWordWrapperQ = awSrc.isNotEmpty
         ? '<div class="delayed-btn" style="visibility:hidden; opacity:0; transition: opacity 0.3s;">${_playBtn('audio-word-q', true)}</div>'
@@ -485,7 +530,8 @@ class HtmlGenerator {
         ? '<div class="delayed-btn" style="visibility:hidden; opacity:0; transition: opacity 0.3s;">${_playBtn('audio-sent-a', true)}</div>'
         : '';
 
-    final String questionView = """
+    final String questionView =
+        """
 <div id="q-view">
   <div class="row-main">
     <div class="ruby-block">
@@ -511,7 +557,8 @@ class HtmlGenerator {
 </div>
 """;
 
-    final String answerView = """
+    final String answerView =
+        """
 <div id="a-view" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
@@ -563,45 +610,65 @@ class HtmlGenerator {
     return """<button class="audio-btn" onclick="playOne('$id')"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>""";
   }
 
-  static String _getBaseCss() {
+  static String _getBaseCss(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    final bg = isDark ? '#121417' : '#ffffff';
+    final text = isDark ? '#ECEFF4' : '#333333';
+    final muted = isDark ? '#B0BEC5' : '#666666';
+    final soft = isDark ? '#90A4AE' : '#777777';
+    final subtleText = isDark ? '#C4D0DA' : '#555555';
+    final panel = isDark ? '#1E252D' : '#F7F7F7';
+    final border = isDark ? '#33404C' : '#E0E0E0';
+    final audioBg = isDark ? '#25313D' : '#F0F0F0';
+    final accent = isDark ? '#80BFFF' : '#0077CC';
+    final inputBg = isDark ? '#17212A' : '#FFFFFF';
+    final inputBorder = isDark ? '#3A4A58' : '#DDDDDD';
+    final focus = isDark ? '#88BEFF' : '#66AAFF';
+    final diffBg = isDark ? '#1B242C' : '#FAFAFA';
+    final diffBorder = isDark ? '#32414F' : '#EEEEEE';
+    final diffGood = isDark ? '#8AE6A0' : '#1A7F37';
+    final diffBad = isDark ? '#FF8A80' : '#C62828';
+
     return """
-body { font-family: 'Segoe UI', Roboto, sans-serif; text-align: center; background-color: #ffffff; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; min-height: 95vh; }
+body { font-family: 'Segoe UI', Roboto, sans-serif; text-align: center; background-color: $bg; color: $text; margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; min-height: 95vh; color-scheme: ${isDark ? 'dark' : 'light'}; }
 .card-container { width: 100%; max-width: 500px; margin: 0 auto; }
 .row-main, .row-sent { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 15px; }
 .ruby-block { display: flex; flex-direction: column; align-items: center; }
 .word-text { font-size: 32px; font-weight: 600; margin: 5px 0; }
-.meaning-text { font-size: 26px; font-weight: 600; margin: 10px 0; }
-.sentence-text { font-size: 18px; color: #555; margin: 10px 0; text-align: center; }
-.translation-text { font-size: 16px; color: #666; margin-top: 8px; padding: 10px; background: #f7f7f7; border-radius: 10px; }
-.separator { height: 1px; background: #e0e0e0; margin: 15px 0; }
-.audio-btn { background: #f0f0f0; border: none; border-radius: 999px; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-.audio-btn svg { width: 22px; height: 22px; fill: #333; }
-.trans-toggle { margin-top: 12px; font-size: 14px; color: #0077cc; cursor: pointer; user-select: none; }
-.forms-text { margin-top: 10px; font-size: 14px; color: #777; }
+.meaning-text { font-size: 26px; font-weight: 600; margin: 10px 0; color: $text; }
+.meaning-muted { color: $subtleText; }
+.sentence-text { font-size: 18px; color: $subtleText; margin: 10px 0; text-align: center; }
+.translation-text { font-size: 16px; color: $muted; margin-top: 8px; padding: 10px; background: $panel; border-radius: 10px; border: 1px solid $border; }
+.separator { height: 1px; background: $border; margin: 15px 0; }
+.audio-btn { background: $audioBg; border: 1px solid $border; border-radius: 999px; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.audio-btn svg { width: 22px; height: 22px; fill: $text; }
+.trans-toggle { margin-top: 12px; font-size: 14px; color: $accent; cursor: pointer; user-select: none; }
+.forms-text { margin-top: 10px; font-size: 14px; color: $soft; }
 
-.reading-text { font-size: 18px; color: #777; margin-top: 3px; transition: opacity 0.3s; }
+.reading-text { font-size: 18px; color: $soft; margin-top: 3px; transition: opacity 0.3s; }
 .sentence-reading { font-size: 16px; }
-.reading-sub { font-size: 18px; color: #777; margin-top: 3px; }
+.reading-sub { font-size: 18px; color: $soft; margin-top: 3px; }
 
-.meaning-prod { font-size: 22px; font-weight: 600; color: #444; margin-bottom: 10px; }
-.sentence-trans-prod { font-size: 16px; color: #777; margin-bottom: 15px; }
+.meaning-prod { font-size: 22px; font-weight: 600; color: $text; margin-bottom: 10px; }
+.sentence-trans-prod { font-size: 16px; color: $soft; margin-bottom: 15px; }
 
 .write-section { margin-top: 10px; text-align: left; }
-.write-label { font-size: 14px; color: #666; margin-bottom: 8px; }
+.write-label { font-size: 14px; color: $muted; margin-bottom: 8px; }
 .write-group { margin-bottom: 10px; }
-.write-index { font-size: 14px; color: #555; margin-right: 6px; }
-.write-input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid #ddd; outline: none; }
-.write-input:focus { border-color: #66aaff; box-shadow: 0 0 0 3px rgba(102,170,255,0.2); }
+.write-index { font-size: 14px; color: $subtleText; margin-right: 6px; }
+.write-input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid $inputBorder; outline: none; background: $inputBg; color: $text; }
+.write-input:focus { border-color: $focus; box-shadow: 0 0 0 3px ${isDark ? 'rgba(136,190,255,0.30)' : 'rgba(102,170,255,0.20)'}; }
 
-.diff-container { text-align: left; background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 10px; margin-top: 10px; }
+.diff-container { text-align: left; background: $diffBg; border: 1px solid $diffBorder; border-radius: 10px; padding: 10px; margin-top: 10px; }
 .diff-row { font-size: 16px; line-height: 1.5; margin-bottom: 6px; word-wrap: break-word; }
-.diff-good { color: #1a7f37; font-weight: 600; }
-.diff-bad { color: #c62828; font-weight: 700; text-decoration: underline; }
+.diff-good { color: $diffGood; font-weight: 600; }
+.diff-bad { color: $diffBad; font-weight: 700; text-decoration: underline; }
 
-.small-note { font-size: 12px; color: #777; margin-top: 6px; }
-.toggle-link { font-size: 13px; color: #0077cc; cursor: pointer; user-select: none; margin-top: 10px; display: inline-block; }
-.user-raw-box { font-size: 14px; color: #444; padding: 8px; border: 1px dashed #ccc; border-radius: 10px; background: #fff; }
-.card-img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; border-radius: 12px; border: 1px solid #eee; }
+.small-note { font-size: 12px; color: $soft; margin-top: 6px; }
+.toggle-link { font-size: 13px; color: $accent; cursor: pointer; user-select: none; margin-top: 10px; display: inline-block; }
+.user-raw-box { font-size: 14px; color: $subtleText; padding: 8px; border: 1px dashed $inputBorder; border-radius: 10px; background: $inputBg; }
+.answer-reference { font-size: 0.9em; margin-top: 5px; border-top: 1px dashed $inputBorder; padding-top: 5px; }
+.card-img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; border-radius: 12px; border: 1px solid $border; background: $panel; }
 
 @media (max-width: 420px) {
   .word-text { font-size: 28px; }

@@ -10,6 +10,7 @@ import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
 import 'package:flashcards_app/features/study_session/srs_service.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class StudyPage extends StatefulWidget {
   final String packName;
@@ -102,15 +103,20 @@ class _StudyPageState extends State<StudyPage> {
     if (_isFinished) return;
     final card = studyQueue[currentIndex];
     webViewController!.loadData(
-      data: HtmlGenerator.generateContent(card, writeMode: isWriteModeActive),
+      data: HtmlGenerator.generateContent(
+        card,
+        writeMode: isWriteModeActive,
+        brightness: Theme.of(context).brightness,
+      ),
     );
   }
 
   Color _cardTypeColor(Flashcard card) {
-    if (card.state == CardState.newCard) return Colors.blue;
-    if (card.state == CardState.learning && card.learningStep == 0)
-      return Colors.orange;
-    return Colors.green;
+    if (card.state == CardState.newCard) return AppUiColors.info(context);
+    if (card.state == CardState.learning && card.learningStep == 0) {
+      return AppUiColors.warning(context);
+    }
+    return AppUiColors.success(context);
   }
 
   bool _isEpoch(DateTime dt) => dt.millisecondsSinceEpoch == 0;
@@ -175,10 +181,10 @@ class _StudyPageState extends State<StudyPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.check_circle_outline,
               size: 80,
-              color: Colors.green,
+              color: AppUiColors.success(context),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -227,6 +233,7 @@ class _StudyPageState extends State<StudyPage> {
                 data: HtmlGenerator.generateContent(
                   card,
                   writeMode: isWriteModeActive,
+                  brightness: Theme.of(context).brightness,
                 ),
               ),
               onWebViewCreated: (controller) {
@@ -264,7 +271,7 @@ class _StudyPageState extends State<StudyPage> {
       if (isComplexCard && !isReadingShown) {
         return _singleButton(
           label: "Mostrar Lectura / Notas",
-          color: Colors.orange,
+          color: AppUiColors.warning(context),
           onPressed: () {
             setState(() => isReadingShown = true);
             webViewController?.evaluateJavascript(source: "showReading()");
@@ -275,7 +282,7 @@ class _StudyPageState extends State<StudyPage> {
 
       return _singleButton(
         label: "Mostrar Respuesta",
-        color: Colors.blue,
+        color: AppUiColors.info(context),
         onPressed: () {
           setState(() => isAnswerShown = true);
           webViewController?.evaluateJavascript(source: "showAnswer()");
@@ -287,7 +294,7 @@ class _StudyPageState extends State<StudyPage> {
     if (isComplexCard && !isReadingShown) {
       return _singleButton(
         label: "Mostrar Lectura / Notas",
-        color: Colors.orange,
+        color: AppUiColors.warning(context),
         onPressed: () {
           setState(() => isReadingShown = true);
           webViewController?.evaluateJavascript(source: "showReading()");
@@ -304,13 +311,13 @@ class _StudyPageState extends State<StudyPage> {
         children: [
           _ratingButton(
             "Mal",
-            Colors.red,
+            AppUiColors.danger(context),
             () => _submitAnswer(card, false),
             true,
           ),
           _ratingButton(
             "Bien",
-            Colors.green,
+            AppUiColors.success(context),
             () => _submitAnswer(card, true),
             writePassed,
           ),
@@ -330,12 +337,12 @@ class _StudyPageState extends State<StudyPage> {
         width: double.infinity,
         height: 60,
         child: ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: color),
-          onPressed: onPressed,
-          child: Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 18),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: AppUiColors.onAccent(color),
           ),
+          onPressed: onPressed,
+          child: Text(label, style: const TextStyle(fontSize: 18)),
         ),
       ),
     );
@@ -354,8 +361,12 @@ class _StudyPageState extends State<StudyPage> {
           height: 60,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: enabled ? color : Colors.grey.shade300,
-              foregroundColor: enabled ? Colors.white : Colors.grey,
+              backgroundColor: enabled
+                  ? color
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              foregroundColor: enabled
+                  ? AppUiColors.onAccent(color)
+                  : Theme.of(context).disabledColor,
             ),
             onPressed: enabled ? onPressed : null,
             child: Text(text, style: const TextStyle(fontSize: 18)),

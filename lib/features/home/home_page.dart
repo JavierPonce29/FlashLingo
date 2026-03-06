@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
-import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/features/home/home_import_helper.dart';
@@ -12,12 +11,20 @@ import 'package:flashcards_app/features/library/deck_overview_page.dart';
 import 'package:flashcards_app/features/library/deck_provider.dart';
 import 'package:flashcards_app/features/library/deck_settings_page.dart';
 import 'package:flashcards_app/features/library/flashcard_browser_page.dart';
+import 'package:flashcards_app/features/settings/general_settings_page.dart';
 import 'package:flashcards_app/features/stats/stats_page.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final info = AppUiColors.info(context);
+    final warning = AppUiColors.warning(context);
+    final success = AppUiColors.success(context);
+    final muted = AppUiColors.mutedText(context);
+    final danger = Theme.of(context).colorScheme.error;
+
     final decksAsync = ref.watch(decksStreamProvider);
     return Scaffold(
       appBar: AppBar(
@@ -25,9 +32,14 @@ class HomePage extends ConsumerWidget {
         elevation: 2,
         actions: [
           IconButton(
-            icon: const Icon(Icons.history_toggle_off),
-            tooltip: "Simular paso del tiempo (+1 dia)",
-            onPressed: () => _showTimeMachineDialog(context, ref),
+            icon: const Icon(Icons.settings),
+            tooltip: "Ajustes generales",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GeneralSettingsPage()),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.add),
@@ -45,12 +57,12 @@ class HomePage extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.library_books, size: 64, color: Colors.grey),
+                  Icon(Icons.library_books, size: 64, color: muted),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     "No hay mazos.\nImporta uno para empezar.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: TextStyle(fontSize: 16, color: muted),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
@@ -96,34 +108,31 @@ class HomePage extends ConsumerWidget {
                       if (deck.newCardsDue > 0)
                         Text(
                           "Nuevas: ${deck.newCardsDue}",
-                          style: const TextStyle(
-                            color: Colors.blue,
+                          style: TextStyle(
+                            color: info,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       if (firstStepDue > 0)
                         Text(
                           "Paso 1: $firstStepDue",
-                          style: const TextStyle(
-                            color: Colors.orange,
+                          style: TextStyle(
+                            color: warning,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       if (deck.reviewCardsDue > 0)
                         Text(
                           "Repaso: ${deck.reviewCardsDue}",
-                          style: const TextStyle(
-                            color: Colors.green,
+                          style: TextStyle(
+                            color: success,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       if (deck.newCardsDue == 0 &&
                           firstStepDue == 0 &&
                           deck.reviewCardsDue == 0)
-                        const Text(
-                          "Al dia!",
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                        Text("Al dia!", style: TextStyle(color: muted)),
                     ],
                   ),
                   onTap: () {
@@ -167,7 +176,7 @@ class HomePage extends ConsumerWidget {
                         _confirmDelete(context, ref, deck.name);
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
                       PopupMenuItem<String>(
                         value: 'settings',
                         child: ListTile(
@@ -212,10 +221,10 @@ class HomePage extends ConsumerWidget {
                       PopupMenuItem<String>(
                         value: 'delete',
                         child: ListTile(
-                          leading: Icon(Icons.delete, color: Colors.red),
+                          leading: Icon(Icons.delete, color: danger),
                           title: Text(
                             'Borrar',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(color: danger),
                           ),
                           contentPadding: EdgeInsets.zero,
                         ),
@@ -247,7 +256,9 @@ class HomePage extends ConsumerWidget {
             child: const Text("Cancelar"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text("Eliminar"),
           ),
@@ -446,52 +457,6 @@ class HomePage extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text("No se pudo renombrar: $e")));
     }
-  }
-
-  void _showTimeMachineDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Maquina del Tiempo"),
-        content: const Text(
-          "Esto mueve todas las tarjetas 1 dia hacia atras (para que queden vencidas).",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _applyTimeTravel(ref);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Viajaste 1 dia al futuro!")),
-                );
-              }
-            },
-            child: const Text("Viajar +1 Dia"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _applyTimeTravel(WidgetRef ref) async {
-    final isar = await ref.read(isarDbProvider.future);
-    final allCards = await isar.flashcards.where().findAll();
-    await isar.writeTxn(() async {
-      for (final card in allCards) {
-        card.nextReview = card.nextReview.subtract(const Duration(days: 1));
-        await isar.flashcards.put(card);
-      }
-      final allSettings = await isar.deckSettings.where().findAll();
-      for (final s in allSettings) {
-        s.newCardsSeenToday = 0;
-        await isar.deckSettings.put(s);
-      }
-    });
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class DeckSettingsPage extends ConsumerStatefulWidget {
   final String packName;
@@ -230,9 +231,9 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text("¡Configuración guardada!"),
-          backgroundColor: Colors.green,
+          backgroundColor: AppUiColors.success(context),
         ),
       );
       Navigator.pop(context);
@@ -241,7 +242,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Error guardando: $e"),
-          backgroundColor: Colors.red,
+          backgroundColor: AppUiColors.danger(context),
         ),
       );
     }
@@ -391,19 +392,27 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blueGrey.shade50,
+                        color: AppUiColors.panelFill(
+                          context,
+                          AppUiColors.info(context),
+                        ),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blueGrey.shade200),
+                        border: Border.all(
+                          color: AppUiColors.panelBorder(
+                            context,
+                            AppUiColors.info(context),
+                          ),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             "Define desde qué hora empieza tu 'día de estudio'.\n"
                             "Ej: 04:00 => lo que estudies a las 02:00 cuenta como el día anterior.",
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.black54,
+                              color: AppUiColors.mutedText(context),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -462,9 +471,17 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
+                        color: AppUiColors.panelFill(
+                          context,
+                          AppUiColors.success(context),
+                        ),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.teal.shade200),
+                        border: Border.all(
+                          color: AppUiColors.panelBorder(
+                            context,
+                            AppUiColors.success(context),
+                          ),
+                        ),
                       ),
                       child: Column(
                         children: [
@@ -488,14 +505,14 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                             },
                           ),
                           const SizedBox(height: 10),
-                          const Align(
+                          Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Los cambios se guardan al instante. "
                               "En una sesión ya iniciada, el modo escritura y parametros de revisión se actualizan al continuar.",
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.black54,
+                                color: AppUiColors.mutedText(context),
                               ),
                             ),
                           ),
@@ -548,9 +565,17 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade50,
+                        color: AppUiColors.panelFill(
+                          context,
+                          Theme.of(context).colorScheme.tertiary,
+                        ),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.deepPurple.shade200),
+                        border: Border.all(
+                          color: AppUiColors.panelBorder(
+                            context,
+                            Theme.of(context).colorScheme.tertiary,
+                          ),
+                        ),
                       ),
                       child: Column(
                         children: [
@@ -564,7 +589,15 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                               "Obliga a escribir la oración en el idioma objetivo.",
                             ),
                             value: _enableWriteMode,
-                            activeColor: Colors.deepPurple,
+                            activeThumbColor: Theme.of(
+                              context,
+                            ).colorScheme.tertiary,
+                            activeTrackColor: AppUiColors.panelFill(
+                              context,
+                              Theme.of(context).colorScheme.tertiary,
+                              lightAlpha: 0.30,
+                              darkAlpha: 0.50,
+                            ),
                             onChanged: (val) =>
                                 setState(() => _enableWriteMode = val),
                           ),
@@ -613,9 +646,17 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
+                        color: AppUiColors.panelFill(
+                          context,
+                          AppUiColors.warning(context),
+                        ),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.shade200),
+                        border: Border.all(
+                          color: AppUiColors.panelBorder(
+                            context,
+                            AppUiColors.warning(context),
+                          ),
+                        ),
                       ),
                       child: SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -627,7 +668,13 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                           "Revertir SOLO la última respuesta (Bien/Mal) durante el estudio.",
                         ),
                         value: _enableUndo,
-                        activeColor: Colors.orange,
+                        activeThumbColor: AppUiColors.warning(context),
+                        activeTrackColor: AppUiColors.panelFill(
+                          context,
+                          AppUiColors.warning(context),
+                          lightAlpha: 0.30,
+                          darkAlpha: 0.50,
+                        ),
                         onChanged: (val) => setState(() => _enableUndo = val),
                       ),
                     ),
@@ -652,7 +699,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
+                          color: AppUiColors.mutedText(context),
                         ),
                       ),
                     ),

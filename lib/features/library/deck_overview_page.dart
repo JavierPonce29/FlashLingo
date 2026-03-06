@@ -8,12 +8,16 @@ import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class DeckOverviewPage extends ConsumerWidget {
   final String packName;
   const DeckOverviewPage({super.key, required this.packName});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = AppUiColors.mutedText(context);
+
     return Scaffold(
       appBar: AppBar(title: Text(packName)),
       body: Center(
@@ -26,10 +30,7 @@ class DeckOverviewPage extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            const Text(
-              "Preparado para estudiar",
-              style: TextStyle(color: Colors.grey),
-            ),
+            Text("Preparado para estudiar", style: TextStyle(color: muted)),
             const SizedBox(height: 40),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -37,8 +38,8 @@ class DeckOverviewPage extends ConsumerWidget {
                   horizontal: 50,
                   vertical: 20,
                 ),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
+                backgroundColor: scheme.primary,
+                foregroundColor: scheme.onPrimary,
               ),
               onPressed: () => _startSession(context, ref),
               child: const Text(
@@ -70,7 +71,8 @@ class DeckOverviewPage extends ConsumerWidget {
     final currentLabel = StudyDay.label(now, settings);
     final last = settings.lastNewCardStudyDate;
     final lastLabel = last == null ? null : StudyDay.label(last, settings);
-    final bool isSameStudyDay = lastLabel != null &&
+    final bool isSameStudyDay =
+        lastLabel != null &&
         lastLabel.year == currentLabel.year &&
         lastLabel.month == currentLabel.month &&
         lastLabel.day == currentLabel.day;
@@ -85,13 +87,17 @@ class DeckOverviewPage extends ConsumerWidget {
       });
     }
     // 2) Si existe una sesion guardada DEL MISMO DIA (de estudio), reanudarla.
-    final existingSession =
-    await isar.studySessions.filter().packNameEqualTo(packName).findFirst();
+    final existingSession = await isar.studySessions
+        .filter()
+        .packNameEqualTo(packName)
+        .findFirst();
 
     if (existingSession != null) {
       if (_isSameDay(existingSession.sessionDay, currentLabel)) {
-        final resumedCards =
-        await _loadCardsFromSession(isar, existingSession.queueCardIds);
+        final resumedCards = await _loadCardsFromSession(
+          isar,
+          existingSession.queueCardIds,
+        );
         // Si la sesion queda vacia/corrupta, la eliminamos y continuamos con una nueva.
         if (resumedCards.isNotEmpty) {
           final savedIndex = existingSession.currentIndex;
@@ -123,8 +129,10 @@ class DeckOverviewPage extends ConsumerWidget {
       }
     }
     // 3) Calcular CUPO RESTANTE de nuevas
-    final int remainingQuota =
-    max(0, settings.newCardsPerDay - settings.newCardsSeenToday);
+    final int remainingQuota = max(
+      0,
+      settings.newCardsPerDay - settings.newCardsSeenToday,
+    );
     // 4) Obtener REPASOS (Limitados) (inclusivo)
     final reviews = await isar.flashcards
         .filter()
@@ -147,10 +155,12 @@ class DeckOverviewPage extends ConsumerWidget {
           .limit(remainingQuota)
           .findAll();
       // Ordenar Recog -> Prod
-      final newRecog =
-      newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
-      final newProd =
-      newCardsRaw.where((c) => c.cardType.endsWith('prod')).toList();
+      final newRecog = newCardsRaw
+          .where((c) => c.cardType.endsWith('recog'))
+          .toList();
+      final newProd = newCardsRaw
+          .where((c) => c.cardType.endsWith('prod'))
+          .toList();
       newCardsOrdered = [...newRecog, ...newProd];
     }
     // 6) Unir sesion segun configuracion de mezcla
@@ -166,7 +176,10 @@ class DeckOverviewPage extends ConsumerWidget {
         message = "Limite diario de nuevas alcanzado!";
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppUiColors.success(context),
+        ),
       );
       return;
     }
@@ -183,14 +196,12 @@ class DeckOverviewPage extends ConsumerWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => StudyPage(
-          packName: packName,
-          cards: sessionCards,
-          initialIndex: 0,
-        ),
+        builder: (_) =>
+            StudyPage(packName: packName, cards: sessionCards, initialIndex: 0),
       ),
     );
   }
+
   List<Flashcard> _buildSessionCards({
     required DeckSettings settings,
     required List<Flashcard> reviews,
@@ -251,13 +262,14 @@ class DeckOverviewPage extends ConsumerWidget {
     }
     return result;
   }
+
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   Future<List<Flashcard>> _loadCardsFromSession(
-      Isar isar,
-      List<int> queueIds,
-      ) async {
+    Isar isar,
+    List<int> queueIds,
+  ) async {
     if (queueIds.isEmpty) return [];
     final uniqueIds = <int>{...queueIds}.toList();
     final cards = await isar.flashcards.getAll(uniqueIds);
@@ -274,4 +286,3 @@ class DeckOverviewPage extends ConsumerWidget {
     return ordered;
   }
 }
-
