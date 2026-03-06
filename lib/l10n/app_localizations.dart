@@ -4,7 +4,9 @@ import 'package:flashcards_app/l10n/app_strings_de.dart';
 import 'package:flashcards_app/l10n/app_strings_en.dart';
 import 'package:flashcards_app/l10n/app_strings_es.dart';
 import 'package:flashcards_app/l10n/app_strings_fr.dart';
+import 'package:flashcards_app/l10n/app_strings_ja.dart';
 import 'package:flashcards_app/l10n/app_strings_ro.dart';
+import 'package:flashcards_app/l10n/app_strings_zh.dart';
 
 class AppLocalizations {
   AppLocalizations(this.locale);
@@ -17,6 +19,8 @@ class AppLocalizations {
     'ro',
     'de',
     'fr',
+    'ja',
+    'zh',
   ];
 
   static const List<Locale> supportedLocales = <Locale>[
@@ -25,6 +29,8 @@ class AppLocalizations {
     Locale('ro'),
     Locale('de'),
     Locale('fr'),
+    Locale('ja'),
+    Locale('zh'),
   ];
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
@@ -37,6 +43,8 @@ class AppLocalizations {
         'ro': appStringsRo,
         'de': appStringsDe,
         'fr': appStringsFr,
+        'ja': appStringsJa,
+        'zh': appStringsZh,
       };
 
   static AppLocalizations of(BuildContext context) {

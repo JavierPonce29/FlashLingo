@@ -103,6 +103,10 @@ class GeneralSettingsPage extends ConsumerWidget {
         return l10n.tr('language_de');
       case 'fr':
         return l10n.tr('language_fr');
+      case 'ja':
+        return l10n.tr('language_ja');
+      case 'zh':
+        return l10n.tr('language_zh');
       default:
         return code;
     }

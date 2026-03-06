@@ -16,6 +16,8 @@ const Map<String, String> appStringsEs = <String, String>{
   'language_ro': 'Rumano',
   'language_de': 'Aleman',
   'language_fr': 'Frances',
+  'language_ja': 'Japones',
+  'language_zh': 'Chino',
   'settings_general_title': 'Ajustes generales',
   'settings_interface_appearance': 'Aspecto de la interfaz',
   'settings_theme_system': 'Segun el telefono',
