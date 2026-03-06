@@ -46,9 +46,11 @@ class _StudyPageState extends State<StudyPage> {
   void initState() {
     super.initState();
     studyQueue = List.from(widget.cards);
-    currentIndex = widget.initialIndex.clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1).toInt();
+    currentIndex = widget.initialIndex
+        .clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1)
+        .toInt();
     _startDeckSettingsWatcher();
-    _refreshDeckSettingsFromDb();
+    _refreshDeckSettingsFromDb(reloadHtml: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _persistStudySession();
       _recomputeCurrentCardState();
@@ -73,7 +75,9 @@ class _StudyPageState extends State<StudyPage> {
     });
   }
 
-  Future<DeckSettings?> _refreshDeckSettingsFromDb({bool reloadHtml = false}) async {
+  Future<DeckSettings?> _refreshDeckSettingsFromDb({
+    bool reloadHtml = false,
+  }) async {
     final isar = Isar.getInstance();
     if (isar == null) return _currentDeckSettings;
     final settings = await isar.deckSettings
@@ -98,18 +102,17 @@ class _StudyPageState extends State<StudyPage> {
     if (_isFinished) return;
     final card = studyQueue[currentIndex];
     webViewController!.loadData(
-      data: HtmlGenerator.generateContent(
-        card,
-        writeMode: isWriteModeActive,
-      ),
+      data: HtmlGenerator.generateContent(card, writeMode: isWriteModeActive),
     );
   }
 
   Color _cardTypeColor(Flashcard card) {
     if (card.state == CardState.newCard) return Colors.blue;
-    if (card.state == CardState.learning && card.learningStep == 0) return Colors.orange;
+    if (card.state == CardState.learning && card.learningStep == 0)
+      return Colors.orange;
     return Colors.green;
   }
+
   bool _isEpoch(DateTime dt) => dt.millisecondsSinceEpoch == 0;
 
   void _recomputeCurrentCardState({bool reloadHtml = false}) {
@@ -130,7 +133,8 @@ class _StudyPageState extends State<StudyPage> {
     final readingVal = extra['reading'];
     final readingStr = (readingVal is String) ? readingVal.trim() : '';
     final bool isRecog = card.cardType.endsWith('recog');
-    final bool hasReading = readingStr.isNotEmpty && readingStr != card.question.trim();
+    final bool hasReading =
+        readingStr.isNotEmpty && readingStr != card.question.trim();
     final bool writeEnabled = _currentDeckSettings?.enableWriteMode ?? false;
     final bool isProd = card.cardType.endsWith('prod');
     final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
@@ -140,7 +144,9 @@ class _StudyPageState extends State<StudyPage> {
     setState(() {
       isComplexCard = isRecog && hasReading;
       isWriteModeActive = writeActive;
-      minScoreRequired = writeActive ? (_currentDeckSettings?.writeModeThreshold ?? 80) : 0;
+      minScoreRequired = writeActive
+          ? (_currentDeckSettings?.writeModeThreshold ?? 80)
+          : 0;
       currentWriteScore = 0;
     });
 
@@ -163,16 +169,22 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildFinished() {
-
     return Scaffold(
       appBar: AppBar(title: const Text("Sesion Finalizada")),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_outline, size: 80, color: Colors.green),
+            const Icon(
+              Icons.check_circle_outline,
+              size: 80,
+              color: Colors.green,
+            ),
             const SizedBox(height: 20),
-            const Text("Has terminado por ahora!", style: TextStyle(fontSize: 20)),
+            const Text(
+              "Has terminado por ahora!",
+              style: TextStyle(fontSize: 20),
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
@@ -226,7 +238,9 @@ class _StudyPageState extends State<StudyPage> {
                   callback: (args) {
                     if (args.isNotEmpty) {
                       final raw = args[0];
-                      final score = (raw is int) ? raw : int.tryParse(raw.toString()) ?? 0;
+                      final score = (raw is int)
+                          ? raw
+                          : int.tryParse(raw.toString()) ?? 0;
                       setState(() => currentWriteScore = score);
                     }
                     return null;
@@ -282,13 +296,24 @@ class _StudyPageState extends State<StudyPage> {
       );
     }
 
-    final bool writePassed = !isWriteModeActive || (currentWriteScore >= minScoreRequired);
+    final bool writePassed =
+        !isWriteModeActive || (currentWriteScore >= minScoreRequired);
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          _ratingButton("Mal", Colors.red, () => _submitAnswer(card, false), true),
-          _ratingButton("Bien", Colors.green, () => _submitAnswer(card, true), writePassed),
+          _ratingButton(
+            "Mal",
+            Colors.red,
+            () => _submitAnswer(card, false),
+            true,
+          ),
+          _ratingButton(
+            "Bien",
+            Colors.green,
+            () => _submitAnswer(card, true),
+            writePassed,
+          ),
         ],
       ),
     );
@@ -307,13 +332,21 @@ class _StudyPageState extends State<StudyPage> {
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: color),
           onPressed: onPressed,
-          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 18)),
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 18),
+          ),
         ),
       ),
     );
   }
 
-  Widget _ratingButton(String text, Color color, VoidCallback onPressed, bool enabled) {
+  Widget _ratingButton(
+    String text,
+    Color color,
+    VoidCallback onPressed,
+    bool enabled,
+  ) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -339,10 +372,15 @@ class _StudyPageState extends State<StudyPage> {
     final now = DateTime.now();
     final prevIndex = currentIndex;
     // Snapshot para Undo antes de mutar
-    final undo = _UndoAction(prevIndex: prevIndex, cardId: card.id, snapshot: _FlashcardSnapshot.fromCard(card));
+    final undo = _UndoAction(
+      prevIndex: prevIndex,
+      cardId: card.id,
+      snapshot: _FlashcardSnapshot.fromCard(card),
+    );
 
     // Contar nueva SOLO en el primer rating real
-    final bool shouldCountNew = (card.state == CardState.newCard) && _isEpoch(card.lastReview);
+    final bool shouldCountNew =
+        (card.state == CardState.newCard) && _isEpoch(card.lastReview);
     // Aplicar SRS
     final bool repeatToday = _srsService.reviewCard(card, isCorrect, settings);
 
@@ -372,7 +410,8 @@ class _StudyPageState extends State<StudyPage> {
           final currentLabel = StudyDay.label(now, latest);
           final last = latest.lastNewCardStudyDate;
           final lastLabel = last == null ? null : StudyDay.label(last, latest);
-          final bool sameStudyDay = lastLabel != null &&
+          final bool sameStudyDay =
+              lastLabel != null &&
               lastLabel.year == currentLabel.year &&
               lastLabel.month == currentLabel.month &&
               lastLabel.day == currentLabel.day;
@@ -435,10 +474,10 @@ class _StudyPageState extends State<StudyPage> {
       final c = studyQueue[action.prevIndex];
       if (c.id == action.cardId) target = c;
     }
-    target ??= studyQueue.where((c) => c.id == action.cardId).cast<Flashcard?>().firstWhere(
-          (c) => c != null,
-      orElse: () => null,
-    );
+    target ??= studyQueue
+        .where((c) => c.id == action.cardId)
+        .cast<Flashcard?>()
+        .firstWhere((c) => c != null, orElse: () => null);
     if (target == null) return;
     action.snapshot.applyTo(target);
 
@@ -460,7 +499,9 @@ class _StudyPageState extends State<StudyPage> {
     });
 
     setState(() {
-      currentIndex = action.prevIndex.clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1).toInt();
+      currentIndex = action.prevIndex
+          .clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1)
+          .toInt();
       isAnswerShown = false;
       isReadingShown = false;
       currentWriteScore = 0;
