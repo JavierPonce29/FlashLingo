@@ -35,6 +35,147 @@ const Map<String, String> appStringsEn = <String, String>{
       'This moves all cards 1 day back (so they become due).',
   'settings_time_machine_success': 'You traveled 1 day to the future!',
   'settings_time_machine_action': 'Travel +1 day',
+  //Tour guiado
+  'settings_tour_title': 'Start guided tour',
+  'settings_tour_subtitle':
+      'You can launch the guided tour again at any time from here.',
+  'onboarding_welcome_title': 'Welcome to FlashLingo!',
+  'onboarding_welcome_body':
+      'FlashLingo is an app to learn languages with flashcards, reviews, and progress statistics.',
+  'onboarding_welcome_question':
+      'Would you like a guided tour of everything in the app?',
+  'onboarding_welcome_yes': 'Yes, continue with the guided tour',
+  'onboarding_welcome_no': 'No, I will check it later',
+  'onboarding_later_title': 'Guided tour available',
+  'onboarding_later_body':
+      'You can start the guided tour anytime from the general settings menu.',
+  'onboarding_later_action': 'Got it',
+  'onboarding_download_link_label': 'to download more decks here',
+  'onboarding_download_link_url': 'https://www.wikipedia.org',
+  'onboarding_tour_next': 'Next',
+  'onboarding_tour_home_intro':
+      'This is the main screen. Here you can see your decks and study status.',
+  'onboarding_tour_open_settings':
+      'Now open the highlighted general settings button to continue the tour.',
+  'onboarding_tour_settings_intro':
+      'This is the general settings menu. Let us review each section quickly.',
+  'onboarding_tour_settings_appearance':
+      'Here you can change interface appearance: system, dark, or light.',
+  'onboarding_tour_settings_language':
+      'In this section you can change the app interface language.',
+  'onboarding_tour_settings_time_machine':
+      'Time machine shifts your cards to reactivate reviews quickly.',
+  'onboarding_tour_settings_tour_button':
+      'From this button you can start the guided tour whenever you want.',
+  'onboarding_tour_settings_exit':
+      'Great. Now press back to leave settings and finish the tour.',
+  'onboarding_tour_settings_blocked': 'Use "Next" to continue the guided tour.',
+  'onboarding_tour_home_import':
+      'Now press the import button. We will load the welcome deck to continue.',
+  'onboarding_tour_import_intro':
+      'This screen summarizes the welcome deck import and the saved deck name.',
+  'onboarding_tour_import_cards':
+      'Here you can see how many cards were processed, created, updated, or unchanged.',
+  'onboarding_tour_import_settings':
+      'This section shows how deck settings were handled during import.',
+  'onboarding_tour_import_media':
+      'Here you can review extracted media files, collisions, and skipped entries.',
+  'onboarding_tour_import_diagnostics':
+      'This diagnostics section reports missing audio or images in cards.',
+  'onboarding_tour_import_exit':
+      'Great. Press Back to leave the summary and return to the home screen.',
+  'onboarding_tour_import_summary_blocked':
+      'Finish this import-summary explanation before leaving.',
+  'onboarding_tour_home_deck_highlight':
+      'This highlighted deck is your welcome deck. Now I will show its options.',
+  'onboarding_tour_home_menu_open':
+      'Press the deck three-dot button to continue.',
+  'onboarding_tour_menu_title': 'Deck menu',
+  'onboarding_tour_menu_settings':
+      'Settings: customize limits, study order, and deck algorithm.',
+  'onboarding_tour_menu_browse': 'Browse: review all cards and deck content.',
+  'onboarding_tour_menu_stats':
+      'Statistics: analyze your progress and review workload.',
+  'onboarding_tour_menu_advance': 'Advance: bring future reviews to today.',
+  'onboarding_tour_menu_rename': 'Rename: change the visible deck name.',
+  'onboarding_tour_menu_delete': 'Delete: remove the deck and its progress.',
+  'onboarding_tour_open_deck_settings': 'Open deck settings',
+  'onboarding_tour_deck_settings_intro':
+      'These are deck settings. I will explain each section.',
+  'onboarding_tour_deck_settings_daily':
+      'Here you define daily limits and the study-day start time.',
+  'onboarding_tour_deck_settings_mix':
+      'This block controls study order between new cards and reviews.',
+  'onboarding_tour_deck_settings_write_on':
+      'Enable write mode to reveal advanced write options.',
+  'onboarding_tour_deck_settings_write_options':
+      'These options control required accuracy and write repetition limits.',
+  'onboarding_tour_deck_settings_write_off':
+      'Now disable write mode to continue to the next section.',
+  'onboarding_tour_deck_settings_lapse_on':
+      'Enable fixed lapse interval to reveal its options.',
+  'onboarding_tour_deck_settings_lapse_options':
+      'Here you configure what happens when a card is failed repeatedly.',
+  'onboarding_tour_deck_settings_lapse_off':
+      'Now disable fixed lapse interval to finish this part of the tour.',
+  'onboarding_tour_deck_settings_exit':
+      'Done. Save and go back to continue the guided path.',
+  'onboarding_tour_deck_settings_blocked':
+      'Complete the current settings step before leaving.',
+  'onboarding_tour_home_open_deck':
+      'Press the highlighted deck to open it and start guided study.',
+  'onboarding_tour_deck_overview_start':
+      'Before studying, press Start to begin the session.',
+  'onboarding_tour_study_intro':
+      'You are now in study mode. Here you will practice each card step by step.',
+  'onboarding_tour_study_counter':
+      'At the top you can see progress and the remaining study queue.',
+  'onboarding_tour_study_type_bar':
+      'The color bar indicates card type (new, learning, or review).',
+  'onboarding_tour_study_word_area':
+      'This area shows the target word or phrase to learn.',
+  'onboarding_tour_study_sentence_area':
+      'These are the example sentences you should memorize.',
+  'onboarding_tour_study_show_answer':
+      'Press "Show answer" to reveal meaning, forms, and translations.',
+  'onboarding_tour_study_meaning':
+      'Here you will see the main meanings of the word.',
+  'onboarding_tour_study_forms':
+      'This section shows essential grammatical forms.',
+  'onboarding_tour_study_translation':
+      'Here you can read translations for the example sentences.',
+  'onboarding_tour_study_rate_first':
+      'Use Good or Bad to rate your answer and move to the next card.',
+  'onboarding_tour_study_second_intro':
+      'This is the same card in reverse direction to reinforce learning.',
+  'onboarding_tour_study_show_answer_second':
+      'Press "Show answer" again to review all elements.',
+  'onboarding_tour_study_rate_second':
+      'Rate this card again with Good or Bad to continue.',
+  'onboarding_tour_study_finish_remaining':
+      'Keep studying until the queue is empty. You cannot leave until done.',
+  'onboarding_tour_study_finished':
+      'You finished for today. Press Back to return to the home screen.',
+  'onboarding_tour_home_open_stats':
+      'Now open deck statistics from the three-dot button.',
+  'onboarding_tour_stats_intro':
+      'These statistics summarize total cards and current states.',
+  'onboarding_tour_stats_activity':
+      'The heatmap shows when you studied and how active each day was.',
+  'onboarding_tour_stats_distribution':
+      'This chart splits the deck into new, learning, and review states.',
+  'onboarding_tour_stats_forecast':
+      'Here you can see the expected review load for upcoming days.',
+  'onboarding_tour_stats_exit':
+      'Press Back to leave statistics and continue the tour.',
+  'onboarding_tour_stats_blocked':
+      'Finish the statistics explanation before leaving.',
+  'onboarding_tour_home_delete_deck':
+      'To finish, open the deck menu and delete the welcome deck.',
+  'onboarding_tour_final_message':
+      'Great work. You completed the guided tour. To download more decks, visit: {link}',
+  'onboarding_tour_finish': 'Finish guided tour',
+  //fin del tour
   'home_title': 'FlashLingo',
   'home_tooltip_settings': 'General settings',
   'home_tooltip_import': 'Import deck',
@@ -51,8 +192,7 @@ const Map<String, String> appStringsEn = <String, String>{
   'home_menu_rename': 'Rename',
   'home_menu_delete': 'Delete',
   'home_delete_title': 'Delete deck',
-  'home_delete_confirm':
-      'Are you sure you want to delete deck "{packName}"?',
+  'home_delete_confirm': 'Are you sure you want to delete deck "{packName}"?',
   'home_delete_success': 'Deck deleted',
   'home_no_future_reviews': 'No future reviews to advance.',
   'home_advance_title': 'Advance reviews',
@@ -83,8 +223,7 @@ const Map<String, String> appStringsEn = <String, String>{
   'import_update_action': 'Update deck',
   'import_create_other_action': 'Create another deck',
   'import_new_name_title': 'New deck name',
-  'import_new_name_description':
-      'Enter a different name to save this deck.',
+  'import_new_name_description': 'Enter a different name to save this deck.',
   'import_deck_name_label': 'Deck name',
   'import_name_empty': 'Name cannot be empty.',
   'import_name_exists': 'A deck with that name already exists.',
@@ -161,8 +300,7 @@ const Map<String, String> appStringsEn = <String, String>{
   'deck_settings_enable_write_hint':
       'Requires typing the sentence in the target language.',
   'deck_settings_min_accuracy': 'Minimum accuracy (%)',
-  'deck_settings_min_accuracy_hint':
-      'If below this %, "Good" stays disabled.',
+  'deck_settings_min_accuracy_hint': 'If below this %, "Good" stays disabled.',
   'deck_settings_write_limit': 'Review limit (0 = always)',
   'deck_settings_write_limit_hint':
       '0 = always on. >0 = disabled after N correct answers on that card.',

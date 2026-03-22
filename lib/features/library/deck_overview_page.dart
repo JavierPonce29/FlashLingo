@@ -9,6 +9,8 @@ import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
+import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
+import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
@@ -23,8 +25,10 @@ class DeckOverviewPage extends ConsumerWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final muted = AppUiColors.mutedText(context);
+    final guidedTourState = ref.watch(guidedTourProvider);
+    final isTourStep = guidedTourState.step == GuidedTourStep.deckOverviewStart;
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(title: Text(packName)),
       body: Center(
         child: Column(
@@ -36,23 +40,59 @@ class DeckOverviewPage extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            Text(l10n.tr('deck_overview_ready'), style: TextStyle(color: muted)),
+            Text(
+              l10n.tr('deck_overview_ready'),
+              style: TextStyle(color: muted),
+            ),
             const SizedBox(height: 40),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                backgroundColor: scheme.primary,
-                foregroundColor: scheme.onPrimary,
-              ),
-              onPressed: () => _startSession(context, ref),
-              child: Text(
-                l10n.tr('deck_overview_start'),
-                style: const TextStyle(fontSize: 18),
+            TourHighlight(
+              highlighted: isTourStep,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 50,
+                    vertical: 20,
+                  ),
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                ),
+                onPressed: () async {
+                  if (guidedTourState.isTourActive && !isTourStep) return;
+                  if (isTourStep) {
+                    ref.read(guidedTourProvider.notifier).onDeckStudyStarted();
+                  }
+                  await _startSession(context, ref);
+                },
+                child: Text(
+                  l10n.tr('deck_overview_start'),
+                  style: const TextStyle(fontSize: 18),
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+
+    if (!isTourStep) return page;
+
+    return Stack(
+      children: [
+        page,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 24,
+          child: TourMessageCard(
+            message: l10n.tr('onboarding_tour_deck_overview_start'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -75,7 +115,8 @@ class DeckOverviewPage extends ConsumerWidget {
     final currentLabel = StudyDay.label(now, settings);
     final last = settings.lastNewCardStudyDate;
     final lastLabel = last == null ? null : StudyDay.label(last, settings);
-    final isSameStudyDay = lastLabel != null &&
+    final isSameStudyDay =
+        lastLabel != null &&
         lastLabel.year == currentLabel.year &&
         lastLabel.month == currentLabel.month &&
         lastLabel.day == currentLabel.day;
@@ -104,7 +145,7 @@ class DeckOverviewPage extends ConsumerWidget {
           final canResume = savedIndex >= 0 && savedIndex < resumedCards.length;
           if (canResume) {
             if (!context.mounted) return;
-            Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => StudyPage(
@@ -114,6 +155,11 @@ class DeckOverviewPage extends ConsumerWidget {
                 ),
               ),
             );
+            if (!context.mounted) return;
+            if (ref.read(guidedTourProvider).step ==
+                GuidedTourStep.homeOpenStats) {
+              Navigator.pop(context);
+            }
             return;
           }
         }
@@ -127,8 +173,10 @@ class DeckOverviewPage extends ConsumerWidget {
       }
     }
 
-    final remainingQuota =
-        max(0, settings.newCardsPerDay - settings.newCardsSeenToday);
+    final remainingQuota = max(
+      0,
+      settings.newCardsPerDay - settings.newCardsSeenToday,
+    );
 
     final reviews = await isar.flashcards
         .filter()
@@ -151,8 +199,12 @@ class DeckOverviewPage extends ConsumerWidget {
           .limit(remainingQuota)
           .findAll();
 
-      final newRecog = newCardsRaw.where((c) => c.cardType.endsWith('recog')).toList();
-      final newProd = newCardsRaw.where((c) => c.cardType.endsWith('prod')).toList();
+      final newRecog = newCardsRaw
+          .where((c) => c.cardType.endsWith('recog'))
+          .toList();
+      final newProd = newCardsRaw
+          .where((c) => c.cardType.endsWith('prod'))
+          .toList();
       newCardsOrdered = [...newRecog, ...newProd];
     }
 
@@ -186,13 +238,17 @@ class DeckOverviewPage extends ConsumerWidget {
       await isar.studySessions.put(session);
     });
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
             StudyPage(packName: packName, cards: sessionCards, initialIndex: 0),
       ),
     );
+    if (!context.mounted) return;
+    if (ref.read(guidedTourProvider).step == GuidedTourStep.homeOpenStats) {
+      Navigator.pop(context);
+    }
   }
 
   List<Flashcard> _buildSessionCards({

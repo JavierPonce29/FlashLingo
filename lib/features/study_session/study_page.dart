@@ -2,18 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
+import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
+import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
 import 'package:flashcards_app/features/study_session/srs_service.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
-class StudyPage extends StatefulWidget {
+class StudyPage extends ConsumerStatefulWidget {
   final String packName;
   final List<Flashcard> cards;
   final int initialIndex;
@@ -24,10 +27,10 @@ class StudyPage extends StatefulWidget {
     this.initialIndex = 0,
   });
   @override
-  State<StudyPage> createState() => _StudyPageState();
+  ConsumerState<StudyPage> createState() => _StudyPageState();
 }
 
-class _StudyPageState extends State<StudyPage> {
+class _StudyPageState extends ConsumerState<StudyPage> {
   InAppWebViewController? webViewController;
   late List<Flashcard> studyQueue;
   int currentIndex = 0;
@@ -163,8 +166,13 @@ class _StudyPageState extends State<StudyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final guidedTourState = ref.watch(guidedTourProvider);
+
     return WillPopScope(
       onWillPop: () async {
+        if (guidedTourState.step.isStudyStep) {
+          return false;
+        }
         if (_isFinished) {
           await _completeSessionIfNeeded();
         } else {
@@ -172,13 +180,18 @@ class _StudyPageState extends State<StudyPage> {
         }
         return true;
       },
-      child: _isFinished ? _buildFinished() : _buildStudy(),
+      child: _isFinished
+          ? _buildFinished(guidedTourState)
+          : _buildStudy(guidedTourState),
     );
   }
 
-  Widget _buildFinished() {
+  Widget _buildFinished(GuidedTourState guidedTourState) {
     final l10n = context.l10n;
-    return Scaffold(
+    final isTourFinishedStep =
+        guidedTourState.step == GuidedTourStep.studyFinishedExplain;
+
+    final page = Scaffold(
       appBar: AppBar(title: Text(l10n.tr('study_finished_title'))),
       body: Center(
         child: Column(
@@ -190,22 +203,58 @@ class _StudyPageState extends State<StudyPage> {
               color: AppUiColors.success(context),
             ),
             const SizedBox(height: 20),
-            Text(l10n.tr('study_finished_message'), style: const TextStyle(fontSize: 20)),
+            Text(
+              l10n.tr('study_finished_message'),
+              style: const TextStyle(fontSize: 20),
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                if (isTourFinishedStep) {
+                  ref
+                      .read(guidedTourProvider.notifier)
+                      .onStudyFinishedScreenClosed();
+                  Navigator.pop(context, 'tour_finished');
+                  return;
+                }
+                Navigator.pop(context);
+              },
               child: Text(l10n.tr('common_back')),
             ),
           ],
         ),
       ),
     );
+
+    if (!isTourFinishedStep) return page;
+
+    return Stack(
+      children: [
+        page,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 24,
+          child: TourMessageCard(
+            message: l10n.tr('onboarding_tour_study_finished'),
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _buildStudy() {
+  Widget _buildStudy(GuidedTourState guidedTourState) {
     final l10n = context.l10n;
     final card = studyQueue[currentIndex];
-    return Scaffold(
+    final tourStep = guidedTourState.step;
+    final isTourInStudy = tourStep.isStudyStep;
+
+    final page = Scaffold(
       appBar: AppBar(
         title: Text(
           l10n.tr(
@@ -270,14 +319,59 @@ class _StudyPageState extends State<StudyPage> {
               },
             ),
           ),
-          _buildControls(card),
+          _buildControls(card, guidedTourState),
         ],
       ),
     );
+
+    if (!isTourInStudy) return page;
+
+    final overlayPlacement = _studyOverlayPlacement(context, tourStep);
+
+    return Stack(
+      children: [
+        page,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          top: overlayPlacement.top,
+          bottom: overlayPlacement.bottom,
+          child: TourMessageCard(
+            message: _tourStudyMessage(l10n, tourStep),
+            actionLabel: _canAdvanceStudyStep(tourStep)
+                ? l10n.tr('onboarding_tour_next')
+                : null,
+            onActionPressed: _canAdvanceStudyStep(tourStep)
+                ? () => ref
+                      .read(guidedTourProvider.notifier)
+                      .nextStudyNarrationStep()
+                : null,
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _buildControls(Flashcard card) {
+  Widget _buildControls(Flashcard card, GuidedTourState guidedTourState) {
     final l10n = context.l10n;
+    final tourStep = guidedTourState.step;
+    final isTourInStudy = tourStep.isStudyStep;
+    final canShowAnswer =
+        !isTourInStudy ||
+        tourStep == GuidedTourStep.studyShowAnswerFirst ||
+        tourStep == GuidedTourStep.studyShowAnswerSecond ||
+        tourStep == GuidedTourStep.studyFinishRemaining;
+    final canRateInTour =
+        !isTourInStudy ||
+        tourStep == GuidedTourStep.studyRateFirst ||
+        tourStep == GuidedTourStep.studyRateSecond ||
+        tourStep == GuidedTourStep.studyFinishRemaining;
+
     if (!isAnswerShown) {
       if (isComplexCard && !isReadingShown) {
         return _singleButton(
@@ -294,11 +388,19 @@ class _StudyPageState extends State<StudyPage> {
       return _singleButton(
         label: l10n.tr('study_show_answer'),
         color: AppUiColors.info(context),
-        onPressed: () {
-          setState(() => isAnswerShown = true);
-          webViewController?.evaluateJavascript(source: "showAnswer()");
-          _persistStudySession();
-        },
+        onPressed: canShowAnswer
+            ? () {
+                setState(() => isAnswerShown = true);
+                webViewController?.evaluateJavascript(source: "showAnswer()");
+                // Defer tour-step transition a tick to avoid refreshing the
+                // web view in the same frame as the JS reveal.
+                Future<void>.delayed(const Duration(milliseconds: 80), () {
+                  if (!mounted) return;
+                  ref.read(guidedTourProvider.notifier).onStudyAnswerShown();
+                });
+                _persistStudySession();
+              }
+            : () {},
       );
     }
 
@@ -324,17 +426,89 @@ class _StudyPageState extends State<StudyPage> {
             l10n.tr('study_bad'),
             AppUiColors.danger(context),
             () => _submitAnswer(card, false),
-            true,
+            canRateInTour,
           ),
           _ratingButton(
             l10n.tr('study_good'),
             AppUiColors.success(context),
             () => _submitAnswer(card, true),
-            writePassed,
+            writePassed && canRateInTour,
           ),
         ],
       ),
     );
+  }
+
+  bool _canAdvanceStudyStep(GuidedTourStep step) {
+    return step == GuidedTourStep.studyIntro ||
+        step == GuidedTourStep.studyTopCounter ||
+        step == GuidedTourStep.studyTypeBar ||
+        step == GuidedTourStep.studyWordArea ||
+        step == GuidedTourStep.studySentenceArea ||
+        step == GuidedTourStep.studyMeaningFirst ||
+        step == GuidedTourStep.studyFormsFirst ||
+        step == GuidedTourStep.studyTranslationFirst ||
+        step == GuidedTourStep.studySecondCardIntro;
+  }
+
+  _OverlayPlacement _studyOverlayPlacement(
+    BuildContext context,
+    GuidedTourStep step,
+  ) {
+    final topInset = MediaQuery.of(context).padding.top + kToolbarHeight + 8;
+    switch (step) {
+      case GuidedTourStep.studyShowAnswerFirst:
+      case GuidedTourStep.studyRateFirst:
+      case GuidedTourStep.studyShowAnswerSecond:
+      case GuidedTourStep.studyRateSecond:
+      case GuidedTourStep.studyFinishRemaining:
+        return _OverlayPlacement(top: topInset);
+      case GuidedTourStep.studyWordArea:
+      case GuidedTourStep.studySentenceArea:
+      case GuidedTourStep.studyMeaningFirst:
+      case GuidedTourStep.studyFormsFirst:
+      case GuidedTourStep.studyTranslationFirst:
+        return const _OverlayPlacement(bottom: 120);
+      default:
+        return const _OverlayPlacement(bottom: 24);
+    }
+  }
+
+  String _tourStudyMessage(AppLocalizations l10n, GuidedTourStep step) {
+    switch (step) {
+      case GuidedTourStep.studyIntro:
+        return l10n.tr('onboarding_tour_study_intro');
+      case GuidedTourStep.studyTopCounter:
+        return l10n.tr('onboarding_tour_study_counter');
+      case GuidedTourStep.studyTypeBar:
+        return l10n.tr('onboarding_tour_study_type_bar');
+      case GuidedTourStep.studyWordArea:
+        return l10n.tr('onboarding_tour_study_word_area');
+      case GuidedTourStep.studySentenceArea:
+        return l10n.tr('onboarding_tour_study_sentence_area');
+      case GuidedTourStep.studyShowAnswerFirst:
+        return l10n.tr('onboarding_tour_study_show_answer');
+      case GuidedTourStep.studyMeaningFirst:
+        return l10n.tr('onboarding_tour_study_meaning');
+      case GuidedTourStep.studyFormsFirst:
+        return l10n.tr('onboarding_tour_study_forms');
+      case GuidedTourStep.studyTranslationFirst:
+        return l10n.tr('onboarding_tour_study_translation');
+      case GuidedTourStep.studyRateFirst:
+        return l10n.tr('onboarding_tour_study_rate_first');
+      case GuidedTourStep.studySecondCardIntro:
+        return l10n.tr('onboarding_tour_study_second_intro');
+      case GuidedTourStep.studyShowAnswerSecond:
+        return l10n.tr('onboarding_tour_study_show_answer_second');
+      case GuidedTourStep.studyRateSecond:
+        return l10n.tr('onboarding_tour_study_rate_second');
+      case GuidedTourStep.studyFinishRemaining:
+        return l10n.tr('onboarding_tour_study_finish_remaining');
+      case GuidedTourStep.studyFinishedExplain:
+        return l10n.tr('onboarding_tour_study_finished');
+      default:
+        return '';
+    }
   }
 
   Widget _singleButton({
@@ -465,6 +639,8 @@ class _StudyPageState extends State<StudyPage> {
       undo.didAppendToQueue = true;
     }
 
+    ref.read(guidedTourProvider.notifier).onStudyRatedCard();
+
     await _nextCard();
     await _persistStudySession();
 
@@ -545,6 +721,7 @@ class _StudyPageState extends State<StudyPage> {
       _recomputeCurrentCardState(reloadHtml: true);
     } else {
       setState(() => currentIndex++);
+      ref.read(guidedTourProvider.notifier).onStudyQueueFinished();
       await _completeSessionIfNeeded();
     }
   }
@@ -659,4 +836,11 @@ class _UndoAction {
     required this.cardId,
     required this.snapshot,
   });
+}
+
+class _OverlayPlacement {
+  final double? top;
+  final double? bottom;
+
+  const _OverlayPlacement({this.top, this.bottom});
 }

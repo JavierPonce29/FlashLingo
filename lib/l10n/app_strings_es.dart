@@ -35,6 +35,152 @@ const Map<String, String> appStringsEs = <String, String>{
       'Esto mueve todas las tarjetas 1 dia hacia atras (para que queden vencidas).',
   'settings_time_machine_success': 'Viajaste 1 dia al futuro!',
   'settings_time_machine_action': 'Viajar +1 dia',
+  //Tour guiado
+  'settings_tour_title': 'Iniciar visita guiada',
+  'settings_tour_subtitle':
+      'Puedes iniciar la visita guiada cuando quieras desde aqui.',
+  'onboarding_welcome_title': 'Bienvenido a FlashLingo!',
+  'onboarding_welcome_body':
+      'FlashLingo es una aplicacion Open-source para aprender idiomas mediante Flashcards y un algoritmo optimisado para repasos inteligentes y que no sobrecargan el estudio.',
+  'onboarding_welcome_question':
+      'Deseas tener una visita guiada de todo lo que contiene la app?',
+  'onboarding_welcome_yes': 'Si, continuar con la visita guiada',
+  'onboarding_welcome_no': 'No, lo vere mas tarde',
+  'onboarding_later_title': 'Visita guiada disponible',
+  'onboarding_later_body':
+      'Puedes ver la visita guiada en cualquier momento desde el menu de ajustes generales.',
+  'onboarding_later_action': 'Entendido',
+  'onboarding_download_link_label': 'para descargar mas masos aqui',
+  'onboarding_download_link_url': 'https://www.wikipedia.org',
+  'onboarding_tour_next': 'Siguiente',
+  'onboarding_tour_home_intro':
+      'Esta es la pantalla principal. Aqui veras tus mazos y el estado de estudio de cada uno.',
+  'onboarding_tour_open_settings':
+      'Ahora abre el boton de ajustes generales que esta resaltado para continuar con la visita.',
+  'onboarding_tour_settings_intro':
+      'Este es el menu de ajustes generales. Vamos a revisar cada seccion rapidamente.',
+  'onboarding_tour_settings_appearance':
+      'Aqui puedes cambiar el aspecto de la interfaz entre sistema, oscuro o claro.',
+  'onboarding_tour_settings_language':
+      'En esta seccion puedes cambiar el idioma de toda la interfaz de la app.',
+  'onboarding_tour_settings_time_machine':
+      'La maquina del tiempo mueve tus tarjetas para reactivar repasos rapidamente.',
+  'onboarding_tour_settings_tour_button':
+      'Desde este boton puedes iniciar la visita guiada siempre que quieras.',
+  'onboarding_tour_settings_exit':
+      'Perfecto. Ahora pulsa volver para salir de ajustes y terminar la visita.',
+  'onboarding_tour_settings_blocked':
+      'Usa "Siguiente" para continuar la visita guiada.',
+  'onboarding_tour_home_import':
+      'Ahora pulsa el boton de importar. Vamos a cargar el mazo de bienvenida para continuar.',
+  'onboarding_tour_import_intro':
+      'Esta pantalla resume la importacion del mazo de bienvenida y el nombre guardado.',
+  'onboarding_tour_import_cards':
+      'Aqui ves cuantas tarjetas se procesaron, crearon, actualizaron o quedaron sin cambios.',
+  'onboarding_tour_import_settings':
+      'Esta seccion indica como quedaron los ajustes del mazo durante la importacion.',
+  'onboarding_tour_import_media':
+      'Aqui se muestran los archivos multimedia extraidos y posibles colisiones o omisiones.',
+  'onboarding_tour_import_diagnostics':
+      'Este diagnostico muestra si faltan audios o imagenes en las tarjetas.',
+  'onboarding_tour_import_exit':
+      'Perfecto. Pulsa Volver para salir del resumen y regresar a la pantalla principal.',
+  'onboarding_tour_import_summary_blocked':
+      'Completa esta explicacion del resumen antes de salir.',
+  'onboarding_tour_home_deck_highlight':
+      'Este mazo resaltado es tu mazo de bienvenida. Ahora te mostrare sus opciones.',
+  'onboarding_tour_home_menu_open':
+      'Pulsa el boton de tres puntos del mazo para continuar.',
+  'onboarding_tour_menu_title': 'Menu del mazo',
+  'onboarding_tour_menu_settings':
+      'Configuracion: personaliza limites, orden de estudio y algoritmo del mazo.',
+  'onboarding_tour_menu_browse':
+      'Explorar: revisa todas las tarjetas del mazo y su contenido.',
+  'onboarding_tour_menu_stats':
+      'Estadisticas: analiza tu progreso y carga de repaso.',
+  'onboarding_tour_menu_advance':
+      'Adelantar: trae repasos futuros al dia de hoy.',
+  'onboarding_tour_menu_rename':
+      'Renombrar: cambia el nombre visible del mazo.',
+  'onboarding_tour_menu_delete':
+      'Borrar: elimina completamente el mazo y su progreso.',
+  'onboarding_tour_open_deck_settings': 'Abrir configuracion del mazo',
+  'onboarding_tour_deck_settings_intro':
+      'Estas son las configuraciones del mazo. Te explicare cada bloque.',
+  'onboarding_tour_deck_settings_daily':
+      'Aqui defines limites diarios y hora de inicio del dia de estudio.',
+  'onboarding_tour_deck_settings_mix':
+      'Este bloque controla el orden de mezcla entre tarjetas nuevas y repasos.',
+  'onboarding_tour_deck_settings_write_on':
+      'Activa el interruptor de modo escritura para ver las opciones avanzadas.',
+  'onboarding_tour_deck_settings_write_options':
+      'Estas opciones controlan precision minima y cuantas veces exigir escritura.',
+  'onboarding_tour_deck_settings_write_off':
+      'Ahora apaga el modo escritura para continuar con la siguiente seccion.',
+  'onboarding_tour_deck_settings_lapse_on':
+      'Activa el intervalo fijo por lapse para mostrar sus opciones.',
+  'onboarding_tour_deck_settings_lapse_options':
+      'Aqui ajustas como responde el mazo cuando fallas varias veces una tarjeta.',
+  'onboarding_tour_deck_settings_lapse_off':
+      'Ahora desactiva el intervalo fijo para terminar esta parte del tour.',
+  'onboarding_tour_deck_settings_exit':
+      'Listo. Guarda y vuelve para seguir el recorrido en el mazo.',
+  'onboarding_tour_deck_settings_blocked':
+      'Completa el paso actual de configuracion antes de salir.',
+  'onboarding_tour_home_open_deck':
+      'Pulsa el mazo resaltado para entrar y comenzar el estudio guiado.',
+  'onboarding_tour_deck_overview_start':
+      'Antes de estudiar, pulsa el boton de empezar para entrar en la sesion.',
+  'onboarding_tour_study_intro':
+      'Ahora estas dentro de estudio. Aqui practicaras cada tarjeta paso a paso.',
+  'onboarding_tour_study_counter':
+      'En la parte superior ves tu progreso y cuantas tarjetas quedan en cola.',
+  'onboarding_tour_study_type_bar':
+      'La barra de color indica el tipo de tarjeta (nueva, aprendizaje o repaso).',
+  'onboarding_tour_study_word_area':
+      'Aqui aparece la palabra o frase objetivo que debes aprender.',
+  'onboarding_tour_study_sentence_area':
+      'Estas son las oraciones de ejemplo que debes memorizar.',
+  'onboarding_tour_study_show_answer':
+      'Pulsa "Mostrar respuesta" para ver significado, formas y traducciones.',
+  'onboarding_tour_study_meaning':
+      'Aqui veras los significados principales de la palabra.',
+  'onboarding_tour_study_forms':
+      'Esta seccion muestra formas gramaticales esenciales de la palabra.',
+  'onboarding_tour_study_translation':
+      'Aqui se muestra la traduccion de las oraciones de ejemplo.',
+  'onboarding_tour_study_rate_first':
+      'Usa Bien o Mal para calificar tu respuesta y avanzar a la siguiente tarjeta.',
+  'onboarding_tour_study_second_intro':
+      'Esta es la misma tarjeta en sentido inverso para reforzar el aprendizaje.',
+  'onboarding_tour_study_show_answer_second':
+      'Pulsa nuevamente "Mostrar respuesta" para revisar todos los elementos.',
+  'onboarding_tour_study_rate_second':
+      'Responde otra vez con Bien o Mal para continuar.',
+  'onboarding_tour_study_finish_remaining':
+      'Continua estudiando hasta vaciar la cola. No podras salir hasta terminar.',
+  'onboarding_tour_study_finished':
+      'Terminaste por hoy. Pulsa Volver para regresar a la pantalla principal.',
+  'onboarding_tour_home_open_stats':
+      'Ahora abre las estadisticas del mazo desde el boton de tres puntos.',
+  'onboarding_tour_stats_intro':
+      'Estas estadisticas resumen el total de tarjetas y su estado actual.',
+  'onboarding_tour_stats_activity':
+      'El heatmap muestra en que dias estudiaste y cuanta actividad tuviste.',
+  'onboarding_tour_stats_distribution':
+      'Este grafico reparte el mazo por tarjetas nuevas, aprendizaje y repaso.',
+  'onboarding_tour_stats_forecast':
+      'Aqui ves el pronostico de carga para los proximos dias.',
+  'onboarding_tour_stats_exit':
+      'Pulsa volver para salir de estadisticas y continuar el tour.',
+  'onboarding_tour_stats_blocked':
+      'Completa la explicacion de estadisticas antes de salir.',
+  'onboarding_tour_home_delete_deck':
+      'Para finalizar, abre el menu del mazo y elimina el mazo de bienvenida.',
+  'onboarding_tour_final_message':
+      'Excelente trabajo. Terminaste la visita guiada. Para descargar mas mazos visita: {link}',
+  'onboarding_tour_finish': 'Finalizar visita guiada',
+  //fin del tour
   'home_title': 'FlashLingo',
   'home_tooltip_settings': 'Ajustes generales',
   'home_tooltip_import': 'Importar mazo',
@@ -51,8 +197,7 @@ const Map<String, String> appStringsEs = <String, String>{
   'home_menu_rename': 'Renombrar',
   'home_menu_delete': 'Borrar',
   'home_delete_title': 'Eliminar mazo',
-  'home_delete_confirm':
-      'Seguro que quieres eliminar el mazo "{packName}"?',
+  'home_delete_confirm': 'Seguro que quieres eliminar el mazo "{packName}"?',
   'home_delete_success': 'Mazo eliminado',
   'home_no_future_reviews': 'No hay repasos futuros para adelantar.',
   'home_advance_title': 'Adelantar repasos',

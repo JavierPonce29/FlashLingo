@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
+import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 import 'stats_provider.dart';
@@ -16,18 +18,28 @@ class StatsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final statsAsync = ref.watch(deckStatsProvider(packName));
+    final guidedTourState = ref.watch(guidedTourProvider);
+    final tourStep = guidedTourState.step;
+    final isTourInStats = tourStep.isStatsStep;
+    final canPop = !isTourInStats || tourStep == GuidedTourStep.statsExit;
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         title: Text(
-          l10n.tr('stats_title', params: <String, Object?>{'packName': packName}),
+          l10n.tr(
+            'stats_title',
+            params: <String, Object?>{'packName': packName},
+          ),
         ),
       ),
       body: statsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(
           child: Text(
-            l10n.tr('common_error_with_detail', params: <String, Object?>{'error': err}),
+            l10n.tr(
+              'common_error_with_detail',
+              params: <String, Object?>{'error': err},
+            ),
           ),
         ),
         data: (stats) {
@@ -40,19 +52,31 @@ class StatsPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeaderCard(context, stats),
+                TourHighlight(
+                  highlighted: tourStep == GuidedTourStep.statsIntro,
+                  child: _buildHeaderCard(context, stats),
+                ),
                 const SizedBox(height: 30),
                 _sectionTitle(context, l10n.tr('stats_activity')),
                 const SizedBox(height: 10),
-                _buildHeatmap(context, stats),
+                TourHighlight(
+                  highlighted: tourStep == GuidedTourStep.statsActivity,
+                  child: _buildHeatmap(context, stats),
+                ),
                 const SizedBox(height: 30),
                 _sectionTitle(context, l10n.tr('stats_distribution')),
                 const SizedBox(height: 20),
-                _buildDistributionChart(context, stats),
+                TourHighlight(
+                  highlighted: tourStep == GuidedTourStep.statsDistribution,
+                  child: _buildDistributionChart(context, stats),
+                ),
                 const SizedBox(height: 40),
                 _sectionTitle(context, l10n.tr('stats_forecast')),
                 const SizedBox(height: 20),
-                _buildForecastChart(context, stats),
+                TourHighlight(
+                  highlighted: tourStep == GuidedTourStep.statsForecast,
+                  child: _buildForecastChart(context, stats),
+                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -60,6 +84,62 @@ class StatsPage extends ConsumerWidget {
         },
       ),
     );
+
+    if (!isTourInStats) return page;
+
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          ref.read(guidedTourProvider.notifier).onStatsClosed();
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tr('onboarding_tour_stats_blocked'))),
+        );
+      },
+      child: Stack(
+        children: [
+          page,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Container(color: Colors.black.withValues(alpha: 0.24)),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: TourMessageCard(
+              message: _statsTourMessage(l10n, tourStep),
+              actionLabel: tourStep == GuidedTourStep.statsExit
+                  ? null
+                  : l10n.tr('onboarding_tour_next'),
+              onActionPressed: tourStep == GuidedTourStep.statsExit
+                  ? null
+                  : () => ref.read(guidedTourProvider.notifier).nextInStats(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _statsTourMessage(AppLocalizations l10n, GuidedTourStep step) {
+    switch (step) {
+      case GuidedTourStep.statsIntro:
+        return l10n.tr('onboarding_tour_stats_intro');
+      case GuidedTourStep.statsActivity:
+        return l10n.tr('onboarding_tour_stats_activity');
+      case GuidedTourStep.statsDistribution:
+        return l10n.tr('onboarding_tour_stats_distribution');
+      case GuidedTourStep.statsForecast:
+        return l10n.tr('onboarding_tour_stats_forecast');
+      case GuidedTourStep.statsExit:
+        return l10n.tr('onboarding_tour_stats_exit');
+      default:
+        return '';
+    }
   }
 
   Widget _sectionTitle(BuildContext context, String title) {
@@ -154,7 +234,9 @@ class StatsPage extends ConsumerWidget {
                 content: Text(
                   l10n.tr(
                     'stats_reviews_on_date',
-                    params: <String, Object?>{'count': stats.heatmapData[value] ?? 0},
+                    params: <String, Object?>{
+                      'count': stats.heatmapData[value] ?? 0,
+                    },
                   ),
                 ),
               ),
@@ -211,7 +293,9 @@ class StatsPage extends ConsumerWidget {
                     _pieSection(
                       danger,
                       stats.relearningCards.toDouble(),
-                      ((stats.relearningCards / total) * 100).toStringAsFixed(0),
+                      ((stats.relearningCards / total) * 100).toStringAsFixed(
+                        0,
+                      ),
                     ),
                 ],
               ),
@@ -309,22 +393,27 @@ class StatsPage extends ConsumerWidget {
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipColor: (_) => scheme.surfaceContainerHighest,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
-                l10n.tr(
-                  'stats_tooltip_reviews',
-                  params: <String, Object?>{'count': rod.toY.toInt()},
-                ),
-                TextStyle(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                  BarTooltipItem(
+                    l10n.tr(
+                      'stats_tooltip_reviews',
+                      params: <String, Object?>{'count': rod.toY.toInt()},
+                    ),
+                    TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
             ),
           ),
           titlesData: FlTitlesData(
             show: true,
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
