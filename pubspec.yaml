@@ -72,6 +72,7 @@ dev_dependencies:
     sdk: flutter
 
   analyzer: 5.13.0
+  flutter_launcher_icons: ^0.14.4
 
   #Generadores de codigo
   build_runner: ^2.4.8
@@ -98,6 +99,7 @@ flutter:
 
   assets:
     - lib/assets/images/deck_default.png
+    - lib/assets/images/ICO.png
     - lib/assets/starter/FlashLingo.flashjp
 
   # To add assets to your application, add an assets section, like this:
@@ -130,3 +132,24 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: lib/assets/images/ICO.png
+  min_sdk_android: 21
+  adaptive_icon_foreground: lib/assets/images/ICO.png
+  adaptive_icon_background: "#FFFFFF"
+  web:
+    generate: true
+    image_path: lib/assets/images/ICO.png
+    background_color: "#FFFFFF"
+    theme_color: "#2A99BE"
+  windows:
+    generate: true
+    image_path: lib/assets/images/ICO.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: lib/assets/images/ICO.png
