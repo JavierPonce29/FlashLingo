@@ -5,9 +5,9 @@ import 'package:flashcards_app/l10n/app_localizations.dart';
 
 class HtmlGenerator {
   static const Set<String> _allowedHtmlTags = {
-    'a', 'b', 'big', 'blockquote', 'br', 'code', 'div', 'em', 'font', 'hr', 'i', 'img', 'kbd',
-    'li', 'mark', 'ol', 'p', 'pre', 'rp', 'rt', 'ruby', 's', 'small', 'span', 'strike',
-    'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+    'a', 'b', 'big', 'blockquote', 'br', 'code',
+    'div', 'em', 'font', 'hr', 'i', 'img', 'kbd', 'li', 'mark', 'ol', 'p', 'pre', 'rp', 'rt', 'ruby', 's',
+    'small', 'span', 'strike', 'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
   };
 
   static String _safeHtml(String? input) {
@@ -65,7 +65,7 @@ class HtmlGenerator {
         final value = raw.substring(1, raw.length - 1);
         final clean = _sanitizeInlineStyle(value);
         if (clean.isEmpty) return '';
-        return ' style=' + quote + clean + quote;
+        return ' style=$quote$clean$quote';
       },
     );
     return sanitized;
@@ -174,7 +174,9 @@ class HtmlGenerator {
 </head>
 <body onload="$jsInit">
   <div class="card-container">
-    $bodyContent
+    <div class="flashcard card">
+      $bodyContent
+    </div>
   </div>
 
   <script>
@@ -206,10 +208,16 @@ class HtmlGenerator {
       }
     }
 
-    // LECTURA SIN AUDIO
+    function revealReadingElements(root) {
+      var scope = root || document;
+      scope.querySelectorAll('.reading-text').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
+      scope.querySelectorAll('.delayed-btn').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
+    }
+
     function showReading() {
-      document.querySelectorAll('.reading-text').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
-      document.querySelectorAll('.delayed-btn').forEach(e => { e.style.visibility='visible'; e.style.opacity='1'; });
+      var qView = document.getElementById('q-view');
+      revealReadingElements(qView || document);
+      playSequence('q-view');
     }
 
     function toggleTranslation() {
@@ -298,16 +306,14 @@ class HtmlGenerator {
 
       // cambiar vista
       if(qView && aView) {
+        revealReadingElements(aView);
         qView.style.display = 'none';
         aView.style.display = 'block';
 
-        // clave: pequeno delay para asegurar DOM listo antes de play()
-        var hasAudio = aView.querySelector('audio');
-        if (hasAudio) {
-          setTimeout(function() {
-            playSequence('a-view');
-          }, 60);
-        }
+        // pequeno delay para asegurar DOM listo antes de play()
+        setTimeout(function() {
+          playSequence('a-view');
+        }, 60);
       }
     }
 
@@ -373,44 +379,48 @@ class HtmlGenerator {
 
     final String questionView =
         """
-<div id="q-view">
+<section id="q-view" class="card-face front">
   <div class="row-main">
     <div class="word-text">$questionHtml</div>
     ${_playBtn('audio-word-q', awSrc.isNotEmpty)}
   </div>
   <div class="separator"></div>
-  <div class="row-sent">
-    <div class="sentence-text">$sentenceHtml</div>
-    ${_playBtn('audio-sent-q', asSrc.isNotEmpty)}
+  <div class="sentence-wrapper">
+    <div class="row-sent">
+      <div class="sentence-text">$sentenceHtml</div>
+      ${_playBtn('audio-sent-q', asSrc.isNotEmpty)}
+    </div>
   </div>
   $imgHtml
   ${_audioHtml('audio-word-q', awSrc, 'audio-w')}
   ${_audioHtml('audio-sent-q', asSrc, 'audio-s')}
-</div>
+</section>
 """;
 
     final String answerView =
         """
-<div id="a-view" style="display:none;">
+<section id="a-view" class="card-face back" style="display:none;">
   <div class="row-main">
     <div class="word-text">$questionHtml</div>
     ${_playBtn('audio-word-a', awSrc.isNotEmpty)}
   </div>
   <div class="separator"></div>
   <div class="meaning-text">$answerHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
-  <div class="row-sent" style="margin-top: 15px;">
-    <div class="sentence-text">$sentenceHtml</div>
-    ${_playBtn('audio-sent-a', asSrc.isNotEmpty)}
+  ${formas.isNotEmpty ? '<div class="forms-text"><span class="prompt">${_safeHtml(l10n.tr('html_forms'))}:</span> $formas</div>' : ''}
+  <div class="sentence-wrapper">
+    <div class="row-sent">
+      <div class="sentence-text">$sentenceHtml</div>
+      ${_playBtn('audio-sent-a', asSrc.isNotEmpty)}
+    </div>
   </div>
-  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
-  <div id="hidden-trans" class="translation-text" style="display:none;">
+  <div class="trans-toggle hint" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
+  <div id="hidden-trans" class="translation-text sentence-translation" style="display:none;">
     $translationHtml
   </div>
   $imgHtml
   ${_audioHtml('audio-word-a', awSrc, 'audio-w')}
   ${_audioHtml('audio-sent-a', asSrc, 'audio-s')}
-</div>
+</section>
 """;
 
     return questionView + answerView;
@@ -468,16 +478,16 @@ class HtmlGenerator {
 
     final String questionView =
         """
-<div id="q-view">
+<section id="q-view" class="card-face front">
   <div class="meaning-prod">$questionHtml</div>
   <div class="sentence-trans-prod">$sentenceHtml</div>
   $inputHtml
-</div>
+</section>
 """;
 
     final String answerView =
         """
-<div id="a-view" style="display:none;">
+<section id="a-view" class="card-face back" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
       <div class="word-text">$answerHtml</div>
@@ -489,9 +499,9 @@ class HtmlGenerator {
   <div class="separator"></div>
 
   <div class="meaning-text meaning-muted">$questionHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
+  ${formas.isNotEmpty ? '<div class="forms-text"><span class="prompt">${_safeHtml(l10n.tr('html_forms'))}:</span> $formas</div>' : ''}
 
-  <div class="row-sent" style="margin-top: 15px; display:block;">
+  <div class="sentence-wrapper sentence-wrapper-block">
     $sentenceArea
     <div style="margin-top:10px; text-align:center;">
       ${_playBtn('audio-sent-a', asSrc.isNotEmpty)}
@@ -500,14 +510,14 @@ class HtmlGenerator {
 
   $imgHtml
 
-  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
-  <div id="hidden-trans" class="translation-text" style="display:none;">
+  <div class="trans-toggle hint" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
+  <div id="hidden-trans" class="translation-text sentence-translation" style="display:none;">
     $sentenceHtml
   </div>
 
   ${_audioHtml('audio-word-a', awSrc, 'audio-w')}
   ${_audioHtml('audio-sent-a', asSrc, 'audio-s')}
-</div>
+</section>
 """;
 
     return questionView + answerView;
@@ -548,7 +558,7 @@ class HtmlGenerator {
 
     final String questionView =
         """
-<div id="q-view">
+<section id="q-view" class="card-face front">
   <div class="row-main">
     <div class="ruby-block">
       <div class="word-text">$questionHtml</div>
@@ -559,23 +569,25 @@ class HtmlGenerator {
 
   <div class="separator"></div>
 
-  <div class="row-sent">
-    <div class="ruby-block">
-      <div class="sentence-text">$sentenceHtml</div>
-      <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+  <div class="sentence-wrapper">
+    <div class="row-sent">
+      <div class="ruby-block">
+        <div class="sentence-text">$sentenceHtml</div>
+        <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+      </div>
+      $btnSentWrapperQ
     </div>
-    $btnSentWrapperQ
   </div>
 
   $imgHtml
   ${_audioHtml('audio-word-q', awSrc, 'audio-w')}
   ${_audioHtml('audio-sent-q', asSrc, 'audio-s')}
-</div>
+</section>
 """;
 
     final String answerView =
         """
-<div id="a-view" style="display:none;">
+<section id="a-view" class="card-face back" style="display:none;">
   <div class="row-main">
     <div class="ruby-block">
       <div class="word-text">$questionHtml</div>
@@ -587,25 +599,27 @@ class HtmlGenerator {
   <div class="separator"></div>
 
   <div class="meaning-text">$answerHtml</div>
-  ${formas.isNotEmpty ? '<div class="forms-text">${_safeHtml(l10n.tr('html_forms'))}: $formas</div>' : ''}
+  ${formas.isNotEmpty ? '<div class="forms-text"><span class="prompt">${_safeHtml(l10n.tr('html_forms'))}:</span> $formas</div>' : ''}
 
-  <div class="row-sent" style="margin-top: 15px;">
-    <div class="ruby-block">
-      <div class="sentence-text">$sentenceHtml</div>
-      <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+  <div class="sentence-wrapper">
+    <div class="row-sent">
+      <div class="ruby-block">
+        <div class="sentence-text">$sentenceHtml</div>
+        <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+      </div>
+      $btnSentWrapperA
     </div>
-    $btnSentWrapperA
   </div>
 
-  <div class="trans-toggle" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
-  <div id="hidden-trans" class="translation-text" style="display:none;">
+  <div class="trans-toggle hint" onclick="toggleTranslation()">${_safeHtml(l10n.tr('html_view_translation'))} v</div>
+  <div id="hidden-trans" class="translation-text sentence-translation" style="display:none;">
     $translationHtml
   </div>
 
   $imgHtml
   ${_audioHtml('audio-word-a', awSrc, 'audio-w')}
   ${_audioHtml('audio-sent-a', asSrc, 'audio-s')}
-</div>
+</section>
 """;
 
     return questionView + answerView;
@@ -623,75 +637,432 @@ class HtmlGenerator {
 
   static String _playBtn(String id, bool exists) {
     if (!exists) return '';
-    return """<button class="audio-btn" onclick="playOne('$id')"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>""";
+    return """<button class="audio-btn" onclick="playOne('$id')"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19"></circle><path d="M16 12.5v15l12-7.5z"></path></svg></button>""";
   }
 
   static String _getBaseCss(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final bg = isDark ? '#121417' : '#ffffff';
-    final text = isDark ? '#ECEFF4' : '#333333';
-    final muted = isDark ? '#B0BEC5' : '#666666';
-    final soft = isDark ? '#90A4AE' : '#777777';
-    final subtleText = isDark ? '#C4D0DA' : '#555555';
-    final panel = isDark ? '#1E252D' : '#F7F7F7';
-    final border = isDark ? '#33404C' : '#E0E0E0';
-    final audioBg = isDark ? '#25313D' : '#F0F0F0';
-    final accent = isDark ? '#80BFFF' : '#0077CC';
-    final inputBg = isDark ? '#17212A' : '#FFFFFF';
-    final inputBorder = isDark ? '#3A4A58' : '#DDDDDD';
-    final focus = isDark ? '#88BEFF' : '#66AAFF';
-    final diffBg = isDark ? '#1B242C' : '#FAFAFA';
-    final diffBorder = isDark ? '#32414F' : '#EEEEEE';
-    final diffGood = isDark ? '#8AE6A0' : '#1A7F37';
-    final diffBad = isDark ? '#FF8A80' : '#C62828';
+    final pageBg = isDark ? 'rgb(11, 7, 22)' : 'rgb(251, 250, 254)';
+    final cardBg = isDark ? 'rgb(19, 12, 34)' : 'rgb(255, 255, 255)';
+    final text = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgb(48, 32, 111)';
+    final soft = isDark
+        ? 'rgba(255, 255, 255, 0.72)'
+        : 'rgba(48, 32, 111, 0.72)';
+    final accent = isDark ? 'rgb(153, 128, 255)' : 'rgb(101, 68, 233)';
+    final accentDark = isDark ? 'rgb(133, 102, 255)' : 'rgb(75, 50, 174)';
+    final line = isDark ? 'rgb(48, 32, 111)' : 'rgb(216, 208, 249)';
+    final panel = isDark ? 'rgb(26, 18, 61)' : 'rgb(246, 245, 253)';
+    final audioFill = isDark ? 'rgb(26, 18, 61)' : 'rgb(246, 245, 253)';
+    final audioBorder = isDark ? 'rgb(48, 32, 111)' : 'rgb(216, 208, 249)';
+    final diffGood = isDark ? 'rgb(140, 224, 175)' : 'rgb(29, 122, 69)';
+    final diffBad = isDark ? 'rgb(255, 154, 154)' : 'rgb(179, 43, 43)';
+    final cardShadow = isDark
+        ? 'rgba(0, 0, 0, 0.75)'
+        : 'rgba(133, 102, 255, 0.4)';
+    final focusRing = isDark
+        ? 'rgba(153, 128, 255, 0.28)'
+        : 'rgba(101, 68, 233, 0.16)';
 
     return """
-body { font-family: 'Segoe UI', Roboto, sans-serif; text-align: center; background-color: $bg; color: $text; margin: 0; padding: 20px; display: flex; flex-direction: column; justify-content: center; min-height: 95vh; color-scheme: ${isDark ? 'dark' : 'light'}; }
-.card-container { width: 100%; max-width: 500px; margin: 0 auto; }
-.row-main, .row-sent { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 15px; }
-.ruby-block { display: flex; flex-direction: column; align-items: center; }
-.word-text { font-size: 32px; font-weight: 600; margin: 5px 0; }
-.meaning-text { font-size: 26px; font-weight: 600; margin: 10px 0; color: $text; }
-.meaning-muted { color: $subtleText; }
-.sentence-text { font-size: 18px; color: $subtleText; margin: 10px 0; text-align: center; }
-.translation-text { font-size: 16px; color: $muted; margin-top: 8px; padding: 10px; background: $panel; border-radius: 10px; border: 1px solid $border; }
-.separator { height: 1px; background: $border; margin: 15px 0; }
-.audio-btn { background: $audioBg; border: 1px solid $border; border-radius: 999px; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-.audio-btn svg { width: 22px; height: 22px; fill: $text; }
-.trans-toggle { margin-top: 12px; font-size: 14px; color: $accent; cursor: pointer; user-select: none; }
-.forms-text { margin-top: 10px; font-size: 14px; color: $soft; }
+html, body { margin: 0; padding: 0; }
+body {
+  margin: 20px;
+  overflow-wrap: break-word;
+  overscroll-behavior: none;
+  background-color: $pageBg;
+  color: $text;
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.187;
+  text-align: left;
+  color-scheme: ${isDark ? 'dark' : 'light'};
+}
 
-.reading-text { font-size: 18px; color: $soft; margin-top: 3px; transition: opacity 0.3s; }
-.sentence-reading { font-size: 16px; }
-.reading-sub { font-size: 18px; color: $soft; margin-top: 3px; }
+a {
+  color: $accent;
+  text-decoration: none;
+}
 
-.meaning-prod { font-size: 22px; font-weight: 600; color: $text; margin-bottom: 10px; }
-.sentence-trans-prod { font-size: 16px; color: $soft; margin-bottom: 15px; }
+strong {
+  font-weight: 700;
+  color: $accentDark;
+}
 
-.write-section { margin-top: 10px; text-align: left; }
-.write-label { font-size: 14px; color: $muted; margin-bottom: 8px; }
-.write-group { margin-bottom: 10px; }
-.write-index { font-size: 14px; color: $subtleText; margin-right: 6px; }
-.write-input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid $inputBorder; outline: none; background: $inputBg; color: $text; }
-.write-input:focus { border-color: $focus; box-shadow: 0 0 0 3px ${isDark ? 'rgba(136,190,255,0.30)' : 'rgba(102,170,255,0.20)'}; }
+ul, ol {
+  margin-left: 20px;
+  margin-bottom: 10px;
+  padding-left: 0;
+}
 
-.diff-container { text-align: left; background: $diffBg; border: 1px solid $diffBorder; border-radius: 10px; padding: 10px; margin-top: 10px; }
-.diff-row { font-size: 16px; line-height: 1.5; margin-bottom: 6px; word-wrap: break-word; }
-.diff-good { color: $diffGood; font-weight: 600; }
-.diff-bad { color: $diffBad; font-weight: 700; text-decoration: underline; }
+li {
+  margin-bottom: 5px;
+  font-size: 18px;
+  line-height: 1.4;
+  color: $text;
+}
 
-.small-note { font-size: 12px; color: $soft; margin-top: 6px; }
-.toggle-link { font-size: 13px; color: $accent; cursor: pointer; user-select: none; margin-top: 10px; display: inline-block; }
-.user-raw-box { font-size: 14px; color: $subtleText; padding: 8px; border: 1px dashed $inputBorder; border-radius: 10px; background: $inputBg; }
-.answer-reference { font-size: 0.9em; margin-top: 5px; border-top: 1px dashed $inputBorder; padding-top: 5px; }
-.card-img { width: 100%; max-height: 220px; object-fit: contain; margin-top: 15px; border-radius: 12px; border: 1px solid $border; background: $panel; }
+blockquote {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid $line;
+  color: $soft;
+}
+
+.card-container {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.card {
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  text-align: left;
+  color: $text;
+}
+
+.flashcard {
+  display: block;
+  padding: 0 24px 20px 24px;
+  min-height: 200px;
+  border-radius: 10px;
+  background-color: $cardBg;
+  box-shadow: 0 5px 10px -5px $cardShadow;
+}
+
+.card-face {
+  display: block;
+  animation: cardFade 0.2s ease;
+}
+
+.front {
+  padding-top: 10px;
+  margin-bottom: -10px;
+  font-family: 'Montserrat', 'Open Sans', 'Segoe UI', sans-serif;
+}
+
+.back {
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  font-size: 20px;
+}
+
+.row-main,
+.row-sent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.row-main {
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+}
+
+.row-sent {
+  align-items: center;
+}
+
+.ruby-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-main > .word-text,
+.row-main > .ruby-block {
+  width: 100%;
+  text-align: center;
+}
+
+.row-main > .audio-btn,
+.row-main > .delayed-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.word-text,
+.reading-sub {
+  color: $accent;
+  font-size: 32px;
+  line-height: 1.18;
+}
+
+.word-text {
+  font-weight: 700;
+}
+
+.meaning-text {
+  font-size: 24px;
+  margin-bottom: 0;
+  color: $text;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.meaning-muted {
+  color: $accentDark;
+}
+
+.sentence-wrapper {
+  display: block;
+  margin-top: 34px;
+}
+
+.sentence-wrapper-block {
+  display: block;
+}
+
+.sentence-text,
+.example-sentence,
+.sentence-trans-prod {
+  font-size: 20px;
+  line-height: 1.5;
+  color: $text;
+  margin: 0;
+}
+
+.translation-text,
+.sentence-translation {
+  margin-top: 8px;
+  font-style: italic;
+  font-size: 16px;
+  color: $soft;
+}
+
+.meaning-prod {
+  font-size: 24px;
+  margin-bottom: 14px;
+  color: $text;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.forms-text,
+.irregular-forms {
+  color: $accentDark;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.prompt {
+  font-weight: 700;
+}
+
+.hint,
+.trans-toggle,
+.toggle-link {
+  color: $accent;
+}
+
+.trans-toggle,
+.toggle-link {
+  display: inline-block;
+  margin-top: 18px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.separator {
+  border: 0;
+  border-bottom: 1px solid $line;
+  margin: 28px 0 32px;
+}
+
+.reading-text,
+.reading-sub {
+  color: $accent;
+  font-size: 20px;
+  line-height: 1.3;
+  margin-top: 4px;
+  transition: opacity 0.25s ease;
+}
+
+.sentence-reading {
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.audio-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.audio-btn svg {
+  width: 40px;
+  height: 40px;
+}
+
+.audio-btn svg circle {
+  fill: $audioFill;
+  stroke: $audioBorder;
+  stroke-width: 1;
+}
+
+.audio-btn svg path {
+  fill: $accentDark;
+}
+
+.audio-btn:active {
+  transform: translateY(1px);
+}
+
+.card-img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  margin-top: 22px;
+  border-radius: 12px;
+  border: 1px solid $line;
+  background: $panel;
+}
+
+.write-section {
+  display: block;
+  margin-top: 26px;
+}
+
+.write-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: $text;
+  margin-bottom: 10px;
+}
+
+.write-group {
+  margin-bottom: 12px;
+}
+
+.write-index {
+  font-size: 14px;
+  color: $accentDark;
+  font-weight: 700;
+}
+
+.write-input {
+  width: 100%;
+  min-height: 88px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid $line;
+  outline: none;
+  background: $panel;
+  color: $text;
+  font-family: 'Open Sans', 'Segoe UI', sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.write-input:focus {
+  border-color: $accent;
+  box-shadow: 0 0 0 3px $focusRing;
+}
+
+.diff-container {
+  text-align: left;
+  background: $panel;
+  border: 1px solid $line;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 10px;
+}
+
+.diff-row {
+  font-size: 18px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+}
+
+.diff-good {
+  color: $diffGood;
+  font-weight: 700;
+}
+
+.diff-bad {
+  color: $diffBad;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.small-note {
+  font-size: 14px;
+  color: $soft;
+  margin-top: 10px;
+}
+
+.user-raw-box {
+  font-size: 16px;
+  color: $text;
+  padding: 12px 14px;
+  border: 1px dashed $line;
+  border-radius: 10px;
+  background: $panel;
+}
+
+.answer-reference {
+  font-size: 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid $line;
+}
+
+.delayed-btn {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+@keyframes cardFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @media (max-width: 420px) {
-  .word-text { font-size: 28px; }
-  .meaning-text { font-size: 22px; }
-  .sentence-text { font-size: 16px; }
+  body {margin: 14px;}
+
+  .flashcard {padding: 0 18px 18px 18px;}
+
+  .row-main,
+  .row-sent {gap: 12px;}
+
+  .word-text {font-size: 28px;}
+
+  .reading-text,
+  .reading-sub {font-size: 18px;}
+
+  .meaning-text,
+  .meaning-prod {font-size: 22px;}
+
+  .sentence-text,
+  .example-sentence,
+  .sentence-trans-prod {font-size: 18px;}
 }
 """;
   }
 }
-
