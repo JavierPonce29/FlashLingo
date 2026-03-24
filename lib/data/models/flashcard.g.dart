@@ -72,49 +72,69 @@ const FlashcardSchema = CollectionSchema(
       name: r'learningStep',
       type: IsarType.long,
     ),
-    r'nextReview': PropertySchema(
+    r'lifetimeCorrectCount': PropertySchema(
       id: 11,
+      name: r'lifetimeCorrectCount',
+      type: IsarType.long,
+    ),
+    r'lifetimeReviewCount': PropertySchema(
+      id: 12,
+      name: r'lifetimeReviewCount',
+      type: IsarType.long,
+    ),
+    r'lifetimeWrongCount': PropertySchema(
+      id: 13,
+      name: r'lifetimeWrongCount',
+      type: IsarType.long,
+    ),
+    r'nextReview': PropertySchema(
+      id: 14,
       name: r'nextReview',
       type: IsarType.dateTime,
     ),
     r'originalId': PropertySchema(
-      id: 12,
+      id: 15,
       name: r'originalId',
       type: IsarType.string,
     ),
     r'packName': PropertySchema(
-      id: 13,
+      id: 16,
       name: r'packName',
       type: IsarType.string,
     ),
     r'question': PropertySchema(
-      id: 14,
+      id: 17,
       name: r'question',
       type: IsarType.string,
     ),
     r'repetitionCount': PropertySchema(
-      id: 15,
+      id: 18,
       name: r'repetitionCount',
       type: IsarType.long,
     ),
     r'sentence': PropertySchema(
-      id: 16,
+      id: 19,
       name: r'sentence',
       type: IsarType.string,
     ),
     r'sentenceAudioPath': PropertySchema(
-      id: 17,
+      id: 20,
       name: r'sentenceAudioPath',
       type: IsarType.string,
     ),
     r'state': PropertySchema(
-      id: 18,
+      id: 21,
       name: r'state',
       type: IsarType.string,
       enumMap: _FlashcardstateEnumValueMap,
     ),
+    r'totalStudyTimeMs': PropertySchema(
+      id: 22,
+      name: r'totalStudyTimeMs',
+      type: IsarType.long,
+    ),
     r'translation': PropertySchema(
-      id: 19,
+      id: 23,
       name: r'translation',
       type: IsarType.string,
     )
@@ -269,15 +289,19 @@ void _flashcardSerialize(
   writer.writeString(offsets[8], object.isoCode);
   writer.writeDateTime(offsets[9], object.lastReview);
   writer.writeLong(offsets[10], object.learningStep);
-  writer.writeDateTime(offsets[11], object.nextReview);
-  writer.writeString(offsets[12], object.originalId);
-  writer.writeString(offsets[13], object.packName);
-  writer.writeString(offsets[14], object.question);
-  writer.writeLong(offsets[15], object.repetitionCount);
-  writer.writeString(offsets[16], object.sentence);
-  writer.writeString(offsets[17], object.sentenceAudioPath);
-  writer.writeString(offsets[18], object.state.name);
-  writer.writeString(offsets[19], object.translation);
+  writer.writeLong(offsets[11], object.lifetimeCorrectCount);
+  writer.writeLong(offsets[12], object.lifetimeReviewCount);
+  writer.writeLong(offsets[13], object.lifetimeWrongCount);
+  writer.writeDateTime(offsets[14], object.nextReview);
+  writer.writeString(offsets[15], object.originalId);
+  writer.writeString(offsets[16], object.packName);
+  writer.writeString(offsets[17], object.question);
+  writer.writeLong(offsets[18], object.repetitionCount);
+  writer.writeString(offsets[19], object.sentence);
+  writer.writeString(offsets[20], object.sentenceAudioPath);
+  writer.writeString(offsets[21], object.state.name);
+  writer.writeLong(offsets[22], object.totalStudyTimeMs);
+  writer.writeString(offsets[23], object.translation);
 }
 
 Flashcard _flashcardDeserialize(
@@ -299,17 +323,21 @@ Flashcard _flashcardDeserialize(
   object.isoCode = reader.readString(offsets[8]);
   object.lastReview = reader.readDateTime(offsets[9]);
   object.learningStep = reader.readLong(offsets[10]);
-  object.nextReview = reader.readDateTime(offsets[11]);
-  object.originalId = reader.readString(offsets[12]);
-  object.packName = reader.readString(offsets[13]);
-  object.question = reader.readString(offsets[14]);
-  object.repetitionCount = reader.readLong(offsets[15]);
-  object.sentence = reader.readStringOrNull(offsets[16]);
-  object.sentenceAudioPath = reader.readStringOrNull(offsets[17]);
+  object.lifetimeCorrectCount = reader.readLong(offsets[11]);
+  object.lifetimeReviewCount = reader.readLong(offsets[12]);
+  object.lifetimeWrongCount = reader.readLong(offsets[13]);
+  object.nextReview = reader.readDateTime(offsets[14]);
+  object.originalId = reader.readString(offsets[15]);
+  object.packName = reader.readString(offsets[16]);
+  object.question = reader.readString(offsets[17]);
+  object.repetitionCount = reader.readLong(offsets[18]);
+  object.sentence = reader.readStringOrNull(offsets[19]);
+  object.sentenceAudioPath = reader.readStringOrNull(offsets[20]);
   object.state =
-      _FlashcardstateValueEnumMap[reader.readStringOrNull(offsets[18])] ??
+      _FlashcardstateValueEnumMap[reader.readStringOrNull(offsets[21])] ??
           CardState.newCard;
-  object.translation = reader.readStringOrNull(offsets[19]);
+  object.totalStudyTimeMs = reader.readLong(offsets[22]);
+  object.translation = reader.readStringOrNull(offsets[23]);
   return object;
 }
 
@@ -343,23 +371,31 @@ P _flashcardDeserializeProp<P>(
     case 10:
       return (reader.readLong(offset)) as P;
     case 11:
-      return (reader.readDateTime(offset)) as P;
-    case 12:
-      return (reader.readString(offset)) as P;
-    case 13:
-      return (reader.readString(offset)) as P;
-    case 14:
-      return (reader.readString(offset)) as P;
-    case 15:
       return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readLong(offset)) as P;
+    case 13:
+      return (reader.readLong(offset)) as P;
+    case 14:
+      return (reader.readDateTime(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
     case 16:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 17:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 18:
+      return (reader.readLong(offset)) as P;
+    case 19:
+      return (reader.readStringOrNull(offset)) as P;
+    case 20:
+      return (reader.readStringOrNull(offset)) as P;
+    case 21:
       return (_FlashcardstateValueEnumMap[reader.readStringOrNull(offset)] ??
           CardState.newCard) as P;
-    case 19:
+    case 22:
+      return (reader.readLong(offset)) as P;
+    case 23:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2028,6 +2064,174 @@ extension FlashcardQueryFilter
     });
   }
 
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeCorrectCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lifetimeCorrectCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeCorrectCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lifetimeCorrectCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeCorrectCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lifetimeCorrectCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeCorrectCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lifetimeCorrectCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeReviewCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lifetimeReviewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeReviewCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lifetimeReviewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeReviewCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lifetimeReviewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeReviewCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lifetimeReviewCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeWrongCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lifetimeWrongCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeWrongCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lifetimeWrongCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeWrongCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lifetimeWrongCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      lifetimeWrongCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lifetimeWrongCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition> nextReviewEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -2967,6 +3171,62 @@ extension FlashcardQueryFilter
   }
 
   QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      totalStudyTimeMsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'totalStudyTimeMs',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      totalStudyTimeMsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'totalStudyTimeMs',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      totalStudyTimeMsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'totalStudyTimeMs',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
+      totalStudyTimeMsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'totalStudyTimeMs',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterFilterCondition>
       translationIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -3247,6 +3507,46 @@ extension FlashcardQuerySortBy on QueryBuilder<Flashcard, Flashcard, QSortBy> {
     });
   }
 
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      sortByLifetimeCorrectCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeCorrectCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      sortByLifetimeCorrectCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeCorrectCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> sortByLifetimeReviewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeReviewCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      sortByLifetimeReviewCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeReviewCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> sortByLifetimeWrongCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeWrongCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      sortByLifetimeWrongCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeWrongCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Flashcard, Flashcard, QAfterSortBy> sortByNextReview() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nextReview', Sort.asc);
@@ -3341,6 +3641,19 @@ extension FlashcardQuerySortBy on QueryBuilder<Flashcard, Flashcard, QSortBy> {
   QueryBuilder<Flashcard, Flashcard, QAfterSortBy> sortByStateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'state', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> sortByTotalStudyTimeMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalStudyTimeMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      sortByTotalStudyTimeMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalStudyTimeMs', Sort.desc);
     });
   }
 
@@ -3492,6 +3805,46 @@ extension FlashcardQuerySortThenBy
     });
   }
 
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      thenByLifetimeCorrectCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeCorrectCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      thenByLifetimeCorrectCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeCorrectCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> thenByLifetimeReviewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeReviewCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      thenByLifetimeReviewCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeReviewCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> thenByLifetimeWrongCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeWrongCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      thenByLifetimeWrongCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lifetimeWrongCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Flashcard, Flashcard, QAfterSortBy> thenByNextReview() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nextReview', Sort.asc);
@@ -3589,6 +3942,19 @@ extension FlashcardQuerySortThenBy
     });
   }
 
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy> thenByTotalStudyTimeMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalStudyTimeMs', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QAfterSortBy>
+      thenByTotalStudyTimeMsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'totalStudyTimeMs', Sort.desc);
+    });
+  }
+
   QueryBuilder<Flashcard, Flashcard, QAfterSortBy> thenByTranslation() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'translation', Sort.asc);
@@ -3677,6 +4043,26 @@ extension FlashcardQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Flashcard, Flashcard, QDistinct>
+      distinctByLifetimeCorrectCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lifetimeCorrectCount');
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QDistinct>
+      distinctByLifetimeReviewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lifetimeReviewCount');
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QDistinct> distinctByLifetimeWrongCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lifetimeWrongCount');
+    });
+  }
+
   QueryBuilder<Flashcard, Flashcard, QDistinct> distinctByNextReview() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'nextReview');
@@ -3729,6 +4115,12 @@ extension FlashcardQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'state', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Flashcard, Flashcard, QDistinct> distinctByTotalStudyTimeMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'totalStudyTimeMs');
     });
   }
 
@@ -3815,6 +4207,25 @@ extension FlashcardQueryProperty
     });
   }
 
+  QueryBuilder<Flashcard, int, QQueryOperations>
+      lifetimeCorrectCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lifetimeCorrectCount');
+    });
+  }
+
+  QueryBuilder<Flashcard, int, QQueryOperations> lifetimeReviewCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lifetimeReviewCount');
+    });
+  }
+
+  QueryBuilder<Flashcard, int, QQueryOperations> lifetimeWrongCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lifetimeWrongCount');
+    });
+  }
+
   QueryBuilder<Flashcard, DateTime, QQueryOperations> nextReviewProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'nextReview');
@@ -3861,6 +4272,12 @@ extension FlashcardQueryProperty
   QueryBuilder<Flashcard, CardState, QQueryOperations> stateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'state');
+    });
+  }
+
+  QueryBuilder<Flashcard, int, QQueryOperations> totalStudyTimeMsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'totalStudyTimeMs');
     });
   }
 

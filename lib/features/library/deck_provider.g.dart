@@ -6,7 +6,7 @@ part of 'deck_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$decksStreamHash() => r'8b23ea1bedd44d3b6de9913fa6348d43e6e08b8a';
+String _$decksStreamHash() => r'4526c478412616b223c19923804bad0d975d8fe9';
 
 /// See also [decksStream].
 @ProviderFor(decksStream)
@@ -20,7 +20,7 @@ final decksStreamProvider = StreamProvider<List<DeckSummary>>.internal(
 );
 
 typedef DecksStreamRef = StreamProviderRef<List<DeckSummary>>;
-String _$deleteDeckHash() => r'3388e1f02063f9346f35b70eae0e395eed770590';
+String _$deleteDeckHash() => r'8b3b848550b2c36edc9df5fc09e0be9ab560e304';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -169,7 +169,7 @@ class _DeleteDeckProviderElement extends FutureProviderElement<void>
   String get packName => (origin as DeleteDeckProvider).packName;
 }
 
-String _$renameDeckHash() => r'87656b014d883703c5f235cec9dfe731d8205fdd';
+String _$renameDeckHash() => r'cc8b9623f9e75fa367e05725d6912ba300867422';
 
 /// See also [renameDeck].
 @ProviderFor(renameDeck)

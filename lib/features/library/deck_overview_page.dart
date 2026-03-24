@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
@@ -17,6 +18,7 @@ import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class DeckOverviewPage extends ConsumerWidget {
   final String packName;
+  static const Uuid _uuid = Uuid();
 
   const DeckOverviewPage({super.key, required this.packName});
 
@@ -135,6 +137,19 @@ class DeckOverviewPage extends ConsumerWidget {
         .findFirst();
 
     if (existingSession != null) {
+      if (existingSession.sessionId.isEmpty ||
+          existingSession.startedAt.millisecondsSinceEpoch == 0) {
+        existingSession.sessionId = existingSession.sessionId.isEmpty
+            ? _uuid.v4()
+            : existingSession.sessionId;
+        existingSession.startedAt =
+            existingSession.startedAt.millisecondsSinceEpoch == 0
+            ? now
+            : existingSession.startedAt;
+        await isar.writeTxn(() async {
+          await isar.studySessions.put(existingSession);
+        });
+      }
       if (_isSameDay(existingSession.sessionDay, currentLabel)) {
         final resumedCards = await _loadCardsFromSession(
           isar,
@@ -152,6 +167,8 @@ class DeckOverviewPage extends ConsumerWidget {
                   packName: packName,
                   cards: resumedCards,
                   initialIndex: savedIndex,
+                  sessionId: existingSession.sessionId,
+                  sessionStartedAt: existingSession.startedAt,
                 ),
               ),
             );
@@ -230,9 +247,11 @@ class DeckOverviewPage extends ConsumerWidget {
 
     final session = StudySession()
       ..packName = packName
+      ..sessionId = _uuid.v4()
       ..queueCardIds = sessionCards.map((c) => c.id).toList()
       ..currentIndex = 0
       ..sessionDay = currentLabel
+      ..startedAt = now
       ..lastUpdated = now;
     await isar.writeTxn(() async {
       await isar.studySessions.put(session);
@@ -241,8 +260,13 @@ class DeckOverviewPage extends ConsumerWidget {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            StudyPage(packName: packName, cards: sessionCards, initialIndex: 0),
+        builder: (_) => StudyPage(
+          packName: packName,
+          cards: sessionCards,
+          initialIndex: 0,
+          sessionId: session.sessionId,
+          sessionStartedAt: session.startedAt,
+        ),
       ),
     );
     if (!context.mounted) return;

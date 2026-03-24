@@ -4,16 +4,35 @@ import 'package:isar/isar.dart';
 
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/data/models/review_log.dart';
+import 'package:flashcards_app/features/library/review_history_sheet.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
+enum _FlashcardSortMode { original, hardest, overdue, nextReview, lastReview }
+
+class _BrowserData {
+  final List<Flashcard> cards;
+  final Map<String, List<ReviewLog>> logsByCardKey;
+
+  const _BrowserData({required this.cards, required this.logsByCardKey});
+}
+
 class FlashcardBrowserPage extends ConsumerStatefulWidget {
   final String packName;
+  final int? initialCardId;
+  final String initialQuery;
 
-  const FlashcardBrowserPage({super.key, required this.packName});
+  const FlashcardBrowserPage({
+    super.key,
+    required this.packName,
+    this.initialCardId,
+    this.initialQuery = '',
+  });
 
   @override
-  ConsumerState<FlashcardBrowserPage> createState() => _FlashcardBrowserPageState();
+  ConsumerState<FlashcardBrowserPage> createState() =>
+      _FlashcardBrowserPageState();
 }
 
 class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
@@ -21,6 +40,13 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   bool _showRecog = true;
   bool _showProd = true;
   CardState? _stateFilter;
+  _FlashcardSortMode _sortMode = _FlashcardSortMode.original;
+
+  @override
+  void initState() {
+    super.initState();
+    _query = widget.initialQuery;
+  }
 
   String _stateLabel(AppLocalizations l10n, CardState state) {
     switch (state) {
@@ -35,6 +61,92 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
     }
   }
 
+  String _sortLabel(AppLocalizations l10n, _FlashcardSortMode mode) {
+    switch (mode) {
+      case _FlashcardSortMode.original:
+        return l10n.tr('browser_sort_original');
+      case _FlashcardSortMode.hardest:
+        return l10n.tr('browser_sort_hardest');
+      case _FlashcardSortMode.overdue:
+        return l10n.tr('browser_sort_overdue');
+      case _FlashcardSortMode.nextReview:
+        return l10n.tr('browser_sort_next_review');
+      case _FlashcardSortMode.lastReview:
+        return l10n.tr('browser_sort_last_review');
+    }
+  }
+
+  int _difficultyScore(Flashcard card) {
+    final reviews = card.lifetimeReviewCount;
+    final accuracy = reviews == 0 ? 0.0 : card.lifetimeCorrectCount / reviews;
+    return (((1 - accuracy) * 50) +
+            (card.consecutiveLapses * 10) +
+            (card.decayRate * 100))
+        .round();
+  }
+
+  int _overdueDays(Flashcard card, DateTime now) {
+    if (!card.nextReview.isBefore(now)) return 0;
+    return now.difference(card.nextReview).inDays;
+  }
+
+  void _sortCards(List<Flashcard> cards) {
+    final now = DateTime.now();
+    switch (_sortMode) {
+      case _FlashcardSortMode.original:
+        cards.sort((a, b) => a.originalId.compareTo(b.originalId));
+        break;
+      case _FlashcardSortMode.hardest:
+        cards.sort(
+          (a, b) => _difficultyScore(b).compareTo(_difficultyScore(a)),
+        );
+        break;
+      case _FlashcardSortMode.overdue:
+        cards.sort(
+          (a, b) => _overdueDays(b, now).compareTo(_overdueDays(a, now)),
+        );
+        break;
+      case _FlashcardSortMode.nextReview:
+        cards.sort((a, b) => a.nextReview.compareTo(b.nextReview));
+        break;
+      case _FlashcardSortMode.lastReview:
+        cards.sort((a, b) => b.lastReview.compareTo(a.lastReview));
+        break;
+    }
+    final highlightedId = widget.initialCardId;
+    if (highlightedId == null) return;
+    final index = cards.indexWhere((card) => card.id == highlightedId);
+    if (index <= 0) return;
+    final highlighted = cards.removeAt(index);
+    cards.insert(0, highlighted);
+  }
+
+  Future<_BrowserData> _loadBrowserData(Isar isar) async {
+    final cardsFuture = isar.flashcards
+        .filter()
+        .packNameEqualTo(widget.packName)
+        .sortByOriginalId()
+        .findAll();
+    final logsFuture = isar.reviewLogs
+        .filter()
+        .packNameEqualTo(widget.packName)
+        .findAll();
+
+    final results = await Future.wait<dynamic>([cardsFuture, logsFuture]);
+    final cards = List<Flashcard>.from(results[0] as List<Flashcard>);
+    final logs = List<ReviewLog>.from(results[1] as List<ReviewLog>);
+    logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    final logsByCardKey = <String, List<ReviewLog>>{};
+    for (final log in logs) {
+      logsByCardKey
+          .putIfAbsent(log.cardOriginalId, () => <ReviewLog>[])
+          .add(log);
+    }
+
+    return _BrowserData(cards: cards, logsByCardKey: logsByCardKey);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -43,73 +155,106 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          l10n.tr('browser_title', params: <String, Object?>{'packName': widget.packName}),
+          l10n.tr(
+            'browser_title',
+            params: <String, Object?>{'packName': widget.packName},
+          ),
         ),
       ),
       body: isarAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Text(
-            l10n.tr('browser_db_error', params: <String, Object?>{'error': error}),
+            l10n.tr(
+              'browser_db_error',
+              params: <String, Object?>{'error': error},
+            ),
           ),
         ),
         data: (isar) {
-          final watchStream = isar.flashcards
+          final cardWatchStream = isar.flashcards
+              .filter()
+              .packNameEqualTo(widget.packName)
+              .watchLazy(fireImmediately: true);
+          final reviewWatchStream = isar.reviewLogs
               .filter()
               .packNameEqualTo(widget.packName)
               .watchLazy(fireImmediately: true);
 
           return StreamBuilder<void>(
-            stream: watchStream,
+            stream: cardWatchStream,
             builder: (context, _) {
-              return FutureBuilder<List<Flashcard>>(
-                future: isar.flashcards
-                    .filter()
-                    .packNameEqualTo(widget.packName)
-                    .sortByOriginalId()
-                    .findAll(),
-                builder: (context, snap) {
-                  if (!snap.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              return StreamBuilder<void>(
+                stream: reviewWatchStream,
+                builder: (context, _) {
+                  return FutureBuilder<_BrowserData>(
+                    future: _loadBrowserData(isar),
+                    builder: (context, snap) {
+                      if (!snap.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                  final all = snap.data!;
-                  final q = _query.trim().toLowerCase();
+                      final data = snap.data!;
+                      final all = data.cards;
+                      final q = _query.trim().toLowerCase();
 
-                  final filtered = all.where((card) {
-                    if (!_showRecog && card.cardType.endsWith('recog')) return false;
-                    if (!_showProd && card.cardType.endsWith('prod')) return false;
-                    if (_stateFilter != null && card.state != _stateFilter) return false;
+                      final filtered = all.where((card) {
+                        if (!_showRecog && card.cardType.endsWith('recog')) {
+                          return false;
+                        }
+                        if (!_showProd && card.cardType.endsWith('prod')) {
+                          return false;
+                        }
+                        if (_stateFilter != null &&
+                            card.state != _stateFilter) {
+                          return false;
+                        }
 
-                    if (q.isEmpty) return true;
-                    final question = card.question.toLowerCase();
-                    final answer = card.answer.toLowerCase();
-                    final sentence = (card.sentence ?? '').toLowerCase();
-                    final translation = (card.translation ?? '').toLowerCase();
-                    return question.contains(q) ||
-                        answer.contains(q) ||
-                        sentence.contains(q) ||
-                        translation.contains(q);
-                  }).toList();
+                        if (q.isEmpty) return true;
+                        final question = card.question.toLowerCase();
+                        final answer = card.answer.toLowerCase();
+                        final sentence = (card.sentence ?? '').toLowerCase();
+                        final translation = (card.translation ?? '')
+                            .toLowerCase();
+                        return question.contains(q) ||
+                            answer.contains(q) ||
+                            sentence.contains(q) ||
+                            translation.contains(q);
+                      }).toList();
+                      _sortCards(filtered);
 
-                  return Column(
-                    children: [
-                      _buildFilters(context),
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? Center(child: Text(l10n.tr('browser_no_results')))
-                            : ListView.builder(
-                                itemCount: filtered.length,
-                                itemBuilder: (context, index) {
-                                  final card = filtered[index];
-                                  return _FlashcardTile(
-                                    card: card,
-                                    stateLabel: _stateLabel(l10n, card.state),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
+                      return Column(
+                        children: [
+                          _buildFilters(context),
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? Center(
+                                    child: Text(l10n.tr('browser_no_results')),
+                                  )
+                                : ListView.builder(
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, index) {
+                                      final card = filtered[index];
+                                      final cardKey =
+                                          '${card.originalId}::${card.cardType}';
+                                      return _FlashcardTile(
+                                        card: card,
+                                        stateLabel: _stateLabel(
+                                          l10n,
+                                          card.state,
+                                        ),
+                                        highlighted:
+                                            widget.initialCardId == card.id,
+                                        reviewLogs:
+                                            data.logsByCardKey[cardKey] ??
+                                            const [],
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               );
@@ -181,6 +326,35 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                l10n.tr('browser_sort_label'),
+                style: TextStyle(color: AppUiColors.mutedText(context)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButton<_FlashcardSortMode>(
+                  value: _sortMode,
+                  isExpanded: true,
+                  underline: const SizedBox.shrink(),
+                  items: _FlashcardSortMode.values
+                      .map(
+                        (mode) => DropdownMenuItem<_FlashcardSortMode>(
+                          value: mode,
+                          child: Text(_sortLabel(l10n, mode)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _sortMode = value);
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -190,15 +364,52 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
 class _FlashcardTile extends StatefulWidget {
   final Flashcard card;
   final String stateLabel;
+  final bool highlighted;
+  final List<ReviewLog> reviewLogs;
 
-  const _FlashcardTile({required this.card, required this.stateLabel});
+  const _FlashcardTile({
+    required this.card,
+    required this.stateLabel,
+    required this.highlighted,
+    required this.reviewLogs,
+  });
 
   @override
   State<_FlashcardTile> createState() => _FlashcardTileState();
 }
 
 class _FlashcardTileState extends State<_FlashcardTile> {
-  bool _expanded = false;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.highlighted;
+  }
+
+  String _formatDuration(int totalMs) {
+    if (totalMs <= 0) return '0s';
+    final totalSeconds = Duration(milliseconds: totalMs).inSeconds;
+    if (totalSeconds < 60) return '${totalSeconds}s';
+    final totalMinutes = Duration(milliseconds: totalMs).inMinutes;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours <= 0) return '${minutes}m';
+    if (minutes == 0) return '${hours}h';
+    return '${hours}h ${minutes}m';
+  }
+
+  String _formatAccuracy(Flashcard card) {
+    if (card.lifetimeReviewCount == 0) return '0%';
+    final accuracy =
+        (card.lifetimeCorrectCount / card.lifetimeReviewCount) * 100;
+    return '${accuracy.round()}%';
+  }
+
+  String _formatDate(DateTime value) {
+    if (value.millisecondsSinceEpoch == 0) return '-';
+    return value.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -209,11 +420,17 @@ class _FlashcardTileState extends State<_FlashcardTile> {
     final type = card.cardType.endsWith('recog')
         ? l10n.tr('browser_filter_recog')
         : (card.cardType.endsWith('prod')
-            ? l10n.tr('browser_filter_prod')
-            : card.cardType);
+              ? l10n.tr('browser_filter_prod')
+              : card.cardType);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: widget.highlighted
+            ? BorderSide(color: AppUiColors.info(context), width: 1.5)
+            : BorderSide.none,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => setState(() => _expanded = !_expanded),
@@ -242,7 +459,10 @@ class _FlashcardTileState extends State<_FlashcardTile> {
               const SizedBox(height: 8),
               Text(
                 card.question,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               if (_expanded) ...[
                 const SizedBox(height: 10),
@@ -275,6 +495,66 @@ class _FlashcardTileState extends State<_FlashcardTile> {
                   ),
                   style: TextStyle(fontSize: 12, color: muted),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.tr(
+                    'browser_last_review',
+                    params: <String, Object?>{
+                      'value': _formatDate(card.lastReview),
+                    },
+                  ),
+                  style: TextStyle(fontSize: 12, color: muted),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _StatPill(
+                      label: l10n.tr('browser_lifetime_reviews'),
+                      value: '${card.lifetimeReviewCount}',
+                    ),
+                    _StatPill(
+                      label: l10n.tr('browser_correct_total'),
+                      value: '${card.lifetimeCorrectCount}',
+                    ),
+                    _StatPill(
+                      label: l10n.tr('browser_wrong_total'),
+                      value: '${card.lifetimeWrongCount}',
+                    ),
+                    _StatPill(
+                      label: l10n.tr('browser_accuracy'),
+                      value: _formatAccuracy(card),
+                    ),
+                    _StatPill(
+                      label: l10n.tr('browser_total_study_time'),
+                      value: _formatDuration(card.totalStudyTimeMs),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (widget.reviewLogs.isEmpty)
+                  Text(
+                    l10n.tr('browser_history_empty'),
+                    style: TextStyle(color: muted),
+                  )
+                else
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          showReviewHistorySheet(context, widget.reviewLogs),
+                      icon: const Icon(Icons.history),
+                      label: Text(
+                        l10n.tr(
+                          'browser_history_button',
+                          params: <String, Object?>{
+                            'count': widget.reviewLogs.length,
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
               ],
               Align(
                 alignment: Alignment.centerRight,
@@ -283,6 +563,29 @@ class _FlashcardTileState extends State<_FlashcardTile> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatPill({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w600),
       ),
     );
   }

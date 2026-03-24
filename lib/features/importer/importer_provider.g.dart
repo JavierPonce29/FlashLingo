@@ -24,11 +24,7 @@ typedef ImporterServiceRef = AutoDisposeProviderRef<ImporterService>;
 String _$importerControllerHash() =>
     r'f74f75c12fd6142919d59b0a16f1dafc066ee498';
 
-/// Controlador de importación para UI:
-/// - expone loading/error
-/// - permite preview + import (legacy wrapper) + import avanzado
-///
-/// Copied from [ImporterController].
+/// See also [ImporterController].
 @ProviderFor(ImporterController)
 final importerControllerProvider =
     AutoDisposeNotifierProvider<ImporterController, AsyncValue<void>>.internal(

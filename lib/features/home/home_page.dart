@@ -148,7 +148,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               separatorBuilder: (_, index) => const Divider(height: 2),
               itemBuilder: (context, index) {
                 final deck = decks[index];
-                final firstStepDue = deck.firstStepDue;
+                final learningDueToday = deck.learningDueToday;
                 final isGuidedDeck =
                     guidedDeckName != null && deck.name == guidedDeckName;
                 final highlightDeck =
@@ -199,12 +199,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          if (firstStepDue > 0)
+                          if (learningDueToday > 0)
                             Text(
                               l10n.tr(
-                                'home_step1',
+                                'home_learning_due',
                                 params: <String, Object?>{
-                                  'count': firstStepDue,
+                                  'count': learningDueToday,
                                 },
                               ),
                               style: TextStyle(
@@ -212,12 +212,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          if (deck.reviewCardsDue > 0)
+                          if (deck.reviewCardsDueToday > 0)
                             Text(
                               l10n.tr(
                                 'home_review',
                                 params: <String, Object?>{
-                                  'count': deck.reviewCardsDue,
+                                  'count': deck.reviewCardsDueToday,
                                 },
                               ),
                               style: TextStyle(
@@ -225,9 +225,36 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                          if (deck.overdueCards > 0)
+                            Text(
+                              l10n.tr(
+                                'home_overdue',
+                                params: <String, Object?>{
+                                  'count': deck.overdueCards,
+                                },
+                              ),
+                              style: TextStyle(
+                                color: danger,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (deck.reviewCount7d > 0)
+                            Text(
+                              l10n.tr(
+                                'home_accuracy_7d',
+                                params: <String, Object?>{
+                                  'percent': (deck.accuracy7d * 100).round(),
+                                },
+                              ),
+                              style: TextStyle(
+                                color: muted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           if (deck.newCardsDue == 0 &&
-                              firstStepDue == 0 &&
-                              deck.reviewCardsDue == 0)
+                              learningDueToday == 0 &&
+                              deck.reviewCardsDueToday == 0 &&
+                              deck.overdueCards == 0)
                             Text(
                               l10n.tr('home_all_caught_up'),
                               style: TextStyle(color: muted),

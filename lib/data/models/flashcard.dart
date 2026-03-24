@@ -35,7 +35,12 @@ class Flashcard {
   int consecutiveLapses = 0;
   // Estadísticas generales
   int repetitionCount = 0;
+  int lifetimeReviewCount = 0;
+  int lifetimeCorrectCount = 0;
+  int lifetimeWrongCount = 0;
+  int totalStudyTimeMs = 0;
   @Enumerated(EnumType.name)
   CardState state = CardState.newCard;
 }
+
 enum CardState { newCard, learning, review, relearning }

@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+import 'package:flashcards_app/data/local/deck_daily_stats_sync.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
@@ -20,11 +22,15 @@ class StudyPage extends ConsumerStatefulWidget {
   final String packName;
   final List<Flashcard> cards;
   final int initialIndex;
+  final String? sessionId;
+  final DateTime? sessionStartedAt;
   const StudyPage({
     super.key,
     required this.packName,
     required this.cards,
     this.initialIndex = 0,
+    this.sessionId,
+    this.sessionStartedAt,
   });
   @override
   ConsumerState<StudyPage> createState() => _StudyPageState();
@@ -47,6 +53,9 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   bool _sessionCleared = false;
   _UndoAction? _lastUndo;
   StreamSubscription<void>? _deckSettingsSubscription;
+  DateTime? _cardShownAt;
+  late final String _activeSessionId;
+  late final DateTime _sessionStartedAt;
   @override
   void initState() {
     super.initState();
@@ -54,6 +63,11 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     currentIndex = widget.initialIndex
         .clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1)
         .toInt();
+    _activeSessionId = widget.sessionId?.trim().isNotEmpty == true
+        ? widget.sessionId!.trim()
+        : '${widget.packName}-${DateTime.now().microsecondsSinceEpoch}';
+    _sessionStartedAt = widget.sessionStartedAt ?? DateTime.now();
+    _markCurrentCardShown();
     _startDeckSettingsWatcher();
     _refreshDeckSettingsFromDb(reloadHtml: true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,6 +84,17 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
   bool get _isFinished => currentIndex >= studyQueue.length;
   bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
+
+  void _markCurrentCardShown() {
+    _cardShownAt = _isFinished ? null : DateTime.now();
+  }
+
+  int _currentCardStudyDurationMs(DateTime now) {
+    final shownAt = _cardShownAt;
+    if (shownAt == null) return 0;
+    final elapsed = now.difference(shownAt).inMilliseconds;
+    return elapsed < 0 ? 0 : elapsed;
+  }
 
   void _startDeckSettingsWatcher() {
     final isar = Isar.getInstance();
@@ -566,6 +591,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     final isar = Isar.getInstance();
     if (settings == null || isar == null) return;
     final now = DateTime.now();
+    final studyDurationMs = _currentCardStudyDurationMs(now);
+    final studyDay = StudyDay.label(now, settings);
     final prevIndex = currentIndex;
     // Snapshot para Undo antes de mutar
     final undo = _UndoAction(
@@ -582,16 +609,41 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
     // Marcar lastReview
     card.lastReview = now;
+    card.lifetimeReviewCount++;
+    card.totalStudyTimeMs += studyDurationMs;
+    if (isCorrect) {
+      card.lifetimeCorrectCount++;
+    } else {
+      card.lifetimeWrongCount++;
+    }
 
-    int daysInterval = card.nextReview.difference(now).inDays;
+    int daysInterval = StudyDay.label(
+      card.nextReview,
+      settings,
+    ).difference(studyDay).inDays;
     if (daysInterval < 0) daysInterval = 0;
+    int daysLate = studyDay
+        .difference(StudyDay.label(undo.snapshot.nextReview, settings))
+        .inDays;
+    if (daysLate < 0) daysLate = 0;
 
     final reviewLog = ReviewLog()
       ..packName = card.packName
       ..timestamp = now
+      ..studyDay = studyDay
       ..cardOriginalId = '${card.originalId}::${card.cardType}'
+      ..flashcardId = card.id
+      ..sessionId = _activeSessionId
+      ..cardType = card.cardType
+      ..isCorrect = isCorrect
+      ..previousState = undo.snapshot.state.name
+      ..newState = card.state.name
+      ..previousNextReview = undo.snapshot.nextReview
+      ..newNextReview = card.nextReview
+      ..daysLate = daysLate
       ..rating = isCorrect ? 3 : 1
-      ..scheduledDays = daysInterval;
+      ..scheduledDays = daysInterval
+      ..studyDurationMs = studyDurationMs;
 
     int? logId;
     int? prevSeen;
@@ -626,6 +678,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     });
 
     undo.reviewLogId = logId;
+    undo.reviewStudyDay = studyDay;
 
     if (shouldCountNew && prevSeen != null) {
       undo.didIncrementNewCounter = true;
@@ -641,6 +694,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
     ref.read(guidedTourProvider.notifier).onStudyRatedCard();
 
+    await syncDeckDailyStatsForPackDay(isar, widget.packName, studyDay);
     await _nextCard();
     await _persistStudySession();
 
@@ -696,6 +750,14 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       }
     });
 
+    if (action.reviewStudyDay != null) {
+      await syncDeckDailyStatsForPackDay(
+        isar,
+        widget.packName,
+        action.reviewStudyDay!,
+      );
+    }
+
     setState(() {
       currentIndex = action.prevIndex
           .clamp(0, studyQueue.isEmpty ? 0 : studyQueue.length - 1)
@@ -705,6 +767,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       currentWriteScore = 0;
       _lastUndo = null; // solo 1 nivel
     });
+    _markCurrentCardShown();
 
     _recomputeCurrentCardState(reloadHtml: true);
     await _persistStudySession();
@@ -718,9 +781,13 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         isReadingShown = false;
         currentWriteScore = 0;
       });
+      _markCurrentCardShown();
       _recomputeCurrentCardState(reloadHtml: true);
     } else {
-      setState(() => currentIndex++);
+      setState(() {
+        currentIndex++;
+        _cardShownAt = null;
+      });
       ref.read(guidedTourProvider.notifier).onStudyQueueFinished();
       await _completeSessionIfNeeded();
     }
@@ -729,7 +796,63 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   Future<void> _completeSessionIfNeeded() async {
     if (_sessionCleared) return;
     _sessionCleared = true;
+    await _storeSessionHistoryIfNeeded();
     await _clearStudySession();
+  }
+
+  Future<void> _storeSessionHistoryIfNeeded() async {
+    final isar = Isar.getInstance();
+    if (isar == null || _activeSessionId.isEmpty) return;
+
+    final existing = await isar.studySessionHistorys
+        .filter()
+        .sessionIdEqualTo(_activeSessionId)
+        .findFirst();
+    if (existing != null) return;
+
+    final logs = await isar.reviewLogs
+        .filter()
+        .sessionIdEqualTo(_activeSessionId)
+        .sortByTimestamp()
+        .findAll();
+    if (logs.isEmpty) return;
+
+    final answerCount = logs.length;
+    final correctCount = logs
+        .where((log) => log.isCorrect || log.rating >= 3)
+        .length;
+    final totalStudyTimeMs = logs.fold<int>(
+      0,
+      (sum, log) => sum + log.studyDurationMs,
+    );
+    final uniqueCards = <String>{};
+    for (final log in logs) {
+      uniqueCards.add(log.cardOriginalId);
+    }
+
+    final history = StudySessionHistory()
+      ..sessionId = _activeSessionId
+      ..packName = widget.packName
+      ..sessionDay = logs.last.studyDay
+      ..startedAt = _sessionStartedAt
+      ..endedAt = logs.last.timestamp
+      ..answerCount = answerCount
+      ..correctCount = correctCount
+      ..wrongCount = answerCount - correctCount
+      ..uniqueCardCount = uniqueCards.length
+      ..totalStudyTimeMs = totalStudyTimeMs
+      ..averageAnswerTimeMs = answerCount == 0
+          ? 0
+          : (totalStudyTimeMs / answerCount).round();
+
+    await isar.writeTxn(() async {
+      await isar.studySessionHistorys.put(history);
+    });
+    await syncDeckDailyStatsForPackDay(
+      isar,
+      widget.packName,
+      history.sessionDay,
+    );
   }
 
   Future<void> _persistStudySession() async {
@@ -752,9 +875,11 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       session ??= StudySession()..packName = widget.packName;
       session
         ..packName = widget.packName
+        ..sessionId = _activeSessionId
         ..queueCardIds = studyQueue.map((c) => c.id).toList()
         ..currentIndex = currentIndex
         ..sessionDay = day
+        ..startedAt = _sessionStartedAt
         ..lastUpdated = now;
       await isar.studySessions.put(session);
     });
@@ -781,6 +906,10 @@ class _FlashcardSnapshot {
   final int learningStep;
   final int consecutiveLapses;
   final int repetitionCount;
+  final int lifetimeReviewCount;
+  final int lifetimeCorrectCount;
+  final int lifetimeWrongCount;
+  final int totalStudyTimeMs;
   final CardState state;
 
   _FlashcardSnapshot({
@@ -791,6 +920,10 @@ class _FlashcardSnapshot {
     required this.learningStep,
     required this.consecutiveLapses,
     required this.repetitionCount,
+    required this.lifetimeReviewCount,
+    required this.lifetimeCorrectCount,
+    required this.lifetimeWrongCount,
+    required this.totalStudyTimeMs,
     required this.state,
   });
 
@@ -803,6 +936,10 @@ class _FlashcardSnapshot {
       learningStep: c.learningStep,
       consecutiveLapses: c.consecutiveLapses,
       repetitionCount: c.repetitionCount,
+      lifetimeReviewCount: c.lifetimeReviewCount,
+      lifetimeCorrectCount: c.lifetimeCorrectCount,
+      lifetimeWrongCount: c.lifetimeWrongCount,
+      totalStudyTimeMs: c.totalStudyTimeMs,
       state: c.state,
     );
   }
@@ -815,6 +952,10 @@ class _FlashcardSnapshot {
     c.learningStep = learningStep;
     c.consecutiveLapses = consecutiveLapses;
     c.repetitionCount = repetitionCount;
+    c.lifetimeReviewCount = lifetimeReviewCount;
+    c.lifetimeCorrectCount = lifetimeCorrectCount;
+    c.lifetimeWrongCount = lifetimeWrongCount;
+    c.totalStudyTimeMs = totalStudyTimeMs;
     c.state = state;
   }
 }
@@ -830,6 +971,7 @@ class _UndoAction {
   int? deckSettingsId;
   late int prevNewCardsSeenToday;
   DateTime? prevLastNewCardStudyDate;
+  DateTime? reviewStudyDay;
 
   _UndoAction({
     required this.prevIndex,

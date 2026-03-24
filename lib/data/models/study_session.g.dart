@@ -41,6 +41,16 @@ const StudySessionSchema = CollectionSchema(
       id: 4,
       name: r'sessionDay',
       type: IsarType.dateTime,
+    ),
+    r'sessionId': PropertySchema(
+      id: 5,
+      name: r'sessionId',
+      type: IsarType.string,
+    ),
+    r'startedAt': PropertySchema(
+      id: 6,
+      name: r'startedAt',
+      type: IsarType.dateTime,
     )
   },
   estimateSize: _studySessionEstimateSize,
@@ -57,6 +67,19 @@ const StudySessionSchema = CollectionSchema(
       properties: [
         IndexPropertySchema(
           name: r'packName',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'sessionId': IndexSchema(
+      id: 6949518585047923839,
+      name: r'sessionId',
+      unique: true,
+      replace: true,
+      properties: [
+        IndexPropertySchema(
+          name: r'sessionId',
           type: IndexType.hash,
           caseSensitive: true,
         )
@@ -92,6 +115,7 @@ int _studySessionEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.packName.length * 3;
   bytesCount += 3 + object.queueCardIds.length * 8;
+  bytesCount += 3 + object.sessionId.length * 3;
   return bytesCount;
 }
 
@@ -106,6 +130,8 @@ void _studySessionSerialize(
   writer.writeString(offsets[2], object.packName);
   writer.writeLongList(offsets[3], object.queueCardIds);
   writer.writeDateTime(offsets[4], object.sessionDay);
+  writer.writeString(offsets[5], object.sessionId);
+  writer.writeDateTime(offsets[6], object.startedAt);
 }
 
 StudySession _studySessionDeserialize(
@@ -121,6 +147,8 @@ StudySession _studySessionDeserialize(
   object.packName = reader.readString(offsets[2]);
   object.queueCardIds = reader.readLongList(offsets[3]) ?? [];
   object.sessionDay = reader.readDateTime(offsets[4]);
+  object.sessionId = reader.readString(offsets[5]);
+  object.startedAt = reader.readDateTime(offsets[6]);
   return object;
 }
 
@@ -140,6 +168,10 @@ P _studySessionDeserializeProp<P>(
     case 3:
       return (reader.readLongList(offset) ?? []) as P;
     case 4:
+      return (reader.readDateTime(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -211,6 +243,59 @@ extension StudySessionByIndex on IsarCollection<StudySession> {
   List<Id> putAllByPackNameSync(List<StudySession> objects,
       {bool saveLinks = true}) {
     return putAllByIndexSync(r'packName', objects, saveLinks: saveLinks);
+  }
+
+  Future<StudySession?> getBySessionId(String sessionId) {
+    return getByIndex(r'sessionId', [sessionId]);
+  }
+
+  StudySession? getBySessionIdSync(String sessionId) {
+    return getByIndexSync(r'sessionId', [sessionId]);
+  }
+
+  Future<bool> deleteBySessionId(String sessionId) {
+    return deleteByIndex(r'sessionId', [sessionId]);
+  }
+
+  bool deleteBySessionIdSync(String sessionId) {
+    return deleteByIndexSync(r'sessionId', [sessionId]);
+  }
+
+  Future<List<StudySession?>> getAllBySessionId(List<String> sessionIdValues) {
+    final values = sessionIdValues.map((e) => [e]).toList();
+    return getAllByIndex(r'sessionId', values);
+  }
+
+  List<StudySession?> getAllBySessionIdSync(List<String> sessionIdValues) {
+    final values = sessionIdValues.map((e) => [e]).toList();
+    return getAllByIndexSync(r'sessionId', values);
+  }
+
+  Future<int> deleteAllBySessionId(List<String> sessionIdValues) {
+    final values = sessionIdValues.map((e) => [e]).toList();
+    return deleteAllByIndex(r'sessionId', values);
+  }
+
+  int deleteAllBySessionIdSync(List<String> sessionIdValues) {
+    final values = sessionIdValues.map((e) => [e]).toList();
+    return deleteAllByIndexSync(r'sessionId', values);
+  }
+
+  Future<Id> putBySessionId(StudySession object) {
+    return putByIndex(r'sessionId', object);
+  }
+
+  Id putBySessionIdSync(StudySession object, {bool saveLinks = true}) {
+    return putByIndexSync(r'sessionId', object, saveLinks: saveLinks);
+  }
+
+  Future<List<Id>> putAllBySessionId(List<StudySession> objects) {
+    return putAllByIndex(r'sessionId', objects);
+  }
+
+  List<Id> putAllBySessionIdSync(List<StudySession> objects,
+      {bool saveLinks = true}) {
+    return putAllByIndexSync(r'sessionId', objects, saveLinks: saveLinks);
   }
 }
 
@@ -339,6 +424,51 @@ extension StudySessionQueryWhere
               indexName: r'packName',
               lower: [],
               upper: [packName],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterWhereClause> sessionIdEqualTo(
+      String sessionId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'sessionId',
+        value: [sessionId],
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterWhereClause>
+      sessionIdNotEqualTo(String sessionId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sessionId',
+              lower: [],
+              upper: [sessionId],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sessionId',
+              lower: [sessionId],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sessionId',
+              lower: [sessionId],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sessionId',
+              lower: [],
+              upper: [sessionId],
               includeUpper: false,
             ));
       }
@@ -941,6 +1071,198 @@ extension StudySessionQueryFilter
       ));
     });
   }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sessionId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sessionId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sessionId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sessionId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      sessionIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sessionId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      startedAtEqualTo(DateTime value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'startedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      startedAtGreaterThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'startedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      startedAtLessThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'startedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterFilterCondition>
+      startedAtBetween(
+    DateTime lower,
+    DateTime upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'startedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension StudySessionQueryObject
@@ -999,6 +1321,30 @@ extension StudySessionQuerySortBy
       sortBySessionDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sessionDay', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> sortBySessionId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sessionId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> sortBySessionIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sessionId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> sortByStartedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'startedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> sortByStartedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'startedAt', Sort.desc);
     });
   }
 }
@@ -1067,6 +1413,30 @@ extension StudySessionQuerySortThenBy
       return query.addSortBy(r'sessionDay', Sort.desc);
     });
   }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> thenBySessionId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sessionId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> thenBySessionIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sessionId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> thenByStartedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'startedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QAfterSortBy> thenByStartedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'startedAt', Sort.desc);
+    });
+  }
 }
 
 extension StudySessionQueryWhereDistinct
@@ -1099,6 +1469,19 @@ extension StudySessionQueryWhereDistinct
   QueryBuilder<StudySession, StudySession, QDistinct> distinctBySessionDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'sessionDay');
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QDistinct> distinctBySessionId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sessionId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<StudySession, StudySession, QDistinct> distinctByStartedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'startedAt');
     });
   }
 }
@@ -1139,6 +1522,18 @@ extension StudySessionQueryProperty
   QueryBuilder<StudySession, DateTime, QQueryOperations> sessionDayProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'sessionDay');
+    });
+  }
+
+  QueryBuilder<StudySession, String, QQueryOperations> sessionIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sessionId');
+    });
+  }
+
+  QueryBuilder<StudySession, DateTime, QQueryOperations> startedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'startedAt');
     });
   }
 }
