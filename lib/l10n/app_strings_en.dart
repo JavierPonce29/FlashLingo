@@ -402,6 +402,8 @@ const Map<String, String> appStringsEn = <String, String>{
   'stats_compare': '7d vs 30d',
   'stats_export_csv': 'Export CSV',
   'stats_export_success': '{count} CSV files exported to: {path}',
+  'stats_export_pdf': 'Export PDF',
+  'stats_export_pdf_success': 'PDF exported to: {path}',
   'stats_heatmap_answers': 'Answers',
   'stats_heatmap_unique': 'Unique cards',
   'stats_heatmap_lifetime': 'Lifetime heatmap grouped month by month.',

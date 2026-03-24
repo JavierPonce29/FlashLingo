@@ -15,6 +15,7 @@ import 'package:flashcards_app/features/library/review_history_sheet.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/stats/stats_analysis.dart';
+import 'package:flashcards_app/features/stats/stats_pdf_chart_export.dart';
 import 'package:flashcards_app/features/stats/stats_export_service.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
@@ -33,7 +34,8 @@ class StatsPage extends ConsumerStatefulWidget {
 
 class _StatsPageState extends ConsumerState<StatsPage> {
   _HeatmapMode _heatmapMode = _HeatmapMode.answers;
-  bool _isExporting = false;
+  bool _isExportingCsv = false;
+  bool _isExportingPdf = false;
   StatsRangeOption _forecastRange = StatsRangeOption.days18;
   StatsRangeOption _studyTimeRange = StatsRangeOption.days7;
   IntervalRangeOption _intervalRange = IntervalRangeOption.month1;
@@ -70,11 +72,27 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         actions: [
           statsAsync.maybeWhen(
             data: (stats) => IconButton(
+              tooltip: l10n.tr('stats_export_pdf'),
+              onPressed: _isExportingCsv || _isExportingPdf
+                  ? null
+                  : () => _exportPdf(context, stats),
+              icon: _isExportingPdf
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+          statsAsync.maybeWhen(
+            data: (stats) => IconButton(
               tooltip: l10n.tr('stats_export_csv'),
-              onPressed: _isExporting
+              onPressed: _isExportingCsv || _isExportingPdf
                   ? null
                   : () => _exportStats(context, stats),
-              icon: _isExporting
+              icon: _isExportingCsv
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -152,8 +170,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   }
 
   Future<void> _exportStats(BuildContext context, DeckStatsData stats) async {
-    if (_isExporting) return;
-    setState(() => _isExporting = true);
+    if (_isExportingCsv || _isExportingPdf) return;
+    setState(() => _isExportingCsv = true);
     try {
       final isar = await ref.read(isarDbProvider.future);
       final result = await exportDeckStatsCsv(isar, widget.packName, stats);
@@ -185,7 +203,68 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isExporting = false);
+        setState(() => _isExportingCsv = false);
+      }
+    }
+  }
+
+  Future<void> _exportPdf(BuildContext context, DeckStatsData stats) async {
+    if (_isExportingCsv || _isExportingPdf) return;
+    setState(() => _isExportingPdf = true);
+    try {
+      final l10n = context.l10n;
+      final charts = await buildDeckStatsPdfCharts(
+        context,
+        stats: stats,
+        selection: DeckStatsPdfChartSelection(
+          heatmapModeLabel: _heatmapMode == _HeatmapMode.answers
+              ? l10n.tr('stats_heatmap_answers')
+              : l10n.tr('stats_heatmap_unique'),
+          forecastRangeLabel: _statsRangeLabel(l10n, _forecastRange),
+          studyTimeRangeLabel: _statsRangeLabel(l10n, _studyTimeRange),
+          intervalRangeLabel: _intervalRangeLabel(l10n, _intervalRange),
+          hourlyRangeLabel: _statsRangeLabel(l10n, _hourlyRange),
+          hourlySlotLabel: _hourlySlotLabel(l10n, _hourlySlot),
+          predictionRangeLabel: _statsRangeLabel(l10n, _predictionRange),
+        ),
+        heatmapSlices: _heatmapSlices(stats),
+        forecastPoints: _forecastPoints(stats),
+        studyTimePoints: _studyTimePoints(stats),
+        intervalPoints: _intervalPoints(stats),
+        hourlyPoints: _hourlyPoints(stats),
+        predictionPoints: _predictionPoints(stats),
+      );
+      final file = await exportDeckStatsPdf(
+        widget.packName,
+        stats,
+        charts: charts,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.tr(
+              'stats_export_pdf_success',
+              params: <String, Object?>{'path': file.path},
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.l10n.tr(
+              'common_error_with_detail',
+              params: <String, Object?>{'error': error},
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingPdf = false);
       }
     }
   }

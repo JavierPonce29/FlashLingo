@@ -1,9 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
@@ -15,6 +18,20 @@ class DeckStatsExportResult {
   final List<File> files;
 
   const DeckStatsExportResult({required this.directory, required this.files});
+}
+
+class DeckStatsPdfChart {
+  final String title;
+  final String? subtitle;
+  final pw.Widget child;
+  final bool landscape;
+
+  const DeckStatsPdfChart({
+    required this.title,
+    this.subtitle,
+    required this.child,
+    this.landscape = false,
+  });
 }
 
 Future<DeckStatsExportResult> exportDeckStatsCsv(
@@ -50,18 +67,264 @@ Future<DeckStatsExportResult> exportDeckStatsCsv(
   return DeckStatsExportResult(directory: exportDir, files: files);
 }
 
-Future<Directory> _createExportDirectory(String packName) async {
-  final baseDir = await _resolveExportBaseDirectory();
-  final sanitized = packName.replaceAll(RegExp(r'[^\w\-]+'), '_');
-  final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-  final directory = Directory(
-    p.join(baseDir.path, 'FlashLingo', '${sanitized}_$timestamp'),
-  );
-  await directory.create(recursive: true);
-  return directory;
+Future<File> exportDeckStatsPdf(
+  String packName,
+  DeckStatsData stats, {
+  List<DeckStatsPdfChart> charts = const <DeckStatsPdfChart>[],
+}) async {
+  final exportDir = await _createExportDirectory(packName);
+  final file = File(p.join(exportDir.path, 'stats_report.pdf'));
+  final bytes = await buildDeckStatsPdfBytes(packName, stats, charts: charts);
+  await file.writeAsBytes(bytes, flush: true);
+  return file;
 }
 
-Future<Directory> _resolveExportBaseDirectory() async {
+Future<List<int>> buildDeckStatsPdfBytes(
+  String packName,
+  DeckStatsData stats, {
+  List<DeckStatsPdfChart> charts = const <DeckStatsPdfChart>[],
+}) async {
+  final pdfTheme = await _loadPdfTheme();
+  final document = pw.Document(
+    title: 'FlashLingo stats report - $packName',
+    author: 'FlashLingo',
+  );
+
+  final recentDailyStats = _takeLast(stats.dailyStatsRows, 30);
+
+  document.addPage(
+    pw.MultiPage(
+      pageTheme: pw.PageTheme(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        theme: pdfTheme,
+      ),
+      build: (context) => <pw.Widget>[
+        _pdfHeader(packName),
+        pw.SizedBox(height: 14),
+        _pdfMetricGrid(<_PdfMetric>[
+          _PdfMetric('Total cards', '${stats.totalCards}'),
+          _PdfMetric('New today', '${stats.newAvailableToday}'),
+          _PdfMetric('Learning now', '${stats.learningDueNow}'),
+          _PdfMetric('Review now', '${stats.reviewDueNow}'),
+          _PdfMetric('Overdue', '${stats.overdueCards}'),
+          _PdfMetric('Lifetime reviews', '${stats.lifetimeReviewCount}'),
+          _PdfMetric('Lifetime accuracy', _pdfPercent(stats.lifetimeAccuracy)),
+          _PdfMetric('Accuracy 7d', _pdfPercent(stats.accuracy7d)),
+          _PdfMetric('Accuracy 30d', _pdfPercent(stats.accuracy30d)),
+          _PdfMetric(
+            'Avg answer time',
+            _pdfDuration(stats.averageAnswerTimeMs),
+          ),
+          _PdfMetric('Study time total', _pdfDuration(stats.totalStudyTimeMs)),
+          _PdfMetric('Study time 7d', _pdfDuration(stats.studyTime7dMs)),
+        ]),
+        pw.SizedBox(height: 18),
+        _pdfSectionTitle('Deck state'),
+        _pdfSimpleTable(
+          headers: const <String>['Metric', 'Value'],
+          rows: <List<String>>[
+            <String>['New cards', '${stats.newCards}'],
+            <String>['Learning cards', '${stats.learningCards}'],
+            <String>['Review cards', '${stats.reviewCards}'],
+            <String>['Relearning cards', '${stats.relearningCards}'],
+            <String>['Sessions 7d', '${stats.sessionCount7d}'],
+            <String>['Sessions 30d', '${stats.sessionCount30d}'],
+            <String>['Active days 7d', '${stats.activeDays7d}/7'],
+            <String>['Active days 30d', '${stats.activeDays30d}/30'],
+          ],
+        ),
+        pw.SizedBox(height: 18),
+        _pdfSectionTitle('Problem cards'),
+        _pdfSimpleTable(
+          headers: const <String>[
+            'Question',
+            'State',
+            'Accuracy',
+            'Fail',
+            'Overdue',
+            'Avg time',
+          ],
+          rows: stats.problemCards
+              .map(
+                (card) => <String>[
+                  _pdfClip(card.question, 42),
+                  card.state.name,
+                  _pdfPercent(card.accuracy),
+                  '${card.lifetimeWrongCount}',
+                  '${card.overdueDays}d',
+                  _pdfDuration(card.averageStudyTimeMs),
+                ],
+              )
+              .toList(),
+          emptyLabel: 'No problem cards',
+        ),
+        pw.SizedBox(height: 18),
+        _pdfSectionTitle('Hardest cards'),
+        _pdfSimpleTable(
+          headers: const <String>[
+            'Question',
+            'Accuracy',
+            'Fail',
+            'Reviews',
+            'Study time',
+          ],
+          rows: stats.hardestCards
+              .map(
+                (card) => <String>[
+                  _pdfClip(card.question, 48),
+                  _pdfPercent(card.accuracy),
+                  '${card.lifetimeWrongCount}',
+                  '${card.lifetimeReviewCount}',
+                  _pdfDuration(card.totalStudyTimeMs),
+                ],
+              )
+              .toList(),
+          emptyLabel: 'No card history',
+        ),
+        pw.SizedBox(height: 18),
+        _pdfSectionTitle('Recent sessions'),
+        _pdfSimpleTable(
+          headers: const <String>[
+            'Ended at',
+            'Answers',
+            'Accuracy',
+            'Duration',
+            'Avg answer',
+          ],
+          rows: stats.recentSessions
+              .map(
+                (session) => <String>[
+                  _dateTime(session.endedAt),
+                  '${session.answerCount}',
+                  _pdfPercent(session.accuracy),
+                  _pdfDuration(session.totalStudyTimeMs),
+                  _pdfDuration(session.averageAnswerTimeMs),
+                ],
+              )
+              .toList(),
+          emptyLabel: 'No completed sessions',
+        ),
+        pw.SizedBox(height: 18),
+        _pdfSectionTitle('Daily stats (last 30 study days)'),
+        _pdfSimpleTable(
+          headers: const <String>[
+            'Day',
+            'Reviews',
+            'Accuracy',
+            'Unique',
+            'Sessions',
+            'Time',
+          ],
+          rows: recentDailyStats
+              .map(
+                (day) => <String>[
+                  _studyDay(day.studyDay),
+                  '${day.reviewCount}',
+                  day.reviewCount == 0
+                      ? '0%'
+                      : _pdfPercent(day.correctCount / day.reviewCount),
+                  '${day.uniqueCardCount}',
+                  '${day.sessionCount}',
+                  _pdfDuration(day.totalStudyTimeMs),
+                ],
+              )
+              .toList(),
+          emptyLabel: 'No daily stats yet',
+        ),
+      ],
+    ),
+  );
+
+  for (final chart in charts) {
+    document.addPage(
+      pw.Page(
+        pageTheme: pw.PageTheme(
+          pageFormat: chart.landscape
+              ? PdfPageFormat.a4.landscape
+              : PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          theme: pdfTheme,
+        ),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: <pw.Widget>[
+              pw.Text(
+                chart.title,
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blueGrey900,
+                ),
+              ),
+              if (chart.subtitle != null && chart.subtitle!.isNotEmpty) ...[
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  chart.subtitle!,
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColors.blueGrey700,
+                  ),
+                ),
+              ],
+              pw.SizedBox(height: 12),
+              pw.Expanded(child: chart.child),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  return document.save();
+}
+
+Future<Directory> _createExportDirectory(String packName) async {
+  final sanitized = packName.replaceAll(RegExp(r'[^\w\-]+'), '_');
+  final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+  final folderName = '${sanitized}_$timestamp';
+  final candidates = await _resolveExportBaseDirectories();
+
+  final attempted = <String>[];
+  Object? lastError;
+  for (final baseDir in candidates) {
+    attempted.add(baseDir.path);
+    try {
+      final directory = Directory(
+        p.join(baseDir.path, 'FlashLingo', folderName),
+      );
+      await directory.create(recursive: true);
+
+      // Validate that the chosen location is actually writable.
+      final probe = File(p.join(directory.path, '.flashlingo_write_test'));
+      await probe.writeAsString('ok', flush: true);
+      if (await probe.exists()) {
+        await probe.delete();
+      }
+      return directory;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw FileSystemException(
+    'No writable export directory found. Tried: ${attempted.join(', ')}'
+    '${lastError == null ? '' : '. Last error: $lastError'}',
+  );
+}
+
+Future<List<Directory>> _resolveExportBaseDirectories() async {
+  final candidates = <Directory>[];
+
+  void addCandidate(Directory? dir) {
+    if (dir == null) return;
+    final alreadyAdded = candidates.any((item) => item.path == dir.path);
+    if (!alreadyAdded) {
+      candidates.add(dir);
+    }
+  }
+
   if (Platform.isAndroid) {
     final external = await getExternalStorageDirectory();
     if (external != null) {
@@ -70,32 +333,44 @@ Future<Directory> _resolveExportBaseDirectory() async {
           '${Platform.pathSeparator}Android${Platform.pathSeparator}data${Platform.pathSeparator}';
       final index = path.indexOf(marker);
       if (index > 0) {
-        final sharedRoot = Directory(path.substring(0, index));
-        try {
-          if (await sharedRoot.exists()) {
-            return sharedRoot;
-          }
-        } catch (_) {}
+        addCandidate(Directory(path.substring(0, index)));
       }
     }
+
     for (final candidatePath in const <String>[
       '/storage/emulated/0',
       '/sdcard',
     ]) {
-      final candidate = Directory(candidatePath);
-      try {
-        if (await candidate.exists()) {
-          return candidate;
-        }
-      } catch (_) {}
+      addCandidate(Directory(candidatePath));
+      addCandidate(Directory(p.join(candidatePath, 'Download')));
+      addCandidate(Directory(p.join(candidatePath, 'Documents')));
     }
+
+    final externalDownloads = await getExternalStorageDirectories(
+      type: StorageDirectory.downloads,
+    );
+    if (externalDownloads != null) {
+      for (final dir in externalDownloads) {
+        addCandidate(dir);
+      }
+    }
+
+    final externalDocuments = await getExternalStorageDirectories(
+      type: StorageDirectory.documents,
+    );
+    if (externalDocuments != null) {
+      for (final dir in externalDocuments) {
+        addCandidate(dir);
+      }
+    }
+
+    addCandidate(external);
   }
 
   final downloads = await getDownloadsDirectory();
-  if (downloads != null) {
-    return downloads;
-  }
-  return getApplicationDocumentsDirectory();
+  addCandidate(downloads);
+  addCandidate(await getApplicationDocumentsDirectory());
+  return candidates;
 }
 
 Future<File> _writeSummaryCsv(
@@ -357,4 +632,175 @@ String _dateTime(DateTime value) {
 String _studyDay(DateTime value) {
   if (value.millisecondsSinceEpoch == 0) return '';
   return DateFormat('yyyy-MM-dd').format(value);
+}
+
+Future<pw.ThemeData> _loadPdfTheme() async {
+  try {
+    final unicode = await rootBundle.load(
+      'lib/assets/fonts/ArialUnicodeMS.ttf',
+    );
+    final unicodeFont = pw.Font.ttf(unicode);
+    return pw.ThemeData.withFont(base: unicodeFont, bold: unicodeFont);
+  } catch (_) {
+    final regular = await rootBundle.load('lib/assets/fonts/DejaVuSans.ttf');
+    final bold = await rootBundle.load('lib/assets/fonts/DejaVuSans-Bold.ttf');
+    return pw.ThemeData.withFont(
+      base: pw.Font.ttf(regular),
+      bold: pw.Font.ttf(bold),
+    );
+  }
+}
+
+class _PdfMetric {
+  final String label;
+  final String value;
+
+  const _PdfMetric(this.label, this.value);
+}
+
+List<T> _takeLast<T>(List<T> values, int count) {
+  if (values.length <= count) {
+    return List<T>.from(values);
+  }
+  return values.sublist(values.length - count);
+}
+
+pw.Widget _pdfHeader(String packName) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: <pw.Widget>[
+      pw.Text(
+        'FlashLingo stats report',
+        style: pw.TextStyle(
+          fontSize: 22,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.blueGrey900,
+        ),
+      ),
+      pw.SizedBox(height: 4),
+      pw.Text(
+        packName,
+        style: pw.TextStyle(fontSize: 15, color: PdfColors.blueGrey700),
+      ),
+      pw.SizedBox(height: 2),
+      pw.Text(
+        'Exported: ${_dateTime(DateTime.now())}',
+        style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+      ),
+    ],
+  );
+}
+
+pw.Widget _pdfSectionTitle(String title) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 8),
+    child: pw.Text(
+      title,
+      style: pw.TextStyle(
+        fontSize: 14,
+        fontWeight: pw.FontWeight.bold,
+        color: PdfColors.blueGrey900,
+      ),
+    ),
+  );
+}
+
+pw.Widget _pdfMetricGrid(List<_PdfMetric> metrics) {
+  return pw.Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: metrics
+        .map(
+          (metric) => pw.Container(
+            width: 162,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blueGrey50,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+              border: pw.Border.all(color: PdfColors.blueGrey100),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: <pw.Widget>[
+                pw.Text(
+                  metric.value,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blueGrey900,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  metric.label,
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.blueGrey700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )
+        .toList(),
+  );
+}
+
+pw.Widget _pdfSimpleTable({
+  required List<String> headers,
+  required List<List<String>> rows,
+  String emptyLabel = 'No data',
+}) {
+  if (rows.isEmpty) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey100,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Text(
+        emptyLabel,
+        style: pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+      ),
+    );
+  }
+
+  return pw.TableHelper.fromTextArray(
+    headers: headers,
+    data: rows,
+    headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
+    headerStyle: pw.TextStyle(
+      fontSize: 9,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColors.blueGrey900,
+    ),
+    cellStyle: const pw.TextStyle(fontSize: 8.5, color: PdfColors.black),
+    cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+    border: pw.TableBorder.all(color: PdfColors.blueGrey100, width: 0.5),
+    oddRowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+    rowDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey50),
+  );
+}
+
+String _pdfPercent(double value) => '${(value * 100).round()}%';
+
+String _pdfDuration(num totalMs) {
+  final ms = totalMs.round();
+  if (ms <= 0) return '0s';
+  final totalSeconds = Duration(milliseconds: ms).inSeconds;
+  if (totalSeconds < 60) return '${totalSeconds}s';
+  final totalMinutes = Duration(milliseconds: ms).inMinutes;
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  if (hours <= 0) return '${minutes}m';
+  if (minutes == 0) return '${hours}h';
+  return '${hours}h ${minutes}m';
+}
+
+String _pdfClip(String value, int maxLength) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return '${value.substring(0, maxLength - 3)}...';
 }
