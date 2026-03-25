@@ -5,9 +5,42 @@ import 'package:flashcards_app/l10n/app_localizations.dart';
 
 class HtmlGenerator {
   static const Set<String> _allowedHtmlTags = {
-    'a', 'b', 'big', 'blockquote', 'br', 'code',
-    'div', 'em', 'font', 'hr', 'i', 'img', 'kbd', 'li', 'mark', 'ol', 'p', 'pre', 'rp', 'rt', 'ruby', 's',
-    'small', 'span', 'strike', 'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+    'a',
+    'b',
+    'big',
+    'blockquote',
+    'br',
+    'code',
+    'div',
+    'em',
+    'font',
+    'hr',
+    'i',
+    'img',
+    'kbd',
+    'li',
+    'mark',
+    'ol',
+    'p',
+    'pre',
+    'rp',
+    'rt',
+    'ruby',
+    's',
+    'small',
+    'span',
+    'strike',
+    'strong',
+    'sub',
+    'sup',
+    'table',
+    'tbody',
+    'td',
+    'th',
+    'thead',
+    'tr',
+    'u',
+    'ul',
   };
 
   static String _safeHtml(String? input) {
@@ -138,10 +171,17 @@ class HtmlGenerator {
     }
 
     final String readingWord = (extraData['reading'] ?? '').toString().trim();
-    final bool hasRealReading =
+    final String sentenceReading = (extraData['sentence_reading'] ?? '')
+        .toString()
+        .trim();
+    final bool hasRealWordReading =
         readingWord.isNotEmpty && readingWord != card.question.trim();
+    final bool hasRealSentenceReading =
+        sentenceReading.isNotEmpty &&
+        sentenceReading != (card.sentence ?? '').trim();
     final bool isRecog = card.cardType.endsWith('recog');
-    final bool isComplexRecog = isRecog && hasRealReading;
+    final bool isComplexRecog =
+        isRecog && (hasRealWordReading || hasRealSentenceReading);
 
     final String css = _getBaseCss(brightness);
     String bodyContent = "";
@@ -234,26 +274,54 @@ class HtmlGenerator {
     var targetSegments = [];
 
     function initWriteMode() {
-      var rawEl = document.getElementById('target-hidden-raw');
+      var sourceRawEl = document.getElementById('source-hidden-raw');
+      var targetRawEl = document.getElementById('target-hidden-raw');
       var container = document.getElementById('dynamic-write-area');
-      if(!rawEl || !container) return;
+      if(!targetRawEl || !container) return;
 
-      var rawHtml = rawEl.innerHTML;
-      var splitRegex = /<strong>\\s*\\d+\\.\\s*<\\/strong>/gi;
-      var parts = rawHtml.split(splitRegex);
+      var sourceRawHtml = sourceRawEl ? sourceRawEl.innerHTML : "";
+      var targetRawHtml = targetRawEl.innerHTML;
+      var sourceParts = splitHtmlSegments(sourceRawHtml);
+      var targetParts = splitHtmlSegments(targetRawHtml);
 
-      targetSegments = parts.map(p => cleanHtmlPart(p)).filter(p => p.length > 0);
-      if (targetSegments.length === 0) targetSegments = [ cleanHtmlPart(rawHtml) ];
+      targetSegments = targetParts.map(p => cleanHtmlPart(p)).filter(p => p.length > 0);
+      if (targetSegments.length === 0) {
+        targetSegments = [ cleanHtmlPart(targetRawHtml) ];
+      }
+
+      var sourceSegments = sourceParts.map(p => p.trim()).filter(p => p.length > 0);
+      if (sourceSegments.length === 0 && sourceRawHtml.trim().length > 0) {
+        sourceSegments = [ sourceRawHtml.trim() ];
+      }
+
+      if (sourceSegments.length > targetSegments.length) {
+        sourceSegments = sourceSegments.slice(0, targetSegments.length);
+      }
+      while (sourceSegments.length < targetSegments.length) {
+        sourceSegments.push('');
+      }
 
       var html = "";
       for (var i = 0; i < targetSegments.length; i++) {
         var label = targetSegments.length > 1 ? (i + 1) + ". " : "";
         html += '<div class="write-group">';
-        if(label) html += '<span class="write-index">' + label + '</span>';
+        html += '<div class="write-prompt">';
+        if(label) html += '<div class="write-prompt-index">' + label + '</div>';
+        if(sourceSegments[i]) {
+          html += '<div class="write-prompt-text">' + sourceSegments[i] + '</div>';
+        }
+        html += '</div>';
         html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="$writePlaceholder"></textarea>';
         html += '</div>';
       }
       container.innerHTML = html;
+    }
+
+    function splitHtmlSegments(rawHtml) {
+      if (!rawHtml || rawHtml.trim().length === 0) return [];
+      var splitRegex = /<strong>\\s*\\d+\\.\\s*<\\/strong>/gi;
+      var parts = rawHtml.split(splitRegex).map(p => p.trim()).filter(p => p.length > 0);
+      return parts.length > 0 ? parts : [rawHtml];
     }
 
     function cleanHtmlPart(text) {
@@ -440,25 +508,38 @@ class HtmlGenerator {
     final String reading = _safeHtml(
       (extra['target_reading'] ?? '').toString(),
     );
+    final String sentenceReading = _safeHtml(
+      (extra['sentence_reading'] ?? '').toString(),
+    );
     final String awSrc = card.audioPath ?? '';
     final String asSrc = card.sentenceAudioPath ?? '';
     final String imgHtml = _imageHtml(card.imagePath);
 
     String inputHtml = "";
-    String sentenceArea =
+    String promptHtml =
         """
-<div class="sentence-text">$translationHtml</div>
+<div class="sentence-trans-prod">$sentenceHtml</div>
 """;
+    final String targetSentenceWithReading =
+        """
+<div class="sentence-answer-block">
+  <div class="sentence-text">$translationHtml</div>
+  ${sentenceReading.isNotEmpty ? '<div class="reading-text sentence-reading">$sentenceReading</div>' : ''}
+</div>
+""";
+    String sentenceArea = targetSentenceWithReading;
 
     if (writeMode) {
       inputHtml =
           """
 <div class="write-section">
   <div class="write-label">${_safeHtml(l10n.tr('html_write_sentences'))}</div>
+  <div id="source-hidden-raw" style="display:none;">$sentenceHtml</div>
   <div id="dynamic-write-area"></div>
   <div id="target-hidden-raw" style="display:none;">$translationHtml</div>
 </div>
 """;
+      promptHtml = '';
 
       sentenceArea =
           """
@@ -470,8 +551,9 @@ class HtmlGenerator {
   <div id="user-raw-text" class="user-raw-box"></div>
 </div>
 
-<div class="sentence-text answer-reference">
-  ${_safeHtml(l10n.tr('html_correct'))}:<br/>$translationHtml
+<div class="answer-reference">
+  <div class="answer-reference-label">${_safeHtml(l10n.tr('html_correct'))}:</div>
+  $targetSentenceWithReading
 </div>
 """;
     }
@@ -480,7 +562,7 @@ class HtmlGenerator {
         """
 <section id="q-view" class="card-face front">
   <div class="meaning-prod">$questionHtml</div>
-  <div class="sentence-trans-prod">$sentenceHtml</div>
+  $promptHtml
   $inputHtml
 </section>
 """;
@@ -537,10 +619,17 @@ class HtmlGenerator {
     final String asSrc = card.sentenceAudioPath ?? '';
     final String imgHtml = _imageHtml(card.imagePath);
 
-    final String readingWord = _safeHtml((extra['reading'] ?? '').toString());
-    final String readingSent = _safeHtml(
-      (extra['sentence_reading'] ?? '').toString(),
-    );
+    final rawReadingWord = (extra['reading'] ?? '').toString().trim();
+    final rawReadingSent = (extra['sentence_reading'] ?? '').toString().trim();
+    final showWordReading =
+        rawReadingWord.isNotEmpty && rawReadingWord != card.question.trim();
+    final showSentenceReading =
+        rawReadingSent.isNotEmpty &&
+        rawReadingSent != (card.sentence ?? '').trim();
+    final String readingWord = showWordReading ? _safeHtml(rawReadingWord) : '';
+    final String readingSent = showSentenceReading
+        ? _safeHtml(rawReadingSent)
+        : '';
 
     final String btnWordWrapperQ = awSrc.isNotEmpty
         ? '<div class="delayed-btn" style="visibility:hidden; opacity:0; transition: opacity 0.3s;">${_playBtn('audio-word-q', true)}</div>'
@@ -562,7 +651,7 @@ class HtmlGenerator {
   <div class="row-main">
     <div class="ruby-block">
       <div class="word-text">$questionHtml</div>
-      <div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>
+      ${showWordReading ? '<div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>' : ''}
     </div>
     $btnWordWrapperQ
   </div>
@@ -573,7 +662,7 @@ class HtmlGenerator {
     <div class="row-sent">
       <div class="ruby-block">
         <div class="sentence-text">$sentenceHtml</div>
-        <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+        ${showSentenceReading ? '<div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>' : ''}
       </div>
       $btnSentWrapperQ
     </div>
@@ -591,7 +680,7 @@ class HtmlGenerator {
   <div class="row-main">
     <div class="ruby-block">
       <div class="word-text">$questionHtml</div>
-      <div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>
+      ${showWordReading ? '<div class="reading-text" style="visibility:hidden; opacity:0;">$readingWord</div>' : ''}
     </div>
     $btnWordWrapperA
   </div>
@@ -605,7 +694,7 @@ class HtmlGenerator {
     <div class="row-sent">
       <div class="ruby-block">
         <div class="sentence-text">$sentenceHtml</div>
-        <div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>
+        ${showSentenceReading ? '<div class="reading-text sentence-reading" style="visibility:hidden; opacity:0;">$readingSent</div>' : ''}
       </div>
       $btnSentWrapperA
     </div>
@@ -947,13 +1036,32 @@ blockquote {
 }
 
 .write-group {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid $line;
+  border-radius: 10px;
+  background: $panel;
+}
+
+.write-group:last-child {
+  margin-bottom: 0;
+}
+
+.write-prompt {
   margin-bottom: 12px;
 }
 
-.write-index {
+.write-prompt-index {
   font-size: 14px;
   color: $accentDark;
   font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.write-prompt-text {
+  font-size: 20px;
+  line-height: 1.5;
+  color: $text;
 }
 
 .write-input {
@@ -964,7 +1072,7 @@ blockquote {
   border-radius: 10px;
   border: 1px solid $line;
   outline: none;
-  background: $panel;
+  background: $cardBg;
   color: $text;
   font-family: 'Open Sans', 'Segoe UI', sans-serif;
   font-size: 18px;
@@ -1020,10 +1128,20 @@ blockquote {
 }
 
 .answer-reference {
-  font-size: 18px;
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid $line;
+}
+
+.answer-reference-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: $accentDark;
+  margin-bottom: 8px;
+}
+
+.sentence-answer-block {
+  display: block;
 }
 
 .delayed-btn {

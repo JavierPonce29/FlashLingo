@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:isar/isar.dart';
@@ -9,10 +9,8 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/deck_settings.dart';
 import '../../data/models/flashcard.dart';
 
-enum ImportDeckConflictAction {
-  createNewDeck,
-  updateExistingDeck,
-}
+enum ImportDeckConflictAction { createNewDeck, updateExistingDeck }
+
 class ImportExecutionOptions {
   final ImportDeckConflictAction action;
   final String? customPackName;
@@ -23,15 +21,14 @@ class ImportExecutionOptions {
     this.updateDeckSettingsFromManifest = false,
   });
 
-  const ImportExecutionOptions.createNew({
-    this.customPackName,
-  })  : action = ImportDeckConflictAction.createNewDeck,
-        updateDeckSettingsFromManifest = false;
+  const ImportExecutionOptions.createNew({this.customPackName})
+    : action = ImportDeckConflictAction.createNewDeck,
+      updateDeckSettingsFromManifest = false;
 
   const ImportExecutionOptions.updateExisting({
     this.updateDeckSettingsFromManifest = false,
-  })  : action = ImportDeckConflictAction.updateExistingDeck,
-        customPackName = null;
+  }) : action = ImportDeckConflictAction.updateExistingDeck,
+       customPackName = null;
 }
 
 class ImportPreviewResult {
@@ -171,14 +168,22 @@ class ImporterService {
   final Isar isar;
   final Uuid _uuid = const Uuid();
   ImporterService(this.isar);
-  Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
+  Future<ImportPreviewResult> previewFlashcardPackage(
+    String zipFilePath,
+  ) async {
     final prepared = await _preparePackage(zipFilePath, copyMedia: false);
     try {
-      final sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
+      final sqliteDb = await sql.openDatabase(
+        prepared.dbFile.path,
+        readOnly: true,
+      );
       try {
-        final rows = await sqliteDb.rawQuery('SELECT COUNT(*) AS c FROM flashcards');
-        final sqliteRows =
-            rows.isNotEmpty ? _asInt(rows.first['c'], fallback: 0) : 0;
+        final rows = await sqliteDb.rawQuery(
+          'SELECT COUNT(*) AS c FROM flashcards',
+        );
+        final sqliteRows = rows.isNotEmpty
+            ? _asInt(rows.first['c'], fallback: 0)
+            : 0;
         final exists = await _deckExistsByName(prepared.packName);
         return ImportPreviewResult(
           zipFilePath: zipFilePath,
@@ -199,18 +204,20 @@ class ImporterService {
       await _cleanupExtractDir(prepared.extractDir);
     }
   }
+
   /// Devuelve un resumen para mostrar en pantalla al finalizar.
   Future<ImportSummary> importFlashcardPackageAdvanced(
-      String zipFilePath, {
-        required ImportExecutionOptions options,
-      }) async {
+    String zipFilePath, {
+    required ImportExecutionOptions options,
+  }) async {
     final prepared = await _preparePackage(zipFilePath, copyMedia: true);
     sql.Database? sqliteDb;
     try {
       final importedPackName = prepared.packName;
       final targetPackName = _resolveTargetPackName(importedPackName, options);
       final targetExists = await _deckExistsByName(targetPackName);
-      if (options.action == ImportDeckConflictAction.createNewDeck && targetExists) {
+      if (options.action == ImportDeckConflictAction.createNewDeck &&
+          targetExists) {
         final preview = ImportPreviewResult(
           zipFilePath: zipFilePath,
           zipFileName: p.basename(zipFilePath),
@@ -225,10 +232,11 @@ class ImporterService {
         );
         throw ImportConflictException(preview);
       }
-      if (options.action == ImportDeckConflictAction.updateExistingDeck && !targetExists) {
+      if (options.action == ImportDeckConflictAction.updateExistingDeck &&
+          !targetExists) {
         throw StateError(
           "No existe el mazo '$targetPackName' para actualizar. "
-              "Selecciona crear nuevo mazo.",
+          "Selecciona crear nuevo mazo.",
         );
       }
 
@@ -276,7 +284,10 @@ class ImporterService {
     }
   }
 
-  String _resolveTargetPackName(String importedPackName, ImportExecutionOptions options) {
+  String _resolveTargetPackName(
+    String importedPackName,
+    ImportExecutionOptions options,
+  ) {
     if (options.action == ImportDeckConflictAction.createNewDeck) {
       final custom = options.customPackName?.trim();
       if (custom != null && custom.isNotEmpty) return custom;
@@ -286,8 +297,10 @@ class ImporterService {
   }
 
   Future<bool> _deckExistsByName(String packName) async {
-    final settings =
-    await isar.deckSettings.filter().packNameEqualTo(packName).findFirst();
+    final settings = await isar.deckSettings
+        .filter()
+        .packNameEqualTo(packName)
+        .findFirst();
     if (settings != null) return true;
     final anyCards = await isar.flashcards
         .filter()
@@ -298,9 +311,9 @@ class ImporterService {
   }
 
   Future<_PreparedPackage> _preparePackage(
-      String zipFilePath, {
-        required bool copyMedia,
-      }) async {
+    String zipFilePath, {
+    required bool copyMedia,
+  }) async {
     final extractDir = await _createTempExtractDir(zipFilePath);
     final fileBytes = await File(zipFilePath).readAsBytes();
     final archive = ZipDecoder().decodeBytes(fileBytes);
@@ -312,8 +325,10 @@ class ImporterService {
       final name = entry.name.replaceAll('\\', '/');
       if (name.startsWith('__MACOSX/')) continue;
       realFileEntries++;
-      final safeOutPath =
-          _resolveSafeExtractPath(extractRoot: extractDir.path, entryName: name);
+      final safeOutPath = _resolveSafeExtractPath(
+        extractRoot: extractDir.path,
+        entryName: name,
+      );
       if (safeOutPath == null) {
         print("WARNING suspicious zip entry ignored: $name");
         continue;
@@ -340,7 +355,7 @@ class ImporterService {
       throw StateError("No se encontro manifest.json en el paquete.");
     }
     final manifestData =
-    jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+        jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
     final isoCode = (manifestData['language_id'] ?? '').toString().trim();
     final packName = (manifestData['pack_name'] ?? '').toString().trim();
     final dbFilename = (manifestData['db_filename'] ?? '').toString().trim();
@@ -350,7 +365,9 @@ class ImporterService {
     final packageRoot = Directory(extractDir.path);
     final dbFile = File(p.join(extractDir.path, dbFilename));
     if (!dbFile.existsSync()) {
-      throw StateError("No se encontro la base de datos '$dbFilename' en el paquete.");
+      throw StateError(
+        "No se encontro la base de datos '$dbFilename' en el paquete.",
+      );
     }
 
     MediaIndex? mediaIndex;
@@ -376,7 +393,9 @@ class ImporterService {
     final tempRoot = Directory(p.join(docs.path, 'import_tmp'));
     await tempRoot.create(recursive: true);
     final name = p.basenameWithoutExtension(zipFilePath);
-    final dir = Directory(p.join(tempRoot.path, "${name}_${DateTime.now().millisecondsSinceEpoch}"));
+    final dir = Directory(
+      p.join(tempRoot.path, "${name}_${DateTime.now().millisecondsSinceEpoch}"),
+    );
     await dir.create(recursive: true);
     return dir;
   }
@@ -423,7 +442,10 @@ class ImporterService {
   //  Multimedia processing -> media_assets
   // ============================================================
 
-  Future<MediaIndex> _processAllMedia(Directory packageRoot, Directory extractDir) async {
+  Future<MediaIndex> _processAllMedia(
+    Directory packageRoot,
+    Directory extractDir,
+  ) async {
     final docs = await getApplicationDocumentsDirectory();
     final destDir = Directory(p.join(docs.path, 'media_assets'));
     await destDir.create(recursive: true);
@@ -434,7 +456,10 @@ class ImporterService {
     int skipped = 0;
     int dupKeys = 0;
     final entities = <File>[];
-    await for (final entity in extractDir.list(recursive: true, followLinks: false)) {
+    await for (final entity in extractDir.list(
+      recursive: true,
+      followLinks: false,
+    )) {
       if (entity is! File) continue;
       final basename = p.basename(entity.path).toLowerCase();
       if (basename.endsWith('.db') || basename == 'manifest.json') continue;
@@ -461,7 +486,9 @@ class ImporterService {
       try {
         keys.add(Uri.decodeFull(p.basename(entity.path)));
       } catch (_) {}
-      final stem1 = p.basenameWithoutExtension(p.basename(entity.path)).toLowerCase();
+      final stem1 = p
+          .basenameWithoutExtension(p.basename(entity.path))
+          .toLowerCase();
       final stem2 = p.basenameWithoutExtension(relFromPackage).toLowerCase();
       final stem3 = p.basenameWithoutExtension(relFromExtract).toLowerCase();
       for (final k in keys) {
@@ -492,7 +519,9 @@ class ImporterService {
         }
       }
     }
-    print("Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)");
+    print(
+      "Multimedia procesada: $count archivos copiados. (omitidos: $skipped, colisiones de keys: $dupKeys)",
+    );
 
     return MediaIndex(
       exactMap,
@@ -540,7 +569,8 @@ class ImporterService {
     if (value is bool) return value;
     if (value is num) return value != 0;
     final s = value.toString().trim().toLowerCase();
-    if (s == 'true' || s == '1' || s == 'yes' || s == 'si' || s == 'sí') return true;
+    if (s == 'true' || s == '1' || s == 'yes' || s == 'si' || s == 'sí')
+      return true;
     if (s == 'false' || s == '0' || s == 'no') return false;
     return fallback;
   }
@@ -585,15 +615,15 @@ class ImporterService {
   // ============================================================
 
   Future<_MergeImportSummary> _migrateDataToIsar(
-      sql.Database db,
-      String isoCode,
-      String importedPackName,
-      String targetPackName,
-      MediaIndex mediaIndex,
-      Map<String, dynamic> manifestData, {
-        required ImportExecutionOptions options,
-        required bool targetDeckExistedBeforeImport,
-      }) async {
+    sql.Database db,
+    String isoCode,
+    String importedPackName,
+    String targetPackName,
+    MediaIndex mediaIndex,
+    Map<String, dynamic> manifestData, {
+    required ImportExecutionOptions options,
+    required bool targetDeckExistedBeforeImport,
+  }) async {
     // 1) SETTINGS (preparar, pero persistir junto con tarjetas en una sola txn)
     final importedSettings = _buildDeckSettingsFromManifest(
       packName: targetPackName,
@@ -605,15 +635,17 @@ class ImporterService {
     bool deckSettingsCreated = false;
     bool deckSettingsUpdated = false;
     bool deckSettingsPreserved = false;
-    final existingSettings =
-        await isar.deckSettings.filter().packNameEqualTo(targetPackName).findFirst();
+    final existingSettings = await isar.deckSettings
+        .filter()
+        .packNameEqualTo(targetPackName)
+        .findFirst();
 
     final bool preserveUserSettings =
         existingSettings != null &&
-            ((options.action == ImportDeckConflictAction.updateExistingDeck &&
-                    !options.updateDeckSettingsFromManifest) ||
-                (options.action == ImportDeckConflictAction.createNewDeck &&
-                    targetDeckExistedBeforeImport));
+        ((options.action == ImportDeckConflictAction.updateExistingDeck &&
+                !options.updateDeckSettingsFromManifest) ||
+            (options.action == ImportDeckConflictAction.createNewDeck &&
+                targetDeckExistedBeforeImport));
 
     DeckSettings? settingsToPersist;
     if (existingSettings == null) {
@@ -629,7 +661,8 @@ class ImporterService {
     } else {
       importedSettings.id = existingSettings.id;
       importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
-      importedSettings.lastNewCardStudyDate = existingSettings.lastNewCardStudyDate;
+      importedSettings.lastNewCardStudyDate =
+          existingSettings.lastNewCardStudyDate;
       importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
       settingsToPersist = importedSettings;
       deckSettingsUpdated = true;
@@ -638,19 +671,24 @@ class ImporterService {
     // 2) Leer filas SQLite
     final rows = await db.query('flashcards');
     print("Importando ${rows.length} registros de la base de datos...");
-    final double initialNtValue = preserveUserSettings && existingSettings != null
+    final double initialNtValue =
+        preserveUserSettings && existingSettings != null
         ? existingSettings.initialNt
         : importedSettings.initialNt;
 
     // 3) Si es actualizacion, cargar tarjetas existentes del mazo una vez
     final Map<String, Flashcard> existingByLogicalKey = {};
     if (options.action == ImportDeckConflictAction.updateExistingDeck) {
-      final existingCards =
-      await isar.flashcards.filter().packNameEqualTo(targetPackName).findAll();
+      final existingCards = await isar.flashcards
+          .filter()
+          .packNameEqualTo(targetPackName)
+          .findAll();
       for (final c in existingCards) {
         existingByLogicalKey[_logicalKey(c.originalId, c.cardType)] = c;
       }
-      print("Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.");
+      print(
+        "Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.",
+      );
     }
     final List<Flashcard> toInsert = [];
     final List<Flashcard> toUpdate = [];
@@ -757,7 +795,8 @@ class ImporterService {
     );
   }
 
-  String _logicalKey(String originalId, String cardType) => '$originalId::$cardType';
+  String _logicalKey(String originalId, String cardType) =>
+      '$originalId::$cardType';
   bool _applyImportedContent(Flashcard existing, Flashcard incoming) {
     bool changed = false;
     if (existing.question != incoming.question) {
@@ -812,47 +851,73 @@ class ImporterService {
       ..offset = 0.0
       ..initialNt = 0.015
       ..learningSteps = [1.0, 4.0]
-      ..newCardMinCorrectReps =
-          _asInt(manifestData['new_card_min_correct_reps'], fallback: 2)
-      ..newCardIntraDayMinutes =
-          _asInt(manifestData['new_card_intra_day_minutes'], fallback: 10)
+      ..newCardMinCorrectReps = _asInt(
+        manifestData['new_card_min_correct_reps'],
+        fallback: 2,
+      )
+      ..newCardIntraDayMinutes = _asInt(
+        manifestData['new_card_intra_day_minutes'],
+        fallback: 10,
+      )
       ..enableWriteMode = false
       ..writeModeThreshold = 80
       ..writeModeMaxReps = 0;
 
-    if (manifestData.containsKey('settings') && manifestData['settings'] is Map) {
-      final Map<String, dynamic> custom =
-          Map<String, dynamic>.from(manifestData['settings'] as Map);
+    if (manifestData.containsKey('settings') &&
+        manifestData['settings'] is Map) {
+      final Map<String, dynamic> custom = Map<String, dynamic>.from(
+        manifestData['settings'] as Map,
+      );
       print("Aplicando configuraciones personalizadas del mazo...");
 
-      settings.newCardsPerDay =
-          _asInt(custom['new_cards_per_day'], fallback: settings.newCardsPerDay);
-      settings.maxReviewsPerDay =
-          _asInt(custom['max_reviews_per_day'], fallback: settings.maxReviewsPerDay);
-      settings.lapseTolerance =
-          _asInt(custom['lapse_tolerance'], fallback: settings.lapseTolerance);
+      settings.newCardsPerDay = _asInt(
+        custom['new_cards_per_day'],
+        fallback: settings.newCardsPerDay,
+      );
+      settings.maxReviewsPerDay = _asInt(
+        custom['max_reviews_per_day'],
+        fallback: settings.maxReviewsPerDay,
+      );
+      settings.lapseTolerance = _asInt(
+        custom['lapse_tolerance'],
+        fallback: settings.lapseTolerance,
+      );
       settings.useFixedIntervalOnLapse = _asBool(
         custom['use_fixed_interval_on_lapse'],
         fallback: settings.useFixedIntervalOnLapse,
       );
-      settings.lapseFixedInterval =
-          _asDouble(custom['lapse_fixed_interval'], fallback: settings.lapseFixedInterval);
+      settings.lapseFixedInterval = _asDouble(
+        custom['lapse_fixed_interval'],
+        fallback: settings.lapseFixedInterval,
+      );
       settings.pMin = _asDouble(custom['p_min'], fallback: settings.pMin);
       settings.alpha = _asDouble(custom['alpha'], fallback: settings.alpha);
       settings.beta = _asDouble(custom['beta'], fallback: settings.beta);
       settings.offset = _asDouble(custom['offset'], fallback: settings.offset);
-      settings.initialNt = _asDouble(custom['initial_nt'], fallback: settings.initialNt);
-      settings.learningSteps =
-          _asDoubleList(custom['learning_steps'], fallback: settings.learningSteps);
-      settings.enableWriteMode =
-          _asBool(custom['enable_write_mode'], fallback: settings.enableWriteMode);
-      settings.writeModeThreshold =
-          _asInt(custom['write_mode_threshold'], fallback: settings.writeModeThreshold);
-      settings.writeModeMaxReps =
-          _asInt(custom['write_mode_max_reps'], fallback: settings.writeModeMaxReps);
+      settings.initialNt = _asDouble(
+        custom['initial_nt'],
+        fallback: settings.initialNt,
+      );
+      settings.learningSteps = _asDoubleList(
+        custom['learning_steps'],
+        fallback: settings.learningSteps,
+      );
+      settings.enableWriteMode = _asBool(
+        custom['enable_write_mode'],
+        fallback: settings.enableWriteMode,
+      );
+      settings.writeModeThreshold = _asInt(
+        custom['write_mode_threshold'],
+        fallback: settings.writeModeThreshold,
+      );
+      settings.writeModeMaxReps = _asInt(
+        custom['write_mode_max_reps'],
+        fallback: settings.writeModeMaxReps,
+      );
     }
     return settings;
   }
+
   List<Flashcard> _buildCardsFromRow({
     required Map<String, Object?> row,
     required String originalId,
@@ -902,6 +967,7 @@ class ImporterService {
       ..state = CardState.newCard
       ..extraDataJson = jsonEncode({
         "target_reading": row['LECTURA_PALABRA'],
+        "sentence_reading": row['LECTURA_ORACION'],
         "forms": row['FORMAS'],
         "type": "production",
       })
@@ -912,6 +978,7 @@ class ImporterService {
     return [cardRecog, cardProd];
   }
 }
+
 class MediaIndex {
   final Map<String, String> exactMap;
   final Map<String, String> lowerCaseMap;
@@ -920,13 +987,13 @@ class MediaIndex {
   final int filesSkipped;
   final int keyCollisions;
   MediaIndex(
-      this.exactMap,
-      this.lowerCaseMap,
-      this.stemMap, {
-        required this.filesCopied,
-        required this.filesSkipped,
-        required this.keyCollisions,
-      });
+    this.exactMap,
+    this.lowerCaseMap,
+    this.stemMap, {
+    required this.filesCopied,
+    required this.filesSkipped,
+    required this.keyCollisions,
+  });
   String? find(String? filename) {
     if (filename == null || filename.trim().isEmpty) return null;
     var clean = filename.trim();
@@ -950,13 +1017,16 @@ class MediaIndex {
     // 4) minusculas decodificado
     try {
       final decodedLower = Uri.decodeFull(clean).toLowerCase();
-      if (lowerCaseMap.containsKey(decodedLower)) return lowerCaseMap[decodedLower];
+      if (lowerCaseMap.containsKey(decodedLower))
+        return lowerCaseMap[decodedLower];
     } catch (_) {}
     // 5) stem (ignora extension)
     final stem = p.basenameWithoutExtension(clean).toLowerCase();
     if (stemMap.containsKey(stem)) return stemMap[stem];
     // 6) stem por basename si venia con ruta
-    final baseStem = p.basenameWithoutExtension(p.basename(clean)).toLowerCase();
+    final baseStem = p
+        .basenameWithoutExtension(p.basename(clean))
+        .toLowerCase();
     if (stemMap.containsKey(baseStem)) return stemMap[baseStem];
     return null;
   }

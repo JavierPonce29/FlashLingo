@@ -85,6 +85,20 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   bool get _isFinished => currentIndex >= studyQueue.length;
   bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
 
+  Map<String, dynamic> _decodeExtraData(String? rawExtra) {
+    if (rawExtra == null || rawExtra.isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(rawExtra);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (_) {}
+    return <String, dynamic>{};
+  }
+
   void _markCurrentCardShown() {
     _cardShownAt = _isFinished ? null : DateTime.now();
   }
@@ -151,26 +165,83 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
   bool _isEpoch(DateTime dt) => dt.millisecondsSinceEpoch == 0;
 
+  Future<void> _ensureProductionReadings(Flashcard card) async {
+    if (!card.cardType.endsWith('prod')) return;
+
+    final extra = _decodeExtraData(card.extraDataJson);
+    final hasTargetReading = (extra['target_reading'] ?? '')
+        .toString()
+        .trim()
+        .isNotEmpty;
+    final hasSentenceReading = (extra['sentence_reading'] ?? '')
+        .toString()
+        .trim()
+        .isNotEmpty;
+    if (hasTargetReading && hasSentenceReading) return;
+
+    final isar = Isar.getInstance();
+    if (isar == null) return;
+
+    final twinCardType = card.cardType.replaceFirst(RegExp(r'prod$'), 'recog');
+    final twin = await isar.flashcards
+        .filter()
+        .packNameEqualTo(card.packName)
+        .originalIdEqualTo(card.originalId)
+        .cardTypeEqualTo(twinCardType)
+        .findFirst();
+    if (!mounted || twin == null) return;
+
+    final twinExtra = _decodeExtraData(twin.extraDataJson);
+    var changed = false;
+
+    if (!hasTargetReading) {
+      final twinWordReading = (twinExtra['reading'] ?? '').toString().trim();
+      if (twinWordReading.isNotEmpty) {
+        extra['target_reading'] = twinWordReading;
+        changed = true;
+      }
+    }
+
+    if (!hasSentenceReading) {
+      final twinSentenceReading = (twinExtra['sentence_reading'] ?? '')
+          .toString()
+          .trim();
+      if (twinSentenceReading.isNotEmpty) {
+        extra['sentence_reading'] = twinSentenceReading;
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+
+    card.extraDataJson = jsonEncode(extra);
+    if (_isFinished || studyQueue[currentIndex].id != card.id) return;
+    if (isAnswerShown || isReadingShown) return;
+    _reloadCurrentHtml();
+  }
+
+  bool _hasMeaningfulRecognitionReading(
+    Flashcard card,
+    Map<String, dynamic> extra,
+  ) {
+    final wordReading = (extra['reading'] ?? '').toString().trim();
+    final sentenceReading = (extra['sentence_reading'] ?? '').toString().trim();
+    final question = card.question.trim();
+    final sentence = (card.sentence ?? '').trim();
+
+    final hasWordReading = wordReading.isNotEmpty && wordReading != question;
+    final hasSentenceReading =
+        sentenceReading.isNotEmpty && sentenceReading != sentence;
+    return hasWordReading || hasSentenceReading;
+  }
+
   void _recomputeCurrentCardState({bool reloadHtml = false}) {
     if (_isFinished) return;
     final card = studyQueue[currentIndex];
-    Map<String, dynamic> extra = {};
-    if (card.extraDataJson != null && card.extraDataJson!.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(card.extraDataJson!);
-        if (decoded is Map<String, dynamic>) {
-          extra = decoded;
-        } else if (decoded is Map) {
-          extra = decoded.map((k, v) => MapEntry(k.toString(), v));
-        }
-      } catch (_) {}
-    }
+    final extra = _decodeExtraData(card.extraDataJson);
 
-    final readingVal = extra['reading'];
-    final readingStr = (readingVal is String) ? readingVal.trim() : '';
     final bool isRecog = card.cardType.endsWith('recog');
-    final bool hasReading =
-        readingStr.isNotEmpty && readingStr != card.question.trim();
+    final bool hasReading = _hasMeaningfulRecognitionReading(card, extra);
     final bool writeEnabled = _currentDeckSettings?.enableWriteMode ?? false;
     final bool isProd = card.cardType.endsWith('prod');
     final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
@@ -187,6 +258,9 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     });
 
     if (reloadHtml) _reloadCurrentHtml();
+    if (isProd) {
+      unawaited(_ensureProductionReadings(card));
+    }
   }
 
   @override
