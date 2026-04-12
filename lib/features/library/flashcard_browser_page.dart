@@ -37,6 +37,7 @@ class FlashcardBrowserPage extends ConsumerStatefulWidget {
 
 class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   String _query = '';
+  late final TextEditingController _queryController;
   bool _showRecog = true;
   bool _showProd = true;
   CardState? _stateFilter;
@@ -46,6 +47,13 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   void initState() {
     super.initState();
     _query = widget.initialQuery;
+    _queryController = TextEditingController(text: widget.initialQuery);
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
   }
 
   String _stateLabel(AppLocalizations l10n, CardState state) {
@@ -272,6 +280,7 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
       child: Column(
         children: [
           TextField(
+            controller: _queryController,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: l10n.tr('browser_search_hint'),

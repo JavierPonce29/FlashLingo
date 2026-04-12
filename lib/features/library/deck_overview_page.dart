@@ -257,6 +257,7 @@ class DeckOverviewPage extends ConsumerWidget {
       await isar.studySessions.put(session);
     });
 
+    if (!context.mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(

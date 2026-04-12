@@ -175,6 +175,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     try {
       final isar = await ref.read(isarDbProvider.future);
       final result = await exportDeckStatsCsv(isar, widget.packName, stats);
+      await shareDeckStatsCsvResult(result, text: widget.packName);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -183,7 +184,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
               'stats_export_success',
               params: <String, Object?>{
                 'count': result.files.length,
-                'path': result.directory.path,
+                'path': '',
               },
             ),
           ),
@@ -239,13 +240,14 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         stats,
         charts: charts,
       );
+      await shareDeckStatsPdfFile(file, text: widget.packName);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             context.l10n.tr(
               'stats_export_pdf_success',
-              params: <String, Object?>{'path': file.path},
+              params: <String, Object?>{'path': ''},
             ),
           ),
         ),

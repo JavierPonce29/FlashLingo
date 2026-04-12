@@ -14,7 +14,10 @@ import 'package:flashcards_app/l10n/app_localizations.dart';
 class HomeImportHelper {
   const HomeImportHelper._();
 
-  static Future<void> pickAndImportFile(BuildContext context, WidgetRef ref) async {
+  static Future<void> pickAndImportFile(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final l10n = context.l10n;
     bool loaderOpen = false;
 
@@ -67,7 +70,12 @@ class HomeImportHelper {
       final preview = await importerCtrl.previewFlashcardPackage(filePath);
       closeLoaderIfOpen();
 
-      final options = await _resolveImportOptionsFromPreview(context, ref, preview);
+      if (!context.mounted) return;
+      final options = await _resolveImportOptionsFromPreview(
+        context,
+        ref,
+        preview,
+      );
       if (options == null) {
         importerCtrl.resetState();
         return;
@@ -133,6 +141,7 @@ class HomeImportHelper {
 
     final decision = await _showImportConflictDialog(context, preview);
     if (decision == null) return null;
+    if (!context.mounted) return null;
 
     switch (decision) {
       case _ImportConflictDecision.updateExisting:
@@ -339,7 +348,4 @@ class HomeImportHelper {
   }
 }
 
-enum _ImportConflictDecision {
-  updateExisting,
-  createNewWithAnotherName,
-}
+enum _ImportConflictDecision { updateExisting, createNewWithAnotherName }

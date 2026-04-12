@@ -3,6 +3,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flashcards_app/data/local/deck_daily_stats_sync.dart';
+import 'package:flashcards_app/data/models/app_meta.dart';
 import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
@@ -12,10 +13,29 @@ import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 part 'isar_provider.g.dart';
 
+const _lifetimeBackfillMigrationKey = 'migration:lifetime_backfill:v1';
+const _deckDailyStatsMigrationKey = 'migration:deck_daily_stats:v2';
+
 class _LifetimeBackfillStats {
   int reviews = 0;
   int correct = 0;
   int wrong = 0;
+}
+
+Future<bool> _hasCompletedMigration(Isar isar, String key) async {
+  final meta = await isar.appMetas.filter().keyEqualTo(key).findFirst();
+  return meta != null;
+}
+
+Future<void> _markMigrationComplete(Isar isar, String key) async {
+  await isar.writeTxn(() async {
+    await isar.appMetas.putByIndex(
+      'key',
+      AppMeta()
+        ..key = key
+        ..updatedAt = DateTime.now(),
+    );
+  });
 }
 
 Future<bool> _needsDeckDailyStatsRebuild(Isar isar) async {
@@ -173,6 +193,7 @@ Future<Isar> isarDb(IsarDbRef ref) async {
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.open(
     [
+      AppMetaSchema,
       FlashcardSchema,
       DeckDailyStatsSchema,
       DeckSettingsSchema,
@@ -183,10 +204,19 @@ Future<Isar> isarDb(IsarDbRef ref) async {
     directory: dir.path,
     inspector: kDebugMode,
   );
-  await _backfillLifetimeStatsIfNeeded(isar);
-  if (await _needsDeckDailyStatsRebuild(isar)) {
-    await rebuildAllDeckDailyStats(isar);
+
+  if (!await _hasCompletedMigration(isar, _lifetimeBackfillMigrationKey)) {
+    await _backfillLifetimeStatsIfNeeded(isar);
+    await _markMigrationComplete(isar, _lifetimeBackfillMigrationKey);
   }
+
+  if (!await _hasCompletedMigration(isar, _deckDailyStatsMigrationKey)) {
+    if (await _needsDeckDailyStatsRebuild(isar)) {
+      await rebuildAllDeckDailyStats(isar);
+    }
+    await _markMigrationComplete(isar, _deckDailyStatsMigrationKey);
+  }
+
   ref.onDispose(() {
     if (isar.isOpen) {
       isar.close();

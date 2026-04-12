@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
@@ -77,6 +78,20 @@ Future<File> exportDeckStatsPdf(
   final bytes = await buildDeckStatsPdfBytes(packName, stats, charts: charts);
   await file.writeAsBytes(bytes, flush: true);
   return file;
+}
+
+Future<void> shareDeckStatsCsvResult(
+  DeckStatsExportResult result, {
+  String? text,
+}) async {
+  await Share.shareXFiles(
+    result.files.map((file) => XFile(file.path)).toList(growable: false),
+    text: text,
+  );
+}
+
+Future<void> shareDeckStatsPdfFile(File file, {String? text}) async {
+  await Share.shareXFiles(<XFile>[XFile(file.path)], text: text);
 }
 
 Future<List<int>> buildDeckStatsPdfBytes(
@@ -284,93 +299,12 @@ Future<Directory> _createExportDirectory(String packName) async {
   final sanitized = packName.replaceAll(RegExp(r'[^\w\-]+'), '_');
   final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
   final folderName = '${sanitized}_$timestamp';
-  final candidates = await _resolveExportBaseDirectories();
-
-  final attempted = <String>[];
-  Object? lastError;
-  for (final baseDir in candidates) {
-    attempted.add(baseDir.path);
-    try {
-      final directory = Directory(
-        p.join(baseDir.path, 'FlashLingo', folderName),
-      );
-      await directory.create(recursive: true);
-
-      // Validate that the chosen location is actually writable.
-      final probe = File(p.join(directory.path, '.flashlingo_write_test'));
-      await probe.writeAsString('ok', flush: true);
-      if (await probe.exists()) {
-        await probe.delete();
-      }
-      return directory;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw FileSystemException(
-    'No writable export directory found. Tried: ${attempted.join(', ')}'
-    '${lastError == null ? '' : '. Last error: $lastError'}',
+  final baseDir = await getApplicationSupportDirectory();
+  final directory = Directory(
+    p.join(baseDir.path, 'flashlingo_exports', folderName),
   );
-}
-
-Future<List<Directory>> _resolveExportBaseDirectories() async {
-  final candidates = <Directory>[];
-
-  void addCandidate(Directory? dir) {
-    if (dir == null) return;
-    final alreadyAdded = candidates.any((item) => item.path == dir.path);
-    if (!alreadyAdded) {
-      candidates.add(dir);
-    }
-  }
-
-  if (Platform.isAndroid) {
-    final external = await getExternalStorageDirectory();
-    if (external != null) {
-      final path = external.path;
-      final marker =
-          '${Platform.pathSeparator}Android${Platform.pathSeparator}data${Platform.pathSeparator}';
-      final index = path.indexOf(marker);
-      if (index > 0) {
-        addCandidate(Directory(path.substring(0, index)));
-      }
-    }
-
-    for (final candidatePath in const <String>[
-      '/storage/emulated/0',
-      '/sdcard',
-    ]) {
-      addCandidate(Directory(candidatePath));
-      addCandidate(Directory(p.join(candidatePath, 'Download')));
-      addCandidate(Directory(p.join(candidatePath, 'Documents')));
-    }
-
-    final externalDownloads = await getExternalStorageDirectories(
-      type: StorageDirectory.downloads,
-    );
-    if (externalDownloads != null) {
-      for (final dir in externalDownloads) {
-        addCandidate(dir);
-      }
-    }
-
-    final externalDocuments = await getExternalStorageDirectories(
-      type: StorageDirectory.documents,
-    );
-    if (externalDocuments != null) {
-      for (final dir in externalDocuments) {
-        addCandidate(dir);
-      }
-    }
-
-    addCandidate(external);
-  }
-
-  final downloads = await getDownloadsDirectory();
-  addCandidate(downloads);
-  addCandidate(await getApplicationDocumentsDirectory());
-  return candidates;
+  await directory.create(recursive: true);
+  return directory;
 }
 
 Future<File> _writeSummaryCsv(

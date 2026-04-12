@@ -10,6 +10,7 @@ import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
+import 'package:flashcards_app/features/importer/media_asset_cleanup.dart';
 part 'deck_provider.g.dart';
 
 class DeckSummary {
@@ -46,6 +47,8 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
     for (final s in decks) {
       // Keep this read-only: writing here can race with deletions and recreate rows.
       final currentLabel = StudyDay.label(now, s);
+      final currentStudyStart = StudyDay.start(now, s);
+      final nextStudyStart = currentStudyStart.add(const Duration(days: 1));
       final last = s.lastNewCardStudyDate;
       final lastLabel = last == null ? null : StudyDay.label(last, s);
       final bool sameStudyDay =
@@ -68,35 +71,42 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
                 .count()
           : 0;
 
-      final nonNewCards = await isar.flashcards
+      final overdueCards = await isar.flashcards
           .filter()
           .packNameEqualTo(s.packName)
           .not()
           .stateEqualTo(CardState.newCard)
-          .findAll();
+          .and()
+          .nextReviewLessThan(currentStudyStart)
+          .count();
 
-      int learningDueToday = 0;
-      int reviewDueToday = 0;
-      int overdueCards = 0;
-      for (final c in nonNewCards) {
-        final reviewLabel = StudyDay.label(c.nextReview, s);
-        if (reviewLabel.isBefore(currentLabel)) {
-          overdueCards++;
-          continue;
-        }
-        final isDueThisStudyDay =
-            reviewLabel.year == currentLabel.year &&
-            reviewLabel.month == currentLabel.month &&
-            reviewLabel.day == currentLabel.day;
-        if (!isDueThisStudyDay) {
-          continue;
-        }
-        if (c.state == CardState.learning || c.state == CardState.relearning) {
-          learningDueToday++;
-        } else if (c.state == CardState.review) {
-          reviewDueToday++;
-        }
-      }
+      final learningDueToday = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .stateEqualTo(CardState.learning)
+          .and()
+          .nextReviewGreaterThan(currentStudyStart, include: true)
+          .and()
+          .nextReviewLessThan(nextStudyStart)
+          .count();
+      final relearningDueToday = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .stateEqualTo(CardState.relearning)
+          .and()
+          .nextReviewGreaterThan(currentStudyStart, include: true)
+          .and()
+          .nextReviewLessThan(nextStudyStart)
+          .count();
+      final reviewDueToday = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .stateEqualTo(CardState.review)
+          .and()
+          .nextReviewGreaterThan(currentStudyStart, include: true)
+          .and()
+          .nextReviewLessThan(nextStudyStart)
+          .count();
 
       final recentDailyStats = await isar.deckDailyStats
           .filter()
@@ -122,7 +132,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           packName: s.packName,
           iconUri: s.deckIconUri,
           newCardsDue: newCount,
-          learningDueToday: learningDueToday,
+          learningDueToday: learningDueToday + relearningDueToday,
           reviewCardsDueToday: reviewDueToday,
           overdueCards: overdueCards,
           accuracy7d: accuracy7d,
@@ -186,6 +196,7 @@ Future<void> deleteDeck(DeleteDeckRef ref, String packName) async {
         .packNameEqualTo(normalizedPackName)
         .deleteAll();
   });
+  await purgeOrphanedMediaAssets(isar);
 }
 
 @Riverpod(keepAlive: true)

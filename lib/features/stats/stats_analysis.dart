@@ -253,12 +253,20 @@ List<StackedForecastPoint> buildForecastSeries(
   int remainingNew = data.cardSnapshots
       .where((card) => card.state == CardState.newCard)
       .length;
-  final remainingQuota = _remainingNewQuotaToday(
+  final remainingQuotaToday = _remainingNewQuotaToday(
     data.settings,
     data.labelToday,
   );
-  if (days > 0 && remainingNew > 0 && remainingQuota > 0) {
-    buckets.first.newCards = math.min(remainingNew, remainingQuota);
+  for (int dayOffset = 0; dayOffset < days && remainingNew > 0; dayOffset++) {
+    final dailyQuota = dayOffset == 0
+        ? remainingQuotaToday
+        : data.settings.newCardsPerDay;
+    if (dailyQuota <= 0) {
+      continue;
+    }
+    final scheduledNew = math.min(remainingNew, dailyQuota);
+    buckets[dayOffset].newCards = scheduledNew;
+    remainingNew -= scheduledNew;
   }
 
   return buckets

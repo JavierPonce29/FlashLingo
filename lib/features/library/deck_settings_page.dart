@@ -161,7 +161,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final initialNt = double.parse(
       _initialNtController.text.trim().replaceAll(',', '.'),
     );
-    final learningSteps = _parseLearningSteps(_learningStepsController.text);
+    final learningSteps = _parseLearningSteps(_learningStepsController.text)!;
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
     final writeThreshold = _enableWriteMode
@@ -237,17 +237,24 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     }
   }
 
-  List<double> _parseLearningSteps(String raw) {
-    final parts = raw
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty);
+  List<double>? _parseLearningSteps(String raw) {
+    final parts = raw.split(',');
+    if (parts.isEmpty) {
+      return null;
+    }
     final list = <double>[];
     for (final part in parts) {
-      final value = double.tryParse(part.replaceAll(',', '.'));
-      if (value != null && value > 0) list.add(value);
+      final normalized = part.trim();
+      if (normalized.isEmpty) {
+        return null;
+      }
+      final value = double.tryParse(normalized.replaceAll(',', '.'));
+      if (value == null) {
+        return null;
+      }
+      list.add(value);
     }
-    return list.isEmpty ? [1.0, 4.0] : list;
+    return list.isEmpty ? null : list;
   }
 
   String? _validateInt(
@@ -307,7 +314,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final raw = (value ?? '').trim();
     if (raw.isEmpty) return l10n.tr('validation_steps_required');
     final list = _parseLearningSteps(raw);
-    if (list.isEmpty) return l10n.tr('validation_steps_invalid');
+    if (list == null) return l10n.tr('validation_steps_invalid');
     if (list.any((x) => x <= 0)) return l10n.tr('validation_steps_positive');
     return null;
   }

@@ -1,11 +1,11 @@
 {
-    "name": "flashcards_app",
-    "short_name": "flashcards_app",
+    "name": "FlashLingo",
+    "short_name": "FlashLingo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
     "theme_color": "#2A99BE",
-    "description": "A new Flutter project.",
+    "description": "FlashLingo is a local-first flashcards app for Android vocabulary study.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

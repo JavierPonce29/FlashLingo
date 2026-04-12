@@ -267,17 +267,17 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   Widget build(BuildContext context) {
     final guidedTourState = ref.watch(guidedTourProvider);
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (guidedTourState.step.isStudyStep) {
-          return false;
+    return PopScope(
+      canPop: !guidedTourState.step.isStudyStep,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) {
+          return;
         }
         if (_isFinished) {
           await _completeSessionIfNeeded();
         } else {
           await _persistStudySession();
         }
-        return true;
       },
       child: _isFinished
           ? _buildFinished(guidedTourState)

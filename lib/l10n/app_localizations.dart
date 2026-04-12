@@ -1,51 +1,25 @@
 import 'package:flutter/widgets.dart';
 
-import 'package:flashcards_app/l10n/app_strings_de.dart';
 import 'package:flashcards_app/l10n/app_strings_en.dart';
 import 'package:flashcards_app/l10n/app_strings_es.dart';
-import 'package:flashcards_app/l10n/app_strings_fr.dart';
-import 'package:flashcards_app/l10n/app_strings_ja.dart';
-import 'package:flashcards_app/l10n/app_strings_ro.dart';
-import 'package:flashcards_app/l10n/app_strings_zh.dart';
 
 class AppLocalizations {
   AppLocalizations(this.locale);
 
   final Locale locale;
 
-  static const List<String> supportedLanguageCodes = <String>[
-    'en',
-    'es',
-    'ro',
-    'de',
-    'fr',
-    'ja',
-    'zh',
-  ];
+  static const List<String> supportedLanguageCodes = <String>['en', 'es'];
 
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('ro'),
-    Locale('de'),
-    Locale('fr'),
-    Locale('ja'),
-    Locale('zh'),
   ];
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
   static const Map<String, Map<String, String>> _localizedValues =
-      <String, Map<String, String>>{
-        'en': appStringsEn,
-        'es': appStringsEs,
-        'ro': appStringsRo,
-        'de': appStringsDe,
-        'fr': appStringsFr,
-        'ja': appStringsJa,
-        'zh': appStringsZh,
-      };
+      <String, Map<String, String>>{'en': appStringsEn, 'es': appStringsEs};
 
   static AppLocalizations of(BuildContext context) {
     final localizations = Localizations.of<AppLocalizations>(
@@ -85,10 +59,8 @@ class _AppLocalizationsDelegate
   const _AppLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) =>
-      AppLocalizations.supportedLanguageCodes.contains(
-        AppLocalizations.normalizeLanguageCode(locale.languageCode),
-      );
+  bool isSupported(Locale locale) => AppLocalizations.supportedLanguageCodes
+      .contains(AppLocalizations.normalizeLanguageCode(locale.languageCode));
 
   @override
   Future<AppLocalizations> load(Locale locale) async {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -233,7 +234,11 @@ class GuidedTourController extends StateNotifier<GuidedTourState> {
         state = state.copyWith(step: GuidedTourStep.settingsLanguage);
         return;
       case GuidedTourStep.settingsLanguage:
-        state = state.copyWith(step: GuidedTourStep.settingsTimeMachine);
+        state = state.copyWith(
+          step: kDebugMode
+              ? GuidedTourStep.settingsTimeMachine
+              : GuidedTourStep.settingsTourButton,
+        );
         return;
       case GuidedTourStep.settingsTimeMachine:
         state = state.copyWith(step: GuidedTourStep.settingsTourButton);

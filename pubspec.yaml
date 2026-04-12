@@ -1,5 +1,5 @@
 name: flashcards_app
-description: "A new Flutter project."
+description: "FlashLingo is a local-first Android flashcards app for importing and studying vocabulary decks."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -53,6 +53,8 @@ dependencies:
   #Renderizado web
   flutter_inappwebview: ^6.0.0
   url_launcher: ^6.3.2
+  share_plus: ^10.0.2
+  cross_file: ^0.3.4+2
 
   #Utilidades JSON
   json_annotation: ^4.8.1
@@ -103,7 +105,6 @@ flutter:
     - lib/assets/images/ICO.png
     - lib/assets/starter/FlashLingo.flashjp
     - lib/assets/fonts/ArialUnicodeMS.ttf
-    - lib/assets/fonts/NotoSansCJK-Regular.ttf
     - lib/assets/fonts/DejaVuSans.ttf
     - lib/assets/fonts/DejaVuSans-Bold.ttf
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -129,20 +130,24 @@ class GeneralSettingsPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                TourHighlight(
-                  highlighted: tourStep == GuidedTourStep.settingsTimeMachine,
-                  child: Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.history_toggle_off),
-                      title: Text(l10n.tr('settings_time_machine_title')),
-                      subtitle: Text(l10n.tr('settings_time_machine_subtitle')),
-                      onTap: tourInsideSettings
-                          ? null
-                          : () => _showTimeMachineDialog(context, ref),
+                if (kDebugMode) ...[
+                  TourHighlight(
+                    highlighted: tourStep == GuidedTourStep.settingsTimeMachine,
+                    child: Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.history_toggle_off),
+                        title: Text(l10n.tr('settings_time_machine_title')),
+                        subtitle: Text(
+                          l10n.tr('settings_time_machine_subtitle'),
+                        ),
+                        onTap: tourInsideSettings
+                            ? null
+                            : () => _showTimeMachineDialog(context, ref),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 TourHighlight(
                   highlighted: tourStep == GuidedTourStep.settingsTourButton,
                   child: Card(
