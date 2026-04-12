@@ -15,6 +15,9 @@ import 'media_asset_cleanup.dart';
 
 enum ImportDeckConflictAction { createNewDeck, updateExistingDeck }
 
+const int _sqliteBatchSize = 250;
+const int _isarWriteBatchSize = 400;
+
 class ImportExecutionOptions {
   final ImportDeckConflictAction action;
   final String? customPackName;
@@ -623,6 +626,19 @@ class ImporterService {
     if (value == null) return fallback;
     if (value is bool) return value;
     if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'yes' ||
+          normalized == 'si' ||
+          normalized == 's\u00ed') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+        return false;
+      }
+    }
     final s = value.toString().trim().toLowerCase();
     if (s == 'true' || s == '1' || s == 'yes' || s == 'si' || s == 'sí')
       return true;
@@ -669,7 +685,8 @@ class ImporterService {
   //  MIGRACION SQLITE -> ISAR (nuevo / actualizacion)
   // ============================================================
 
-  Future<_MergeImportSummary> _migrateDataToIsar(
+  // ignore: unused_element
+  Future<_MergeImportSummary> _migrateDataToIsarLegacy(
     sql.Database db,
     String isoCode,
     String importedPackName,
@@ -859,6 +876,240 @@ class ImporterService {
       missingSentenceAudio: missingSentenceAudio,
       missingImages: missingImages,
     );
+  }
+
+  Future<_MergeImportSummary> _migrateDataToIsar(
+    sql.Database db,
+    String isoCode,
+    String importedPackName,
+    String targetPackName,
+    MediaIndex mediaIndex,
+    Map<String, dynamic> manifestData, {
+    required ImportExecutionOptions options,
+    required bool targetDeckExistedBeforeImport,
+  }) async {
+    final importedSettings = _buildDeckSettingsFromManifest(
+      packName: targetPackName,
+      manifestData: manifestData,
+    );
+    final iconRef = _extractDeckIconRef(manifestData);
+    final iconUri = mediaIndex.find(iconRef);
+    bool deckSettingsCreated = false;
+    bool deckSettingsUpdated = false;
+    bool deckSettingsPreserved = false;
+    final existingSettings = await isar.deckSettings
+        .filter()
+        .packNameEqualTo(targetPackName)
+        .findFirst();
+
+    final bool preserveUserSettings =
+        existingSettings != null &&
+        ((options.action == ImportDeckConflictAction.updateExistingDeck &&
+                !options.updateDeckSettingsFromManifest) ||
+            (options.action == ImportDeckConflictAction.createNewDeck &&
+                targetDeckExistedBeforeImport));
+
+    DeckSettings? settingsToPersist;
+    if (existingSettings == null) {
+      importedSettings.deckIconUri = iconUri;
+      settingsToPersist = importedSettings;
+      deckSettingsCreated = true;
+    } else if (preserveUserSettings) {
+      deckSettingsPreserved = true;
+      if (iconUri != null && iconUri != existingSettings.deckIconUri) {
+        existingSettings.deckIconUri = iconUri;
+        settingsToPersist = existingSettings;
+      }
+    } else {
+      importedSettings.id = existingSettings.id;
+      importedSettings.newCardsSeenToday = existingSettings.newCardsSeenToday;
+      importedSettings.lastNewCardStudyDate =
+          existingSettings.lastNewCardStudyDate;
+      importedSettings.deckIconUri = iconUri ?? existingSettings.deckIconUri;
+      settingsToPersist = importedSettings;
+      deckSettingsUpdated = true;
+    }
+
+    if (settingsToPersist != null) {
+      final settings = settingsToPersist;
+      await isar.writeTxn(() async {
+        await isar.deckSettings.putByIndex('packName', settings);
+      });
+    }
+
+    final sqliteRows = await _countSqliteRows(db, 'flashcards');
+    _debugLog('Importando $sqliteRows registros de la base de datos...');
+    final DeckSettings? preservedSettings = preserveUserSettings
+        ? existingSettings
+        : null;
+    final preservedInitialNt = preservedSettings?.initialNt;
+    final double initialNtValue =
+        preservedInitialNt ?? importedSettings.initialNt;
+
+    final Map<String, Flashcard> existingByLogicalKey = {};
+    if (options.action == ImportDeckConflictAction.updateExistingDeck) {
+      final existingCards = await isar.flashcards
+          .filter()
+          .packNameEqualTo(targetPackName)
+          .findAll();
+      for (final c in existingCards) {
+        existingByLogicalKey[_logicalKey(c.originalId, c.cardType)] = c;
+      }
+      _debugLog(
+        "Mazo existente '$targetPackName': ${existingCards.length} tarjetas actuales.",
+      );
+    }
+
+    final List<Flashcard> toInsert = [];
+    final List<Flashcard> toUpdate = [];
+    final seenImportKeys = <String>{};
+    int duplicateLogicalCardsInImport = 0;
+    int cardsCreated = 0;
+    int cardsUpdated = 0;
+    int cardsUnchanged = 0;
+    int missingWordAudio = 0;
+    int missingSentenceAudio = 0;
+    int missingImages = 0;
+
+    for (int offset = 0; offset < sqliteRows; offset += _sqliteBatchSize) {
+      final rows = await _readFlashcardBatch(
+        db,
+        offset: offset,
+        limit: _sqliteBatchSize,
+      );
+      for (int i = 0; i < rows.length; i++) {
+        final row = rows[i];
+        final rowNumber = offset + i + 1;
+        final wordAudioRef = _normalizeDbRef(row['AUDIO_PALABRA']);
+        final sentenceAudioRef = _normalizeDbRef(row['AUDIO_ORACION']);
+        final imageRef = _normalizeDbRef(row['IMAGEN']);
+        final String? audioPath = mediaIndex.find(wordAudioRef);
+        final String? sentenceAudioPath = mediaIndex.find(sentenceAudioRef);
+        final String? imagePath = mediaIndex.find(imageRef);
+
+        if (wordAudioRef != null && audioPath == null) {
+          missingWordAudio++;
+          if (missingWordAudio <= 20) {
+            _debugLog(
+              "Audio palabra faltante fila $rowNumber: '$wordAudioRef'",
+            );
+          }
+        }
+        if (sentenceAudioRef != null && sentenceAudioPath == null) {
+          missingSentenceAudio++;
+          if (missingSentenceAudio <= 20) {
+            _debugLog(
+              "Audio oracion faltante fila $rowNumber: '$sentenceAudioRef'",
+            );
+          }
+        }
+        if (imageRef != null && imagePath == null) {
+          missingImages++;
+          if (missingImages <= 20) {
+            _debugLog("Imagen faltante fila $rowNumber: '$imageRef'");
+          }
+        }
+
+        final originalId = (row['ID'] ?? '').toString().trim();
+        if (originalId.isEmpty) {
+          continue;
+        }
+        final cards = _buildCardsFromRow(
+          row: row,
+          originalId: originalId,
+          isoCode: isoCode,
+          packName: targetPackName,
+          audioPath: audioPath,
+          sentenceAudioPath: sentenceAudioPath,
+          imagePath: imagePath,
+          initialNtValue: initialNtValue,
+        );
+
+        for (final card in cards) {
+          final key = _logicalKey(card.originalId, card.cardType);
+          if (seenImportKeys.contains(key)) {
+            duplicateLogicalCardsInImport++;
+            continue;
+          }
+          seenImportKeys.add(key);
+
+          if (options.action == ImportDeckConflictAction.updateExistingDeck) {
+            final existing = existingByLogicalKey[key];
+            if (existing == null) {
+              toInsert.add(card);
+              cardsCreated++;
+            } else {
+              final changed = _applyImportedContent(existing, card);
+              if (changed) {
+                toUpdate.add(existing);
+                cardsUpdated++;
+              } else {
+                cardsUnchanged++;
+              }
+            }
+          } else {
+            toInsert.add(card);
+            cardsCreated++;
+          }
+
+          if (toInsert.length + toUpdate.length >= _isarWriteBatchSize) {
+            await _flushFlashcardBatch(toInsert: toInsert, toUpdate: toUpdate);
+          }
+        }
+      }
+    }
+
+    await _flushFlashcardBatch(toInsert: toInsert, toUpdate: toUpdate);
+
+    return _MergeImportSummary(
+      deckSettingsCreated: deckSettingsCreated,
+      deckSettingsUpdated: deckSettingsUpdated,
+      deckSettingsPreserved: deckSettingsPreserved,
+      sqliteRows: sqliteRows,
+      cardsCreated: cardsCreated,
+      cardsUpdated: cardsUpdated,
+      cardsUnchanged: cardsUnchanged,
+      duplicateLogicalCardsInImport: duplicateLogicalCardsInImport,
+      missingWordAudio: missingWordAudio,
+      missingSentenceAudio: missingSentenceAudio,
+      missingImages: missingImages,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> _readFlashcardBatch(
+    sql.Database db, {
+    required int offset,
+    required int limit,
+  }) async {
+    return db.query(
+      'flashcards',
+      orderBy: 'rowid',
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  Future<void> _flushFlashcardBatch({
+    required List<Flashcard> toInsert,
+    required List<Flashcard> toUpdate,
+  }) async {
+    if (toInsert.isEmpty && toUpdate.isEmpty) {
+      return;
+    }
+
+    final insertBatch = List<Flashcard>.from(toInsert);
+    final updateBatch = List<Flashcard>.from(toUpdate);
+    toInsert.clear();
+    toUpdate.clear();
+
+    await isar.writeTxn(() async {
+      if (insertBatch.isNotEmpty) {
+        await isar.flashcards.putAll(insertBatch);
+      }
+      if (updateBatch.isNotEmpty) {
+        await isar.flashcards.putAll(updateBatch);
+      }
+    });
   }
 
   String _logicalKey(String originalId, String cardType) =>

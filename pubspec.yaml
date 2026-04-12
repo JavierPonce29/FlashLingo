@@ -76,6 +76,9 @@ dev_dependencies:
 
   analyzer: 5.13.0
   flutter_launcher_icons: ^0.14.4
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
+  sqflite_common_ffi: ^2.3.6
 
   #Generadores de codigo
   build_runner: ^2.4.8
