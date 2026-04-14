@@ -109,14 +109,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ignoring: blockHomeBody,
         child: decksAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(
-            child: Text(
-              l10n.tr(
-                'common_error_with_detail',
-                params: <String, Object?>{'error': err},
-              ),
-            ),
-          ),
+          error: (err, _) => Center(child: Text(l10n.tr('home_load_error'))),
           data: (decks) {
             if (decks.isEmpty) {
               return Center(

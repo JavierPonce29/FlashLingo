@@ -125,14 +125,8 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
       ),
       body: isarAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text(
-            l10n.tr(
-              'browser_db_error',
-              params: <String, Object?>{'error': error},
-            ),
-          ),
-        ),
+        error: (_, stackTrace) =>
+            Center(child: Text(l10n.tr('browser_load_error'))),
         data: (isar) {
           final cardWatchStream = isar.flashcards
               .filter()

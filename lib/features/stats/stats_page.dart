@@ -106,14 +106,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       ),
       body: statsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Text(
-            l10n.tr(
-              'common_error_with_detail',
-              params: <String, Object?>{'error': err},
-            ),
-          ),
-        ),
+        error: (_, stackTrace) =>
+            Center(child: Text(l10n.tr('stats_load_error'))),
         data: (stats) {
           if (stats.totalCards == 0) {
             return Center(child: Text(l10n.tr('stats_empty')));
@@ -190,17 +184,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           ),
         ),
       );
-    } catch (error) {
+    } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.l10n.tr(
-              'common_error_with_detail',
-              params: <String, Object?>{'error': error},
-            ),
-          ),
-        ),
+        SnackBar(content: Text(context.l10n.tr('stats_export_csv_error'))),
       );
     } finally {
       if (mounted) {
@@ -252,17 +239,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           ),
         ),
       );
-    } catch (error) {
+    } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.l10n.tr(
-              'common_error_with_detail',
-              params: <String, Object?>{'error': error},
-            ),
-          ),
-        ),
+        SnackBar(content: Text(context.l10n.tr('stats_export_pdf_error'))),
       );
     } finally {
       if (mounted) {
