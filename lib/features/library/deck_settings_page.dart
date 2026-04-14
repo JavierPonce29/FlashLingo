@@ -7,6 +7,7 @@ import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
+import 'package:flashcards_app/features/library/deck_settings_validation.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
@@ -161,7 +162,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final initialNt = double.parse(
       _initialNtController.text.trim().replaceAll(',', '.'),
     );
-    final learningSteps = _parseLearningSteps(_learningStepsController.text)!;
+    final learningSteps = parseLearningSteps(_learningStepsController.text)!;
     final newMinReps = int.parse(_newMinCorrectRepsController.text.trim());
     final newMinutes = int.parse(_newIntraDayMinutesController.text.trim());
     final writeThreshold = _enableWriteMode
@@ -237,26 +238,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     }
   }
 
-  List<double>? _parseLearningSteps(String raw) {
-    final parts = raw.split(',');
-    if (parts.isEmpty) {
-      return null;
-    }
-    final list = <double>[];
-    for (final part in parts) {
-      final normalized = part.trim();
-      if (normalized.isEmpty) {
-        return null;
-      }
-      final value = double.tryParse(normalized.replaceAll(',', '.'));
-      if (value == null) {
-        return null;
-      }
-      list.add(value);
-    }
-    return list.isEmpty ? null : list;
-  }
-
   String? _validateInt(
     String? value, {
     required String label,
@@ -310,13 +291,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   }
 
   String? _validateLearningSteps(String? value) {
-    final l10n = context.l10n;
-    final raw = (value ?? '').trim();
-    if (raw.isEmpty) return l10n.tr('validation_steps_required');
-    final list = _parseLearningSteps(raw);
-    if (list == null) return l10n.tr('validation_steps_invalid');
-    if (list.any((x) => x <= 0)) return l10n.tr('validation_steps_positive');
-    return null;
+    return validateLearningStepsInput(context.l10n, value);
   }
 
   String? _validateInterleaveCount(String? value, {required String label}) {

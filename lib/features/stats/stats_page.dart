@@ -8,12 +8,12 @@ import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
 
 import 'package:flashcards_app/data/local/isar_provider.dart';
-import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/features/library/flashcard_browser_page.dart';
 import 'package:flashcards_app/features/library/review_history_sheet.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
+import 'package:flashcards_app/features/stats/problem_card_actions.dart';
 import 'package:flashcards_app/features/stats/stats_analysis.dart';
 import 'package:flashcards_app/features/stats/stats_pdf_chart_export.dart';
 import 'package:flashcards_app/features/stats/stats_export_service.dart';
@@ -291,14 +291,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     DeckCardInsight card,
   ) async {
     final isar = await ref.read(isarDbProvider.future);
-    final flashcard = await isar.flashcards.get(card.id);
-    if (flashcard == null || flashcard.state == CardState.newCard) {
+    final flashcard = await bringProblemCardToToday(isar, card.id);
+    if (flashcard == null) {
       return;
     }
-    await isar.writeTxn(() async {
-      flashcard.nextReview = DateTime.now();
-      await isar.flashcards.put(flashcard);
-    });
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1954,8 +1950,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final now = DateTime.now();
     return Column(
       children: stats.problemCards.map((card) {
-        final canBringToToday =
-            card.state != CardState.newCard && card.nextReview.isAfter(now);
+        final canBringToToday = canBringProblemCardToToday(card, now);
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: Padding(

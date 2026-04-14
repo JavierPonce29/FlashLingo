@@ -5,11 +5,10 @@ import 'package:isar/isar.dart';
 import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
+import 'package:flashcards_app/features/library/flashcard_browser_logic.dart';
 import 'package:flashcards_app/features/library/review_history_sheet.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
-
-enum _FlashcardSortMode { original, hardest, overdue, nextReview, lastReview }
 
 class _BrowserData {
   final List<Flashcard> cards;
@@ -41,7 +40,7 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
   bool _showRecog = true;
   bool _showProd = true;
   CardState? _stateFilter;
-  _FlashcardSortMode _sortMode = _FlashcardSortMode.original;
+  FlashcardBrowserSortMode _sortMode = FlashcardBrowserSortMode.original;
 
   @override
   void initState() {
@@ -69,64 +68,19 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
     }
   }
 
-  String _sortLabel(AppLocalizations l10n, _FlashcardSortMode mode) {
+  String _sortLabel(AppLocalizations l10n, FlashcardBrowserSortMode mode) {
     switch (mode) {
-      case _FlashcardSortMode.original:
+      case FlashcardBrowserSortMode.original:
         return l10n.tr('browser_sort_original');
-      case _FlashcardSortMode.hardest:
+      case FlashcardBrowserSortMode.hardest:
         return l10n.tr('browser_sort_hardest');
-      case _FlashcardSortMode.overdue:
+      case FlashcardBrowserSortMode.overdue:
         return l10n.tr('browser_sort_overdue');
-      case _FlashcardSortMode.nextReview:
+      case FlashcardBrowserSortMode.nextReview:
         return l10n.tr('browser_sort_next_review');
-      case _FlashcardSortMode.lastReview:
+      case FlashcardBrowserSortMode.lastReview:
         return l10n.tr('browser_sort_last_review');
     }
-  }
-
-  int _difficultyScore(Flashcard card) {
-    final reviews = card.lifetimeReviewCount;
-    final accuracy = reviews == 0 ? 0.0 : card.lifetimeCorrectCount / reviews;
-    return (((1 - accuracy) * 50) +
-            (card.consecutiveLapses * 10) +
-            (card.decayRate * 100))
-        .round();
-  }
-
-  int _overdueDays(Flashcard card, DateTime now) {
-    if (!card.nextReview.isBefore(now)) return 0;
-    return now.difference(card.nextReview).inDays;
-  }
-
-  void _sortCards(List<Flashcard> cards) {
-    final now = DateTime.now();
-    switch (_sortMode) {
-      case _FlashcardSortMode.original:
-        cards.sort((a, b) => a.originalId.compareTo(b.originalId));
-        break;
-      case _FlashcardSortMode.hardest:
-        cards.sort(
-          (a, b) => _difficultyScore(b).compareTo(_difficultyScore(a)),
-        );
-        break;
-      case _FlashcardSortMode.overdue:
-        cards.sort(
-          (a, b) => _overdueDays(b, now).compareTo(_overdueDays(a, now)),
-        );
-        break;
-      case _FlashcardSortMode.nextReview:
-        cards.sort((a, b) => a.nextReview.compareTo(b.nextReview));
-        break;
-      case _FlashcardSortMode.lastReview:
-        cards.sort((a, b) => b.lastReview.compareTo(a.lastReview));
-        break;
-    }
-    final highlightedId = widget.initialCardId;
-    if (highlightedId == null) return;
-    final index = cards.indexWhere((card) => card.id == highlightedId);
-    if (index <= 0) return;
-    final highlighted = cards.removeAt(index);
-    cards.insert(0, highlighted);
   }
 
   Future<_BrowserData> _loadBrowserData(Isar isar) async {
@@ -203,33 +157,17 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
                       }
 
                       final data = snap.data!;
-                      final all = data.cards;
-                      final q = _query.trim().toLowerCase();
-
-                      final filtered = all.where((card) {
-                        if (!_showRecog && card.cardType.endsWith('recog')) {
-                          return false;
-                        }
-                        if (!_showProd && card.cardType.endsWith('prod')) {
-                          return false;
-                        }
-                        if (_stateFilter != null &&
-                            card.state != _stateFilter) {
-                          return false;
-                        }
-
-                        if (q.isEmpty) return true;
-                        final question = card.question.toLowerCase();
-                        final answer = card.answer.toLowerCase();
-                        final sentence = (card.sentence ?? '').toLowerCase();
-                        final translation = (card.translation ?? '')
-                            .toLowerCase();
-                        return question.contains(q) ||
-                            answer.contains(q) ||
-                            sentence.contains(q) ||
-                            translation.contains(q);
-                      }).toList();
-                      _sortCards(filtered);
+                      final filtered = buildVisibleFlashcards(
+                        data.cards,
+                        filters: FlashcardBrowserFilters(
+                          query: _query,
+                          showRecog: _showRecog,
+                          showProd: _showProd,
+                          stateFilter: _stateFilter,
+                          sortMode: _sortMode,
+                          highlightedId: widget.initialCardId,
+                        ),
+                      );
 
                       return Column(
                         children: [
@@ -344,13 +282,13 @@ class _FlashcardBrowserPageState extends ConsumerState<FlashcardBrowserPage> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: DropdownButton<_FlashcardSortMode>(
+                child: DropdownButton<FlashcardBrowserSortMode>(
                   value: _sortMode,
                   isExpanded: true,
                   underline: const SizedBox.shrink(),
-                  items: _FlashcardSortMode.values
+                  items: FlashcardBrowserSortMode.values
                       .map(
-                        (mode) => DropdownMenuItem<_FlashcardSortMode>(
+                        (mode) => DropdownMenuItem<FlashcardBrowserSortMode>(
                           value: mode,
                           child: Text(_sortLabel(l10n, mode)),
                         ),
