@@ -15,6 +15,17 @@ import 'media_asset_cleanup.dart';
 
 enum ImportDeckConflictAction { createNewDeck, updateExistingDeck }
 
+enum ImportProgressPhase {
+  preparingPackage,
+  extractingArchive,
+  scanningPackage,
+  copyingMedia,
+  readingDatabase,
+  importingCards,
+  cleaningUp,
+  finalizing,
+}
+
 const int _sqliteBatchSize = 250;
 const int _isarWriteBatchSize = 400;
 
@@ -119,6 +130,24 @@ class ImportSummary {
   });
 }
 
+class ImportProgressUpdate {
+  final ImportProgressPhase phase;
+  final double overallProgress;
+  final int? processedItems;
+  final int? totalItems;
+
+  const ImportProgressUpdate({
+    required this.phase,
+    required this.overallProgress,
+    this.processedItems,
+    this.totalItems,
+  });
+
+  bool get hasKnownItemCount => totalItems != null && totalItems! > 0;
+}
+
+typedef ImportProgressCallback = void Function(ImportProgressUpdate update);
+
 class _PreparedPackage {
   final Directory extractDir;
   final Directory packageRoot;
@@ -171,44 +200,194 @@ class _MergeImportSummary {
   });
 }
 
+class _ImportProgressReporter {
+  final ImportProgressCallback? onProgress;
+  final _ImportProgressMode mode;
+
+  const _ImportProgressReporter._(this.onProgress, this.mode);
+
+  const _ImportProgressReporter.preview(ImportProgressCallback? onProgress)
+    : this._(onProgress, _ImportProgressMode.preview);
+
+  const _ImportProgressReporter.importing(ImportProgressCallback? onProgress)
+    : this._(onProgress, _ImportProgressMode.importing);
+
+  void preparingPackage() => _emit(ImportProgressPhase.preparingPackage, 1);
+
+  void extractingArchive({required int processed, required int total}) {
+    _emit(
+      ImportProgressPhase.extractingArchive,
+      _ratio(processed, total),
+      processedItems: processed,
+      totalItems: total,
+    );
+  }
+
+  void scanningPackage() => _emit(ImportProgressPhase.scanningPackage, 1);
+
+  void copyingMedia({required int processed, required int total}) {
+    _emit(
+      ImportProgressPhase.copyingMedia,
+      _ratio(processed, total),
+      processedItems: processed,
+      totalItems: total,
+    );
+  }
+
+  void readingDatabase({int? processed, int? total}) {
+    _emit(
+      ImportProgressPhase.readingDatabase,
+      _ratio(processed ?? 0, total ?? 1),
+      processedItems: total != null && total > 0 ? processed : null,
+      totalItems: total != null && total > 0 ? total : null,
+    );
+  }
+
+  void importingCards({required int processed, required int total}) {
+    _emit(
+      ImportProgressPhase.importingCards,
+      _ratio(processed, total),
+      processedItems: processed,
+      totalItems: total,
+    );
+  }
+
+  void cleaningUp() => _emit(ImportProgressPhase.cleaningUp, 1);
+
+  void finalizing() => _emit(ImportProgressPhase.finalizing, 1);
+
+  double _ratio(int processed, int total) {
+    if (total <= 0) return 1;
+    return (processed / total).clamp(0.0, 1.0);
+  }
+
+  void _emit(
+    ImportProgressPhase phase,
+    double phaseProgress, {
+    int? processedItems,
+    int? totalItems,
+  }) {
+    final callback = onProgress;
+    if (callback == null) return;
+    callback(
+      ImportProgressUpdate(
+        phase: phase,
+        overallProgress: _overallProgressFor(phase, phaseProgress),
+        processedItems: processedItems,
+        totalItems: totalItems,
+      ),
+    );
+  }
+
+  double _overallProgressFor(ImportProgressPhase phase, double phaseProgress) {
+    final clampedPhaseProgress = phaseProgress.clamp(0.0, 1.0);
+    switch (mode) {
+      case _ImportProgressMode.preview:
+        return _previewOverallProgressFor(phase, clampedPhaseProgress);
+      case _ImportProgressMode.importing:
+        return _importOverallProgressFor(phase, clampedPhaseProgress);
+    }
+  }
+
+  double _importOverallProgressFor(
+    ImportProgressPhase phase,
+    double phaseProgress,
+  ) {
+    final clampedPhaseProgress = phaseProgress.clamp(0.0, 1.0);
+    switch (phase) {
+      case ImportProgressPhase.preparingPackage:
+        return 0.03 * clampedPhaseProgress;
+      case ImportProgressPhase.extractingArchive:
+        return 0.03 + (0.22 * clampedPhaseProgress);
+      case ImportProgressPhase.scanningPackage:
+        return 0.25 + (0.08 * clampedPhaseProgress);
+      case ImportProgressPhase.copyingMedia:
+        return 0.33 + (0.20 * clampedPhaseProgress);
+      case ImportProgressPhase.readingDatabase:
+        return 0.53 + (0.07 * clampedPhaseProgress);
+      case ImportProgressPhase.importingCards:
+        return 0.60 + (0.35 * clampedPhaseProgress);
+      case ImportProgressPhase.cleaningUp:
+        return 0.95 + (0.03 * clampedPhaseProgress);
+      case ImportProgressPhase.finalizing:
+        return 0.98 + (0.02 * clampedPhaseProgress);
+    }
+  }
+
+  double _previewOverallProgressFor(
+    ImportProgressPhase phase,
+    double phaseProgress,
+  ) {
+    final clampedPhaseProgress = phaseProgress.clamp(0.0, 1.0);
+    switch (phase) {
+      case ImportProgressPhase.preparingPackage:
+        return 0.05 * clampedPhaseProgress;
+      case ImportProgressPhase.extractingArchive:
+        return 0.05 + (0.50 * clampedPhaseProgress);
+      case ImportProgressPhase.scanningPackage:
+        return 0.55 + (0.15 * clampedPhaseProgress);
+      case ImportProgressPhase.copyingMedia:
+        return 0.70;
+      case ImportProgressPhase.readingDatabase:
+        return 0.70 + (0.22 * clampedPhaseProgress);
+      case ImportProgressPhase.importingCards:
+        return 0.92;
+      case ImportProgressPhase.cleaningUp:
+        return 0.92 + (0.05 * clampedPhaseProgress);
+      case ImportProgressPhase.finalizing:
+        return 0.97 + (0.03 * clampedPhaseProgress);
+    }
+  }
+}
+
+enum _ImportProgressMode { preview, importing }
+
 class ImporterService {
   final Isar isar;
   final Uuid _uuid = const Uuid();
   ImporterService(this.isar);
   Future<ImportPreviewResult> previewFlashcardPackage(
-    String zipFilePath,
-  ) async {
-    final prepared = await _preparePackage(zipFilePath, copyMedia: false);
+    String zipFilePath, {
+    ImportProgressCallback? onProgress,
+  }) async {
+    final progress = _ImportProgressReporter.preview(onProgress);
+    progress.preparingPackage();
+    final prepared = await _preparePackage(
+      zipFilePath,
+      copyMedia: false,
+      progress: progress,
+    );
+    sql.Database? sqliteDb;
     try {
-      final sqliteDb = await sql.openDatabase(
-        prepared.dbFile.path,
-        readOnly: true,
+      sqliteDb = await sql.openDatabase(prepared.dbFile.path, readOnly: true);
+      progress.readingDatabase(processed: 0, total: 1);
+      final rows = await sqliteDb.rawQuery(
+        'SELECT COUNT(*) AS c FROM flashcards',
       );
-      try {
-        final rows = await sqliteDb.rawQuery(
-          'SELECT COUNT(*) AS c FROM flashcards',
-        );
-        final sqliteRows = rows.isNotEmpty
-            ? _asInt(rows.first['c'], fallback: 0)
-            : 0;
-        final exists = await _deckExistsByName(prepared.packName);
-        return ImportPreviewResult(
-          zipFilePath: zipFilePath,
-          zipFileName: p.basename(zipFilePath),
-          importedPackName: prepared.packName,
-          isoCode: prepared.isoCode,
-          dbFilename: prepared.dbFilename,
-          deckNameExists: exists,
-          sqliteRows: sqliteRows,
-          estimatedCardsToImport: sqliteRows * 2,
-          zipEntriesTotal: prepared.archiveEntriesTotal,
-          zipRealFileEntries: prepared.archiveRealFileEntries,
-        );
-      } finally {
-        await sqliteDb.close();
-      }
+      final sqliteRows = rows.isNotEmpty
+          ? _asInt(rows.first['c'], fallback: 0)
+          : 0;
+      final exists = await _deckExistsByName(prepared.packName);
+      progress.readingDatabase(processed: 1, total: 1);
+      return ImportPreviewResult(
+        zipFilePath: zipFilePath,
+        zipFileName: p.basename(zipFilePath),
+        importedPackName: prepared.packName,
+        isoCode: prepared.isoCode,
+        dbFilename: prepared.dbFilename,
+        deckNameExists: exists,
+        sqliteRows: sqliteRows,
+        estimatedCardsToImport: sqliteRows * 2,
+        zipEntriesTotal: prepared.archiveEntriesTotal,
+        zipRealFileEntries: prepared.archiveRealFileEntries,
+      );
     } finally {
+      try {
+        await sqliteDb?.close();
+      } catch (_) {}
+      progress.cleaningUp();
       await _cleanupExtractDir(prepared.extractDir);
+      progress.finalizing();
     }
   }
 
@@ -216,8 +395,15 @@ class ImporterService {
   Future<ImportSummary> importFlashcardPackageAdvanced(
     String zipFilePath, {
     required ImportExecutionOptions options,
+    ImportProgressCallback? onProgress,
   }) async {
-    final prepared = await _preparePackage(zipFilePath, copyMedia: true);
+    final progress = _ImportProgressReporter.importing(onProgress);
+    progress.preparingPackage();
+    final prepared = await _preparePackage(
+      zipFilePath,
+      copyMedia: true,
+      progress: progress,
+    );
     sql.Database? sqliteDb;
     try {
       final importedPackName = prepared.packName;
@@ -258,8 +444,11 @@ class ImporterService {
         prepared.manifestData,
         options: options,
         targetDeckExistedBeforeImport: targetExists,
+        progress: progress,
       );
+      progress.cleaningUp();
       await purgeOrphanedMediaAssets(isar);
+      progress.finalizing();
 
       return ImportSummary(
         zipFilePath: zipFilePath,
@@ -321,12 +510,18 @@ class ImporterService {
   Future<_PreparedPackage> _preparePackage(
     String zipFilePath, {
     required bool copyMedia,
+    _ImportProgressReporter? progress,
   }) async {
     final extractDir = await _createTempExtractDir(zipFilePath);
     final input = InputFileStream(zipFilePath);
     final archive = ZipDecoder().decodeStream(input);
-    int totalEntries = archive.length;
+    final totalEntries = archive.length;
+    final realEntries = archive.where((entry) => entry.isFile).where((entry) {
+      final name = entry.name.replaceAll('\\', '/');
+      return !name.startsWith('__MACOSX/');
+    }).length;
     int realFileEntries = 0;
+    progress?.extractingArchive(processed: 0, total: realEntries);
 
     try {
       for (final entry in archive) {
@@ -351,11 +546,20 @@ class ImporterService {
         } finally {
           await output.close();
         }
+        if (realEntries <= 25 ||
+            realFileEntries == realEntries ||
+            realFileEntries % 10 == 0) {
+          progress?.extractingArchive(
+            processed: realFileEntries,
+            total: realEntries,
+          );
+        }
       }
     } finally {
       await input.close();
     }
 
+    progress?.scanningPackage();
     final manifestFile = await _findManifestFile(extractDir);
     final manifestData =
         jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
@@ -370,7 +574,11 @@ class ImporterService {
 
     MediaIndex? mediaIndex;
     if (copyMedia) {
-      mediaIndex = await _processAllMedia(packageRoot, extractDir);
+      mediaIndex = await _processAllMedia(
+        packageRoot,
+        extractDir,
+        progress: progress,
+      );
     }
     return _PreparedPackage(
       extractDir: extractDir,
@@ -501,8 +709,9 @@ class ImporterService {
 
   Future<MediaIndex> _processAllMedia(
     Directory packageRoot,
-    Directory extractDir,
-  ) async {
+    Directory extractDir, {
+    _ImportProgressReporter? progress,
+  }) async {
     final docs = await getApplicationDocumentsDirectory();
     final destDir = Directory(p.join(docs.path, 'media_assets'));
     await destDir.create(recursive: true);
@@ -522,6 +731,7 @@ class ImporterService {
       if (basename.endsWith('.db') || basename == 'manifest.json') continue;
       entities.add(entity);
     }
+    progress?.copyingMedia(processed: 0, total: entities.length);
     for (final entity in entities) {
       final ext = p.extension(entity.path);
       if (ext.isEmpty) {
@@ -574,6 +784,11 @@ class ImporterService {
         } else {
           dupKeys++;
         }
+      }
+      if (entities.length <= 25 ||
+          count == entities.length ||
+          count % 10 == 0) {
+        progress?.copyingMedia(processed: count, total: entities.length);
       }
     }
     _debugLog(
@@ -887,6 +1102,7 @@ class ImporterService {
     Map<String, dynamic> manifestData, {
     required ImportExecutionOptions options,
     required bool targetDeckExistedBeforeImport,
+    _ImportProgressReporter? progress,
   }) async {
     final importedSettings = _buildDeckSettingsFromManifest(
       packName: targetPackName,
@@ -937,7 +1153,9 @@ class ImporterService {
       });
     }
 
+    progress?.readingDatabase();
     final sqliteRows = await _countSqliteRows(db, 'flashcards');
+    progress?.readingDatabase(processed: 1, total: 1);
     _debugLog('Importando $sqliteRows registros de la base de datos...');
     final DeckSettings? preservedSettings = preserveUserSettings
         ? existingSettings
@@ -970,6 +1188,7 @@ class ImporterService {
     int missingWordAudio = 0;
     int missingSentenceAudio = 0;
     int missingImages = 0;
+    progress?.importingCards(processed: 0, total: sqliteRows);
 
     for (int offset = 0; offset < sqliteRows; offset += _sqliteBatchSize) {
       final rows = await _readFlashcardBatch(
@@ -1057,6 +1276,10 @@ class ImporterService {
           }
         }
       }
+      progress?.importingCards(
+        processed: offset + rows.length,
+        total: sqliteRows,
+      );
     }
 
     await _flushFlashcardBatch(toInsert: toInsert, toUpdate: toUpdate);

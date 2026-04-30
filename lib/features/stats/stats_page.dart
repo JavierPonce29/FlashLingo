@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +25,15 @@ import 'stats_provider.dart';
 
 enum _HeatmapMode { answers, uniqueCards }
 
+enum _StatsRangeLoadingPhase { calculating, rendering }
+
+class _StatsRangeLoadingState {
+  final double progress;
+  final _StatsRangeLoadingPhase phase;
+
+  const _StatsRangeLoadingState({required this.progress, required this.phase});
+}
+
 class StatsPage extends ConsumerStatefulWidget {
   final String packName;
 
@@ -42,6 +53,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   StatsRangeOption _hourlyRange = StatsRangeOption.month1;
   HourlySlotOption _hourlySlot = HourlySlotOption.hourly;
   StatsRangeOption _predictionRange = StatsRangeOption.days18;
+  bool _isRefreshingStatsRange = false;
   DeckStatsData? _cachedStats;
   final Map<_HeatmapMode, List<MonthHeatmapSlice>> _heatmapCache = {};
   final Map<StatsRangeOption, List<StackedForecastPoint>> _forecastCache = {};
@@ -342,48 +354,306 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   }
 
   List<StackedForecastPoint> _forecastPoints(DeckStatsData stats) {
+    return _forecastPointsForRange(stats, _forecastRange);
+  }
+
+  List<StackedForecastPoint> _forecastPointsForRange(
+    DeckStatsData stats,
+    StatsRangeOption option,
+  ) {
     _resetAnalysisCacheIfNeeded(stats);
     return _forecastCache.putIfAbsent(
-      _forecastRange,
-      () => buildForecastSeries(stats, _forecastRange),
+      option,
+      () => buildForecastSeries(stats, option),
     );
   }
 
   List<StudyTimePoint> _studyTimePoints(DeckStatsData stats) {
+    return _studyTimePointsForRange(stats, _studyTimeRange);
+  }
+
+  List<StudyTimePoint> _studyTimePointsForRange(
+    DeckStatsData stats,
+    StatsRangeOption option,
+  ) {
     _resetAnalysisCacheIfNeeded(stats);
     return _studyTimeCache.putIfAbsent(
-      _studyTimeRange,
-      () => buildStudyTimeSeries(stats, _studyTimeRange),
+      option,
+      () => buildStudyTimeSeries(stats, option),
     );
   }
 
   List<IntervalHistogramPoint> _intervalPoints(DeckStatsData stats) {
+    return _intervalPointsForRange(stats, _intervalRange);
+  }
+
+  List<IntervalHistogramPoint> _intervalPointsForRange(
+    DeckStatsData stats,
+    IntervalRangeOption option,
+  ) {
     _resetAnalysisCacheIfNeeded(stats);
     return _intervalCache.putIfAbsent(
-      _intervalRange,
-      () => buildIntervalHistogram(stats, _intervalRange),
+      option,
+      () => buildIntervalHistogram(stats, option),
     );
   }
 
   List<HourlyDistributionPoint> _hourlyPoints(DeckStatsData stats) {
+    return _hourlyPointsForSelection(
+      stats,
+      range: _hourlyRange,
+      slot: _hourlySlot,
+    );
+  }
+
+  List<HourlyDistributionPoint> _hourlyPointsForSelection(
+    DeckStatsData stats, {
+    required StatsRangeOption range,
+    required HourlySlotOption slot,
+  }) {
     _resetAnalysisCacheIfNeeded(stats);
-    final key = '${_hourlyRange.name}:${_hourlySlot.name}';
+    final key = '${range.name}:${slot.name}';
     return _hourlyCache.putIfAbsent(
       key,
-      () => buildHourlyDistribution(
-        stats,
-        option: _hourlyRange,
-        slotOption: _hourlySlot,
-      ),
+      () => buildHourlyDistribution(stats, option: range, slotOption: slot),
     );
   }
 
   List<PredictionTimelinePoint> _predictionPoints(DeckStatsData stats) {
+    return _predictionPointsForRange(stats, _predictionRange);
+  }
+
+  List<PredictionTimelinePoint> _predictionPointsForRange(
+    DeckStatsData stats,
+    StatsRangeOption option,
+  ) {
     _resetAnalysisCacheIfNeeded(stats);
     return _predictionCache.putIfAbsent(
-      _predictionRange,
-      () => buildPredictionTimeline(stats, _predictionRange),
+      option,
+      () => buildPredictionTimeline(stats, option),
     );
+  }
+
+  Future<void> _changeForecastRange(
+    BuildContext context,
+    DeckStatsData stats,
+    StatsRangeOption value,
+  ) {
+    final showLoader = _shouldUseBlockingLoaderForStatsRange(value);
+    return _runStatsRangeUpdate(
+      context,
+      shouldRun: value != _forecastRange,
+      showBlockingLoader: showLoader,
+      prepare: (onProgress) async {
+        if (_forecastCache.containsKey(value)) return;
+        final points = await buildForecastSeriesAsync(
+          stats,
+          value,
+          onProgress: onProgress,
+        );
+        _forecastCache[value] = points;
+      },
+      apply: () => _forecastRange = value,
+    );
+  }
+
+  Future<void> _changeStudyTimeRange(
+    BuildContext context,
+    DeckStatsData stats,
+    StatsRangeOption value,
+  ) {
+    final showLoader = _shouldUseBlockingLoaderForStatsRange(value);
+    return _runStatsRangeUpdate(
+      context,
+      shouldRun: value != _studyTimeRange,
+      showBlockingLoader: showLoader,
+      prepare: (onProgress) async {
+        if (_studyTimeCache.containsKey(value)) return;
+        final points = await buildStudyTimeSeriesAsync(
+          stats,
+          value,
+          onProgress: onProgress,
+        );
+        _studyTimeCache[value] = points;
+      },
+      apply: () => _studyTimeRange = value,
+    );
+  }
+
+  Future<void> _changeIntervalRange(
+    BuildContext context,
+    DeckStatsData stats,
+    IntervalRangeOption value,
+  ) {
+    final showLoader = _shouldUseBlockingLoaderForIntervalRange(value);
+    return _runStatsRangeUpdate(
+      context,
+      shouldRun: value != _intervalRange,
+      showBlockingLoader: showLoader,
+      prepare: (onProgress) async {
+        if (_intervalCache.containsKey(value)) return;
+        final points = await buildIntervalHistogramAsync(
+          stats,
+          value,
+          onProgress: onProgress,
+        );
+        _intervalCache[value] = points;
+      },
+      apply: () => _intervalRange = value,
+    );
+  }
+
+  Future<void> _changeHourlyRange(
+    BuildContext context,
+    DeckStatsData stats,
+    StatsRangeOption value,
+  ) {
+    final showLoader = _shouldUseBlockingLoaderForStatsRange(value);
+    return _runStatsRangeUpdate(
+      context,
+      shouldRun: value != _hourlyRange,
+      showBlockingLoader: showLoader,
+      prepare: (onProgress) async {
+        final key = '${value.name}:${_hourlySlot.name}';
+        if (_hourlyCache.containsKey(key)) return;
+        final points = await buildHourlyDistributionAsync(
+          stats,
+          option: value,
+          slotOption: _hourlySlot,
+          onProgress: onProgress,
+        );
+        _hourlyCache[key] = points;
+      },
+      apply: () => _hourlyRange = value,
+    );
+  }
+
+  Future<void> _changePredictionRange(
+    BuildContext context,
+    DeckStatsData stats,
+    StatsRangeOption value,
+  ) {
+    final showLoader = _shouldUseBlockingLoaderForStatsRange(value);
+    return _runStatsRangeUpdate(
+      context,
+      shouldRun: value != _predictionRange,
+      showBlockingLoader: showLoader,
+      prepare: (onProgress) async {
+        if (_predictionCache.containsKey(value)) return;
+        final points = await buildPredictionTimelineAsync(
+          stats,
+          value,
+          onProgress: onProgress,
+        );
+        _predictionCache[value] = points;
+      },
+      apply: () => _predictionRange = value,
+    );
+  }
+
+  bool _shouldUseBlockingLoaderForStatsRange(StatsRangeOption option) {
+    return option == StatsRangeOption.months6 ||
+        option == StatsRangeOption.year1 ||
+        option == StatsRangeOption.life;
+  }
+
+  bool _shouldUseBlockingLoaderForIntervalRange(IntervalRangeOption option) {
+    return option == IntervalRangeOption.lifeHalf ||
+        option == IntervalRangeOption.lifeFull;
+  }
+
+  Future<void> _runStatsRangeUpdate(
+    BuildContext context, {
+    required bool shouldRun,
+    required bool showBlockingLoader,
+    required Future<void> Function(void Function(double progress) onProgress)
+    prepare,
+    required VoidCallback apply,
+  }) async {
+    if (!shouldRun || _isRefreshingStatsRange) {
+      return;
+    }
+
+    _isRefreshingStatsRange = true;
+    bool dialogOpen = false;
+    ValueNotifier<_StatsRangeLoadingState>? progressNotifier;
+
+    void updateProgress({
+      required double progress,
+      required _StatsRangeLoadingPhase phase,
+    }) {
+      progressNotifier?.value = _StatsRangeLoadingState(
+        progress: progress.clamp(0.0, 1.0),
+        phase: phase,
+      );
+    }
+
+    try {
+      if (showBlockingLoader && context.mounted) {
+        progressNotifier = ValueNotifier<_StatsRangeLoadingState>(
+          const _StatsRangeLoadingState(
+            progress: 0.02,
+            phase: _StatsRangeLoadingPhase.calculating,
+          ),
+        );
+        dialogOpen = true;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          useRootNavigator: true,
+          builder: (_) => PopScope(
+            canPop: false,
+            child: _StatsRangeLoadingDialog(
+              progressListenable: progressNotifier!,
+            ),
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await WidgetsBinding.instance.endOfFrame;
+      }
+
+      await prepare((progress) {
+        if (!showBlockingLoader) return;
+        updateProgress(
+          progress: 0.05 + (progress * 0.83),
+          phase: _StatsRangeLoadingPhase.calculating,
+        );
+      });
+      if (!mounted) {
+        return;
+      }
+      if (showBlockingLoader) {
+        updateProgress(
+          progress: 0.92,
+          phase: _StatsRangeLoadingPhase.rendering,
+        );
+      }
+      setState(apply);
+      if (showBlockingLoader) {
+        await Future<void>.delayed(Duration.zero);
+        await WidgetsBinding.instance.endOfFrame;
+        updateProgress(
+          progress: 0.98,
+          phase: _StatsRangeLoadingPhase.rendering,
+        );
+        await Future<void>.delayed(Duration.zero);
+        await WidgetsBinding.instance.endOfFrame;
+        updateProgress(progress: 1, phase: _StatsRangeLoadingPhase.rendering);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('stats_load_error'))),
+        );
+      }
+    } finally {
+      _isRefreshingStatsRange = false;
+      if (dialogOpen && context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      progressNotifier?.dispose();
+    }
   }
 
   List<Widget Function()> _buildSections(
@@ -1001,7 +1271,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
             StatsRangeOption.life,
           ],
           labelBuilder: (value) => _statsRangeLabel(l10n, value),
-          onSelected: (value) => setState(() => _forecastRange = value),
+          onSelected: (value) =>
+              unawaited(_changeForecastRange(context, stats, value)),
         ),
         const SizedBox(height: 12),
         SingleChildScrollView(
@@ -1188,7 +1459,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                 StatsRangeOption.life,
               ],
               labelBuilder: (value) => _statsRangeLabel(l10n, value),
-              onSelected: (value) => setState(() => _studyTimeRange = value),
+              onSelected: (value) =>
+                  unawaited(_changeStudyTimeRange(context, stats, value)),
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -1318,7 +1590,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
               selected: _intervalRange,
               values: IntervalRangeOption.values,
               labelBuilder: (value) => _intervalRangeLabel(l10n, value),
-              onSelected: (value) => setState(() => _intervalRange = value),
+              onSelected: (value) =>
+                  unawaited(_changeIntervalRange(context, stats, value)),
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -1439,7 +1712,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                 StatsRangeOption.year1,
               ],
               labelBuilder: (value) => _statsRangeLabel(l10n, value),
-              onSelected: (value) => setState(() => _hourlyRange = value),
+              onSelected: (value) =>
+                  unawaited(_changeHourlyRange(context, stats, value)),
             ),
             const SizedBox(height: 8),
             _rangeSelector(
@@ -1579,7 +1853,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                 StatsRangeOption.life,
               ],
               labelBuilder: (value) => _statsRangeLabel(l10n, value),
-              onSelected: (value) => setState(() => _predictionRange = value),
+              onSelected: (value) =>
+                  unawaited(_changePredictionRange(context, stats, value)),
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -1740,7 +2015,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                 StatsRangeOption.life,
               ],
               labelBuilder: (value) => _statsRangeLabel(l10n, value),
-              onSelected: (value) => setState(() => _predictionRange = value),
+              onSelected: (value) =>
+                  unawaited(_changePredictionRange(context, stats, value)),
             ),
             const SizedBox(height: 12),
             SingleChildScrollView(
@@ -2373,5 +2649,61 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   String _formatDateTime(DateTime value) {
     if (value.millisecondsSinceEpoch == 0) return '-';
     return DateFormat('yyyy-MM-dd HH:mm').format(value);
+  }
+}
+
+class _StatsRangeLoadingDialog extends StatelessWidget {
+  const _StatsRangeLoadingDialog({required this.progressListenable});
+
+  final ValueListenable<_StatsRangeLoadingState> progressListenable;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AlertDialog(
+      title: Text(l10n.tr('stats_updating_title')),
+      content: ValueListenableBuilder<_StatsRangeLoadingState>(
+        valueListenable: progressListenable,
+        builder: (context, state, _) {
+          final percent = (state.progress * 100).round().clamp(0, 100);
+          final phaseLabel = state.phase == _StatsRangeLoadingPhase.calculating
+              ? l10n.tr('stats_updating_phase_calculating')
+              : l10n.tr('stats_updating_phase_rendering');
+
+          return SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.tr('stats_updating_message')),
+                const SizedBox(height: 14),
+                Text(
+                  phaseLabel,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: state.progress.clamp(0.0, 1.0),
+                    minHeight: 10,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  l10n.tr(
+                    'stats_updating_progress',
+                    params: <String, Object?>{'percent': percent},
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

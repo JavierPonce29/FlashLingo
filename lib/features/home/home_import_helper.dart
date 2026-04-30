@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
@@ -20,32 +21,7 @@ class HomeImportHelper {
   ) async {
     final l10n = context.l10n;
     bool loaderOpen = false;
-
-    void showLoader([String? message]) {
-      if (!context.mounted) return;
-      loaderOpen = true;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        useRootNavigator: true,
-        builder: (_) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            content: Row(
-              children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-                const SizedBox(width: 14),
-                Expanded(child: Text(message ?? l10n.tr('import_processing'))),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    ValueNotifier<ImportProgressUpdate>? progressNotifier;
 
     void closeLoaderIfOpen() {
       if (!context.mounted) return;
@@ -53,6 +29,28 @@ class HomeImportHelper {
         Navigator.of(context, rootNavigator: true).pop();
       }
       loaderOpen = false;
+    }
+
+    void disposeProgressNotifier() {
+      progressNotifier?.dispose();
+      progressNotifier = null;
+    }
+
+    void showProgressDialog(String title) {
+      if (!context.mounted || progressNotifier == null) return;
+      loaderOpen = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (_) => PopScope(
+          canPop: false,
+          child: _ImportProgressDialog(
+            title: title,
+            progressListenable: progressNotifier!,
+          ),
+        ),
+      );
     }
 
     try {
@@ -66,9 +64,21 @@ class HomeImportHelper {
       final importerCtrl = ref.read(importerControllerProvider.notifier);
 
       if (!context.mounted) return;
-      showLoader(l10n.tr('import_analyzing'));
-      final preview = await importerCtrl.previewFlashcardPackage(filePath);
+      progressNotifier = ValueNotifier<ImportProgressUpdate>(
+        const ImportProgressUpdate(
+          phase: ImportProgressPhase.preparingPackage,
+          overallProgress: 0,
+        ),
+      );
+      showProgressDialog(l10n.tr('import_analyzing'));
+      final preview = await importerCtrl.previewFlashcardPackage(
+        filePath,
+        onProgress: (update) {
+          progressNotifier?.value = update;
+        },
+      );
       closeLoaderIfOpen();
+      disposeProgressNotifier();
 
       if (!context.mounted) return;
       final options = await _resolveImportOptionsFromPreview(
@@ -82,12 +92,22 @@ class HomeImportHelper {
       }
 
       if (!context.mounted) return;
-      showLoader(l10n.tr('import_importing'));
+      progressNotifier = ValueNotifier<ImportProgressUpdate>(
+        const ImportProgressUpdate(
+          phase: ImportProgressPhase.preparingPackage,
+          overallProgress: 0,
+        ),
+      );
+      showProgressDialog(l10n.tr('import_importing'));
       final summary = await importerCtrl.importFlashcardPackageAdvanced(
         filePath,
         options: options,
+        onProgress: (update) {
+          progressNotifier?.value = update;
+        },
       );
       closeLoaderIfOpen();
+      disposeProgressNotifier();
       importerCtrl.resetState();
 
       if (!context.mounted) return;
@@ -105,6 +125,7 @@ class HomeImportHelper {
       );
     } on ImportConflictException catch (e) {
       closeLoaderIfOpen();
+      disposeProgressNotifier();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -120,6 +141,7 @@ class HomeImportHelper {
       );
     } catch (_) {
       closeLoaderIfOpen();
+      disposeProgressNotifier();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -345,6 +367,114 @@ class HomeImportHelper {
         .packNameEqualTo(normalized)
         .count();
     return fcCount > 0;
+  }
+}
+
+class _ImportProgressDialog extends StatelessWidget {
+  const _ImportProgressDialog({
+    required this.title,
+    required this.progressListenable,
+  });
+
+  final String title;
+  final ValueListenable<ImportProgressUpdate> progressListenable;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return AlertDialog(
+      title: Text(title),
+      content: ValueListenableBuilder<ImportProgressUpdate>(
+        valueListenable: progressListenable,
+        builder: (context, progress, _) {
+          final percent = (progress.overallProgress * 100).round().clamp(
+            0,
+            100,
+          );
+          final totalItems = progress.totalItems ?? 0;
+          final processedItems = progress.processedItems ?? 0;
+          final remainingItems = totalItems > 0
+              ? (totalItems - processedItems).clamp(0, totalItems)
+              : 0;
+          return SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.tr(
+                    'import_progress_phase',
+                    params: <String, Object?>{
+                      'phase': _phaseLabel(context, progress.phase),
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress.overallProgress.clamp(0.0, 1.0),
+                    minHeight: 10,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  l10n.tr(
+                    'import_progress_percent',
+                    params: <String, Object?>{'percent': percent},
+                  ),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (progress.hasKnownItemCount) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.tr(
+                      'import_progress_items',
+                      params: <String, Object?>{
+                        'current': processedItems,
+                        'total': totalItems,
+                      },
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.tr(
+                      'import_progress_remaining',
+                      params: <String, Object?>{'count': remainingItems},
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _phaseLabel(BuildContext context, ImportProgressPhase phase) {
+    final l10n = context.l10n;
+    switch (phase) {
+      case ImportProgressPhase.preparingPackage:
+        return l10n.tr('import_progress_phase_preparing');
+      case ImportProgressPhase.extractingArchive:
+        return l10n.tr('import_progress_phase_extracting');
+      case ImportProgressPhase.scanningPackage:
+        return l10n.tr('import_progress_phase_scanning');
+      case ImportProgressPhase.copyingMedia:
+        return l10n.tr('import_progress_phase_media');
+      case ImportProgressPhase.readingDatabase:
+        return l10n.tr('import_progress_phase_database');
+      case ImportProgressPhase.importingCards:
+        return l10n.tr('import_progress_phase_cards');
+      case ImportProgressPhase.cleaningUp:
+        return l10n.tr('import_progress_phase_cleanup');
+      case ImportProgressPhase.finalizing:
+        return l10n.tr('import_progress_phase_finalizing');
+    }
   }
 }
 

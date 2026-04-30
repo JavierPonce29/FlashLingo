@@ -10,22 +10,32 @@ ImporterService importerService(ImporterServiceRef ref) {
   final asyncIsar = ref.watch(isarDbProvider);
   final isar = asyncIsar.valueOrNull ?? Isar.getInstance();
   if (isar == null) {
-    throw StateError('Isar DB aún no está inicializada. Espera a que termine de cargar antes de importar.');
+    throw StateError(
+      'Isar DB aún no está inicializada. Espera a que termine de cargar antes de importar.',
+    );
   }
   return ImporterService(isar);
 }
+
 @riverpod
 class ImporterController extends _$ImporterController {
   @override
   AsyncValue<void> build() {
     return const AsyncData(null);
   }
-  Future<ImportPreviewResult> previewFlashcardPackage(String zipFilePath) async {
+
+  Future<ImportPreviewResult> previewFlashcardPackage(
+    String zipFilePath, {
+    ImportProgressCallback? onProgress,
+  }) async {
     final service = ref.read(importerServiceProvider);
 
     state = const AsyncLoading();
     try {
-      final preview = await service.previewFlashcardPackage(zipFilePath);
+      final preview = await service.previewFlashcardPackage(
+        zipFilePath,
+        onProgress: onProgress,
+      );
       state = const AsyncData(null);
       return preview;
     } catch (e, st) {
@@ -56,15 +66,17 @@ class ImporterController extends _$ImporterController {
   }
 
   Future<ImportSummary> importFlashcardPackageAdvanced(
-      String zipFilePath, {
-        required ImportExecutionOptions options,
-      }) async {
+    String zipFilePath, {
+    required ImportExecutionOptions options,
+    ImportProgressCallback? onProgress,
+  }) async {
     final service = ref.read(importerServiceProvider);
     state = const AsyncLoading();
     try {
       final summary = await service.importFlashcardPackageAdvanced(
         zipFilePath,
         options: options,
+        onProgress: onProgress,
       );
       state = const AsyncData(null);
       return summary;
@@ -73,6 +85,7 @@ class ImporterController extends _$ImporterController {
       rethrow;
     }
   }
+
   void resetState() {
     state = const AsyncData(null);
   }

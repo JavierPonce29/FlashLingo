@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flashcards_app/data/models/deck_daily_stats.dart';
@@ -11,6 +12,8 @@ enum StatsRangeOption { days7, days18, month1, months3, months6, year1, life }
 enum IntervalRangeOption { month1, months3, lifeHalf, lifeFull }
 
 enum HourlySlotOption { hourly, halfHourly, quarterHourly }
+
+typedef StatsComputationProgressCallback = void Function(double progress);
 
 class MonthHeatmapSlice {
   final DateTime monthStart;
@@ -250,25 +253,95 @@ List<StackedForecastPoint> buildForecastSeries(
     }
   }
 
-  int remainingNew = data.cardSnapshots
+  final remainingNew = data.cardSnapshots
       .where((card) => card.state == CardState.newCard)
       .length;
   final remainingQuotaToday = _remainingNewQuotaToday(
     data.settings,
     data.labelToday,
   );
-  for (int dayOffset = 0; dayOffset < days && remainingNew > 0; dayOffset++) {
-    final dailyQuota = dayOffset == 0
-        ? remainingQuotaToday
-        : data.settings.newCardsPerDay;
-    if (dailyQuota <= 0) {
-      continue;
-    }
-    final scheduledNew = math.min(remainingNew, dailyQuota);
-    buckets[dayOffset].newCards = scheduledNew;
-    remainingNew -= scheduledNew;
+  if (remainingNew > 0 && remainingQuotaToday > 0) {
+    buckets.first.newCards = math.min(remainingNew, remainingQuotaToday);
   }
 
+  return buckets
+      .map(
+        (bucket) => StackedForecastPoint(
+          day: bucket.day,
+          overdue: bucket.overdue,
+          learning: bucket.learning,
+          review: bucket.review,
+          newCards: bucket.newCards,
+        ),
+      )
+      .toList();
+}
+
+Future<List<StackedForecastPoint>> buildForecastSeriesAsync(
+  DeckStatsData data,
+  StatsRangeOption option, {
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final days = forecastRangeDaysForOption(option, data);
+  final points = List<StackedForecastPoint>.generate(
+    days,
+    (index) => StackedForecastPoint(
+      day: data.labelToday.add(Duration(days: index)),
+      overdue: 0,
+      learning: 0,
+      review: 0,
+      newCards: 0,
+    ),
+  );
+  final buckets = List<_MutableForecastBucket>.generate(
+    days,
+    (index) => _MutableForecastBucket(day: points[index].day),
+  );
+
+  final cards = data.cardSnapshots;
+  final progressStep = _progressStep(cards.length);
+  _reportProgress(onProgress, 0);
+  for (int index = 0; index < cards.length; index++) {
+    final card = cards[index];
+    if (card.state != CardState.newCard) {
+      final reviewLabel = StudyDay.label(card.nextReview, data.settings);
+      final isLearning =
+          card.state == CardState.learning ||
+          card.state == CardState.relearning;
+      if (reviewLabel.isBefore(data.labelToday)) {
+        buckets.first.overdue++;
+      } else {
+        final diff = reviewLabel.difference(data.labelToday).inDays;
+        if (diff >= 0 && diff < days) {
+          if (isLearning) {
+            buckets[diff].learning++;
+          } else if (card.state == CardState.review) {
+            buckets[diff].review++;
+          }
+        }
+      }
+    }
+
+    if (_shouldYieldProgress(index + 1, cards.length, progressStep)) {
+      await _yieldProgress(
+        onProgress,
+        _fraction(index + 1, cards.length) * 0.88,
+      );
+    }
+  }
+
+  final remainingNew = cards
+      .where((card) => card.state == CardState.newCard)
+      .length;
+  final remainingQuotaToday = _remainingNewQuotaToday(
+    data.settings,
+    data.labelToday,
+  );
+  if (remainingNew > 0 && remainingQuotaToday > 0) {
+    buckets.first.newCards = math.min(remainingNew, remainingQuotaToday);
+  }
+
+  _reportProgress(onProgress, 1);
   return buckets
       .map(
         (bucket) => StackedForecastPoint(
@@ -311,6 +384,45 @@ List<StudyTimePoint> buildStudyTimeSeries(
   });
 }
 
+Future<List<StudyTimePoint>> buildStudyTimeSeriesAsync(
+  DeckStatsData data,
+  StatsRangeOption option, {
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final days = rangeDaysForOption(option, data);
+  final startDay = data.labelToday.subtract(Duration(days: days - 1));
+  final map = <DateTime, int>{};
+  final rows = data.dailyStatsRows;
+  final rowStep = _progressStep(rows.length);
+  _reportProgress(onProgress, 0);
+  for (int index = 0; index < rows.length; index++) {
+    final row = rows[index];
+    map[row.studyDay] = row.totalStudyTimeMs;
+    if (_shouldYieldProgress(index + 1, rows.length, rowStep)) {
+      await _yieldProgress(
+        onProgress,
+        _fraction(index + 1, rows.length) * 0.45,
+      );
+    }
+  }
+
+  final points = <StudyTimePoint>[];
+  final dayStep = _progressStep(days);
+  for (int index = 0; index < days; index++) {
+    final day = startDay.add(Duration(days: index));
+    points.add(StudyTimePoint(day: day, studyTimeMs: map[day] ?? 0));
+    if (_shouldYieldProgress(index + 1, days, dayStep)) {
+      await _yieldProgress(
+        onProgress,
+        0.45 + (_fraction(index + 1, days) * 0.55),
+      );
+    }
+  }
+
+  _reportProgress(onProgress, 1);
+  return points;
+}
+
 List<IntervalHistogramPoint> buildIntervalHistogram(
   DeckStatsData data,
   IntervalRangeOption option,
@@ -337,6 +449,69 @@ List<IntervalHistogramPoint> buildIntervalHistogram(
             IntervalHistogramPoint(intervalDay: entry.key, count: entry.value),
       )
       .toList();
+}
+
+Future<List<IntervalHistogramPoint>> buildIntervalHistogramAsync(
+  DeckStatsData data,
+  IntervalRangeOption option, {
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final maxDays = intervalRangeMaxDays(option, data);
+  if (maxDays <= 0) {
+    _reportProgress(onProgress, 1);
+    return const <IntervalHistogramPoint>[];
+  }
+
+  final counts = <int, int>{};
+  final initStep = _progressStep(maxDays);
+  _reportProgress(onProgress, 0);
+  for (int day = 1; day <= maxDays; day++) {
+    counts[day] = 0;
+    if (_shouldYieldProgress(day, maxDays, initStep)) {
+      await _yieldProgress(onProgress, _fraction(day, maxDays) * 0.25);
+    }
+  }
+
+  final cards = data.cardSnapshots;
+  final cardStep = _progressStep(cards.length);
+  for (int index = 0; index < cards.length; index++) {
+    final card = cards[index];
+    final interval = math.max(
+      0,
+      StudyDay.label(
+        card.nextReview,
+        data.settings,
+      ).difference(data.labelToday).inDays,
+    );
+    if (interval > 0 && interval <= maxDays) {
+      counts[interval] = (counts[interval] ?? 0) + 1;
+    }
+    if (_shouldYieldProgress(index + 1, cards.length, cardStep)) {
+      await _yieldProgress(
+        onProgress,
+        0.25 + (_fraction(index + 1, cards.length) * 0.55),
+      );
+    }
+  }
+
+  final entries = counts.entries.toList(growable: false);
+  final output = <IntervalHistogramPoint>[];
+  final outputStep = _progressStep(entries.length);
+  for (int index = 0; index < entries.length; index++) {
+    final entry = entries[index];
+    output.add(
+      IntervalHistogramPoint(intervalDay: entry.key, count: entry.value),
+    );
+    if (_shouldYieldProgress(index + 1, entries.length, outputStep)) {
+      await _yieldProgress(
+        onProgress,
+        0.80 + (_fraction(index + 1, entries.length) * 0.20),
+      );
+    }
+  }
+
+  _reportProgress(onProgress, 1);
+  return output;
 }
 
 List<HourlyDistributionPoint> buildHourlyDistribution(
@@ -374,6 +549,65 @@ List<HourlyDistributionPoint> buildHourlyDistribution(
         ),
       )
       .toList();
+}
+
+Future<List<HourlyDistributionPoint>> buildHourlyDistributionAsync(
+  DeckStatsData data, {
+  required StatsRangeOption option,
+  required HourlySlotOption slotOption,
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final slotMinutes = hourlySlotMinutes(slotOption);
+  final slotCount = (24 * 60) ~/ slotMinutes;
+  final days = rangeDaysForOption(option, data);
+  final startDay = data.labelToday.subtract(Duration(days: days - 1));
+  final counts = <int, int>{for (int i = 0; i < slotCount; i++) i: 0};
+
+  final rows = data.dailyStatsRows;
+  final rowStep = _progressStep(rows.length);
+  _reportProgress(onProgress, 0);
+  for (int index = 0; index < rows.length; index++) {
+    final row = rows[index];
+    if (!row.studyDay.isBefore(startDay) &&
+        !row.studyDay.isAfter(data.labelToday)) {
+      final sourceBuckets = row.quarterHourBuckets;
+      if (sourceBuckets.isNotEmpty) {
+        for (int quarter = 0; quarter < sourceBuckets.length; quarter++) {
+          final slot = ((quarter * 15) ~/ slotMinutes).clamp(0, slotCount - 1);
+          counts[slot] = (counts[slot] ?? 0) + sourceBuckets[quarter];
+        }
+      }
+    }
+    if (_shouldYieldProgress(index + 1, rows.length, rowStep)) {
+      await _yieldProgress(
+        onProgress,
+        _fraction(index + 1, rows.length) * 0.82,
+      );
+    }
+  }
+
+  final entries = counts.entries.toList(growable: false);
+  final output = <HourlyDistributionPoint>[];
+  final outputStep = _progressStep(entries.length);
+  for (int index = 0; index < entries.length; index++) {
+    final entry = entries[index];
+    output.add(
+      HourlyDistributionPoint(
+        slotIndex: entry.key,
+        slotMinutes: slotMinutes,
+        count: entry.value,
+      ),
+    );
+    if (_shouldYieldProgress(index + 1, entries.length, outputStep)) {
+      await _yieldProgress(
+        onProgress,
+        0.82 + (_fraction(index + 1, entries.length) * 0.18),
+      );
+    }
+  }
+
+  _reportProgress(onProgress, 1);
+  return output;
 }
 
 List<PredictionTimelinePoint> buildPredictionTimeline(
@@ -426,6 +660,84 @@ List<PredictionTimelinePoint> buildPredictionTimeline(
       ),
     );
   }
+  return points;
+}
+
+Future<List<PredictionTimelinePoint>> buildPredictionTimelineAsync(
+  DeckStatsData data,
+  StatsRangeOption option, {
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final startDay = data.firstStudyDay ?? data.labelToday;
+  final lastActualDay = data.dailyStatsRows.isEmpty
+      ? startDay
+      : data.dailyStatsRows.last.studyDay;
+  final totalDays = option == StatsRangeOption.life
+      ? math.max(1, lastActualDay.difference(startDay).inDays + 1)
+      : rangeDaysForOption(option, data);
+
+  final actualByDay = <DateTime, _ActualDayStats>{};
+  final rows = data.dailyStatsRows;
+  final rowStep = _progressStep(rows.length);
+  _reportProgress(onProgress, 0);
+  for (int index = 0; index < rows.length; index++) {
+    final row = rows[index];
+    actualByDay[row.studyDay] = _ActualDayStats(
+      newCards: row.newReviewCount,
+      reviewCards: row.learningReviewCount + row.reviewStateCount,
+      studyTimeMs: row.totalStudyTimeMs,
+    );
+    if (_shouldYieldProgress(index + 1, rows.length, rowStep)) {
+      await _yieldProgress(
+        onProgress,
+        _fraction(index + 1, rows.length) * 0.10,
+      );
+    }
+  }
+
+  final stageAverages = _stageAveragesFromDailyRows(
+    data.dailyStatsRows,
+    data.averageAnswerTimeMs,
+  );
+  _reportProgress(onProgress, 0.12);
+  final predicted = await _simulateDeckFromStartAsync(
+    data,
+    startDay: startDay,
+    totalDays: totalDays,
+    stageAverages: stageAverages,
+    onProgress: (progress) {
+      _reportProgress(onProgress, 0.12 + (progress * 0.68));
+    },
+  );
+
+  final points = <PredictionTimelinePoint>[];
+  final pointStep = _progressStep(totalDays);
+  for (int offset = 0; offset < totalDays; offset++) {
+    final day = startDay.add(Duration(days: offset));
+    final actual = actualByDay[day] ?? _ActualDayStats();
+    final future = predicted[day] ?? const _PredictedDayStats();
+    points.add(
+      PredictionTimelinePoint(
+        offset: offset,
+        day: day,
+        predictedNew: future.newCards,
+        predictedLearning: future.learningCards,
+        predictedReview: future.reviewCards,
+        actualNew: actual.newCards,
+        actualReview: actual.reviewCards,
+        actualStudyTimeMs: actual.studyTimeMs,
+        predictedMinutes: future.predictedMinutes,
+      ),
+    );
+    if (_shouldYieldProgress(offset + 1, totalDays, pointStep)) {
+      await _yieldProgress(
+        onProgress,
+        0.80 + (_fraction(offset + 1, totalDays) * 0.20),
+      );
+    }
+  }
+
+  _reportProgress(onProgress, 1);
   return points;
 }
 
@@ -631,6 +943,125 @@ Map<DateTime, _PredictedDayStats> _simulateDeckFromStart(
   }
 
   return predicted;
+}
+
+Future<Map<DateTime, _PredictedDayStats>> _simulateDeckFromStartAsync(
+  DeckStatsData data, {
+  required DateTime startDay,
+  required int totalDays,
+  required _StageAverages stageAverages,
+  StatsComputationProgressCallback? onProgress,
+}) async {
+  final settings = data.settings;
+  final activeCards = <_SimCard>[];
+  final newPool = data.cardSnapshots
+      .map((card) => _SimCard.initial(card.cardType, settings, startDay))
+      .toList();
+
+  final predicted = <DateTime, _PredictedDayStats>{};
+  final dayStep = _progressStep(totalDays);
+
+  _reportProgress(onProgress, 0);
+  for (int offset = 0; offset < totalDays; offset++) {
+    final day = startDay.add(Duration(days: offset));
+    final queue = <_SimCard>[];
+    for (final card in activeCards) {
+      if (!StudyDay.label(card.nextReview, settings).isAfter(day)) {
+        queue.add(card);
+      }
+    }
+
+    final quota = settings.newCardsPerDay;
+    int toIntroduce = 0;
+    if (quota > 0 && newPool.isNotEmpty) {
+      toIntroduce = math.min(quota, newPool.length);
+      for (int i = 0; i < toIntroduce; i++) {
+        final card = newPool.removeAt(0);
+        activeCards.add(card);
+        queue.add(card);
+      }
+    }
+
+    final counts = _PredictedDayStatsMutable();
+    final dayAnchor = DateTime(
+      day.year,
+      day.month,
+      day.day,
+      settings.dayCutoffHour ?? 4,
+      settings.dayCutoffMinute ?? 0,
+    );
+    final estimatedDayWork = math.max(1, queue.length + toIntroduce);
+    int processedDayItems = 0;
+
+    while (queue.isNotEmpty) {
+      final card = queue.removeLast();
+      final previousState = card.state;
+      if (previousState == CardState.newCard) {
+        counts.newCards++;
+        counts.predictedMinutes += stageAverages.newMs / 60000;
+      } else if (previousState == CardState.learning ||
+          previousState == CardState.relearning) {
+        counts.learningCards++;
+        counts.predictedMinutes += stageAverages.learningMs / 60000;
+      } else {
+        counts.reviewCards++;
+        counts.predictedMinutes += stageAverages.reviewMs / 60000;
+      }
+
+      _applySuccessfulSimulation(card, settings, dayAnchor);
+      if (!StudyDay.label(card.nextReview, settings).isAfter(day)) {
+        queue.add(card);
+      }
+
+      processedDayItems++;
+      if (processedDayItems % 128 == 0) {
+        final withinDay = math.min(1.0, processedDayItems / estimatedDayWork);
+        await _yieldProgress(
+          onProgress,
+          _fraction(offset + withinDay, totalDays.toDouble()),
+        );
+      }
+    }
+
+    predicted[day] = counts.freeze();
+    if (_shouldYieldProgress(offset + 1, totalDays, dayStep)) {
+      await _yieldProgress(onProgress, _fraction(offset + 1, totalDays));
+    }
+  }
+
+  _reportProgress(onProgress, 1);
+  return predicted;
+}
+
+int _progressStep(int total) {
+  if (total <= 0) return 1;
+  return math.max(1, total ~/ 24);
+}
+
+bool _shouldYieldProgress(int processed, int total, int step) {
+  if (processed <= 0) return false;
+  if (total <= 0) return processed == 1;
+  return processed == total || processed % step == 0;
+}
+
+double _fraction(num processed, num total) {
+  if (total <= 0) return 1;
+  return (processed / total).clamp(0.0, 1.0);
+}
+
+void _reportProgress(
+  StatsComputationProgressCallback? onProgress,
+  double progress,
+) {
+  onProgress?.call(progress.clamp(0.0, 1.0));
+}
+
+Future<void> _yieldProgress(
+  StatsComputationProgressCallback? onProgress,
+  double progress,
+) async {
+  _reportProgress(onProgress, progress);
+  await Future<void>.delayed(Duration.zero);
 }
 
 void _applySuccessfulSimulation(
