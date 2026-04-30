@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,6 +57,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   DateTime? _cardShownAt;
   late final String _activeSessionId;
   late final DateTime _sessionStartedAt;
+  List<TextEditingController> _writeControllers = <TextEditingController>[];
+  _WriteModeCardData? _writeModeCardData;
   @override
   void initState() {
     super.initState();
@@ -79,6 +82,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   @override
   void dispose() {
     _deckSettingsSubscription?.cancel();
+    _disposeWriteControllers();
     super.dispose();
   }
 
@@ -97,6 +101,104 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       }
     } catch (_) {}
     return <String, dynamic>{};
+  }
+
+  void _disposeWriteControllers() {
+    for (final controller in _writeControllers) {
+      controller.dispose();
+    }
+    _writeControllers = <TextEditingController>[];
+  }
+
+  List<String> _splitHtmlSegments(String rawHtml) {
+    final normalized = rawHtml.trim();
+    if (normalized.isEmpty) return const <String>[];
+    final splitRegex = RegExp(
+      r'<strong>\s*\d+\.\s*</strong>',
+      caseSensitive: false,
+    );
+    final parts = normalized
+        .split(splitRegex)
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    return parts.isNotEmpty ? parts : <String>[normalized];
+  }
+
+  String _decodeBasicHtmlEntities(String value) {
+    return value
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'");
+  }
+
+  String _plainTextFromHtml(String? rawHtml) {
+    if (rawHtml == null || rawHtml.trim().isEmpty) return '';
+    final withoutBreaks = rawHtml.replaceAll(
+      RegExp(r'<br\s*/?>', caseSensitive: false),
+      ' ',
+    );
+    final noTags = withoutBreaks.replaceAll(RegExp(r'<[^>]+>'), '');
+    final decoded = _decodeBasicHtmlEntities(noTags);
+    return decoded.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  _WriteModeCardData _buildWriteModeCardData(Flashcard card) {
+    final sourceRaw = card.sentence ?? '';
+    final targetRaw = card.translation ?? '';
+
+    final sourceParts = _splitHtmlSegments(sourceRaw);
+    final targetParts = _splitHtmlSegments(targetRaw);
+
+    final targets = targetParts
+        .map(_plainTextFromHtml)
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (targets.isEmpty) {
+      final fallbackTarget = _plainTextFromHtml(targetRaw);
+      if (fallbackTarget.isNotEmpty) {
+        targets.add(fallbackTarget);
+      }
+    }
+
+    final prompts = sourceParts
+        .map(_plainTextFromHtml)
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (prompts.isEmpty) {
+      final fallbackPrompt = _plainTextFromHtml(sourceRaw);
+      if (fallbackPrompt.isNotEmpty) {
+        prompts.add(fallbackPrompt);
+      }
+    }
+
+    if (prompts.length > targets.length) {
+      prompts.removeRange(targets.length, prompts.length);
+    }
+    while (prompts.length < targets.length) {
+      prompts.add('');
+    }
+
+    return _WriteModeCardData(prompts: prompts, targets: targets);
+  }
+
+  void _configureWriteModeInputs(Flashcard card, bool writeActive) {
+    if (!writeActive) {
+      _writeModeCardData = null;
+      _disposeWriteControllers();
+      return;
+    }
+
+    final data = _buildWriteModeCardData(card);
+    _writeModeCardData = data;
+    _disposeWriteControllers();
+    _writeControllers = List<TextEditingController>.generate(
+      data.targets.length,
+      (_) => TextEditingController(),
+    );
   }
 
   void _markCurrentCardShown() {
@@ -150,6 +252,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         card,
         l10n: context.l10n,
         writeMode: isWriteModeActive,
+        nativeWriteInput: isWriteModeActive,
         brightness: Theme.of(context).brightness,
       ),
     );
@@ -247,6 +350,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     final int maxReps = _currentDeckSettings?.writeModeMaxReps ?? 0;
     final bool withinMax = (maxReps <= 0) || (card.repetitionCount < maxReps);
     final bool writeActive = writeEnabled && isProd && withinMax;
+    _configureWriteModeInputs(card, writeActive);
 
     setState(() {
       isComplexCard = isRecog && hasReading;
@@ -391,6 +495,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                   card,
                   l10n: context.l10n,
                   writeMode: isWriteModeActive,
+                  nativeWriteInput: isWriteModeActive,
                   brightness: Theme.of(context).brightness,
                 ),
               ),
@@ -418,6 +523,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
               },
             ),
           ),
+          if (isWriteModeActive && !isAnswerShown) _buildNativeWritePanel(),
           _buildControls(card, guidedTourState),
         ],
       ),
@@ -456,6 +562,253 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     );
   }
 
+  Widget _buildNativeWritePanel() {
+    final l10n = context.l10n;
+    final data = _writeModeCardData;
+    if (data == null || data.targets.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final palette = _StudyWritePalette.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 300),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    l10n.tr('html_write_sentences'),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: palette.text,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (var i = 0; i < data.targets.length; i++) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: palette.panel,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: palette.line),
+                      boxShadow: [
+                        BoxShadow(
+                          color: palette.shadow,
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                          spreadRadius: -5,
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (data.targets.length > 1)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '${i + 1}.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: palette.accentDark,
+                                ),
+                              ),
+                            ),
+                          if (data.prompts[i].isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                data.prompts[i],
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  height: 1.5,
+                                  color: palette.text,
+                                ),
+                              ),
+                            ),
+                          TextField(
+                            controller: _writeControllers[i],
+                            keyboardType: TextInputType.visiblePassword,
+                            textInputAction: i == data.targets.length - 1
+                                ? TextInputAction.done
+                                : TextInputAction.next,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            enableIMEPersonalizedLearning: false,
+                            smartDashesType: SmartDashesType.disabled,
+                            smartQuotesType: SmartQuotesType.disabled,
+                            spellCheckConfiguration:
+                                const SpellCheckConfiguration.disabled(),
+                            autofillHints: null,
+                            minLines: 3,
+                            maxLines: 5,
+                            style: TextStyle(
+                              fontSize: 18,
+                              height: 1.45,
+                              color: palette.text,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: l10n.tr('html_write_placeholder'),
+                              hintStyle: TextStyle(
+                                fontSize: 18,
+                                color: palette.soft,
+                              ),
+                              filled: true,
+                              fillColor: palette.card,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: palette.line),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: palette.accent,
+                                  width: 1.5,
+                                ),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: palette.line),
+                              ),
+                              isDense: true,
+                            ),
+                            onSubmitted: (_) {
+                              if (i < data.targets.length - 1) {
+                                FocusScope.of(context).nextFocus();
+                              } else {
+                                FocusScope.of(context).unfocus();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (i != data.targets.length - 1) const SizedBox(height: 16),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _escapeHtml(String value) {
+    return const HtmlEscape(HtmlEscapeMode.element).convert(value);
+  }
+
+  _WriteDiffResult _compareByWords(String user, String target) {
+    final cleanUser = user.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final cleanTarget = target.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    final userWords = cleanUser.isEmpty
+        ? const <String>[]
+        : cleanUser.split(' ');
+    final targetWords = cleanTarget.isEmpty
+        ? const <String>[]
+        : cleanTarget.split(' ');
+
+    final html = StringBuffer();
+    var totalCorrectChars = 0;
+    var totalTargetChars = cleanTarget.replaceAll(' ', '').characters.length;
+    if (totalTargetChars == 0) totalTargetChars = 1;
+
+    for (var i = 0; i < targetWords.length; i++) {
+      final targetWord = targetWords[i];
+      final userWord = i < userWords.length ? userWords[i] : '';
+      final targetChars = targetWord.characters.toList();
+      final userChars = userWord.characters.toList();
+      final maxLength = targetChars.length > userChars.length
+          ? targetChars.length
+          : userChars.length;
+
+      for (var k = 0; k < maxLength; k++) {
+        final targetChar = k < targetChars.length ? targetChars[k] : '';
+        final userChar = k < userChars.length ? userChars[k] : '';
+
+        if (targetChar.toLowerCase() == userChar.toLowerCase()) {
+          html.write(
+            "<span class='diff-good'>${_escapeHtml(targetChar)}</span>",
+          );
+          if (targetChar.isNotEmpty) totalCorrectChars++;
+        } else if (targetChar.isNotEmpty) {
+          html.write(
+            "<span class='diff-bad'>${_escapeHtml(targetChar)}</span>",
+          );
+        }
+      }
+      html.write(' ');
+    }
+
+    var percent = ((totalCorrectChars / totalTargetChars) * 100).round();
+    if (percent > 100) percent = 100;
+    return _WriteDiffResult(html: html.toString(), percent: percent);
+  }
+
+  _WriteModeEvaluation? _evaluateWriteInputs() {
+    final data = _writeModeCardData;
+    if (!isWriteModeActive || data == null || data.targets.isEmpty) {
+      return null;
+    }
+
+    var totalPercent = 0;
+    final resultHtml = StringBuffer();
+    final userRawHtml = StringBuffer();
+
+    for (var i = 0; i < data.targets.length; i++) {
+      final userText = i < _writeControllers.length
+          ? _writeControllers[i].text
+          : '';
+      final targetText = data.targets[i];
+      final diff = _compareByWords(userText, targetText);
+      totalPercent += diff.percent;
+
+      final escapedUserText = _escapeHtml(userText).replaceAll('\n', '<br>');
+      if (data.targets.length > 1) {
+        userRawHtml.write('${i + 1}. $escapedUserText<br>');
+        resultHtml.write('<div class="diff-row"><strong>${i + 1}. </strong>');
+      } else {
+        userRawHtml.write(escapedUserText);
+        resultHtml.write('<div class="diff-row">');
+      }
+      resultHtml.write(diff.html);
+      resultHtml.write('</div>');
+    }
+
+    final score = (totalPercent / data.targets.length).round();
+    return _WriteModeEvaluation(
+      score: score,
+      resultHtml: resultHtml.toString(),
+      userRawHtml: userRawHtml.toString(),
+    );
+  }
+
+  Future<void> _pushWriteEvaluationToWebView(
+    _WriteModeEvaluation evaluation,
+  ) async {
+    final controller = webViewController;
+    if (controller == null) return;
+    final script =
+        'setNativeWriteResults(${jsonEncode(evaluation.resultHtml)}, '
+        '${jsonEncode(evaluation.userRawHtml)}, ${evaluation.score});';
+    await controller.evaluateJavascript(source: script);
+  }
+
   Widget _buildControls(Flashcard card, GuidedTourState guidedTourState) {
     final l10n = context.l10n;
     final tourStep = guidedTourState.step;
@@ -488,9 +841,16 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         label: l10n.tr('study_show_answer'),
         color: AppUiColors.info(context),
         onPressed: canShowAnswer
-            ? () {
+            ? () async {
+                final evaluation = _evaluateWriteInputs();
+                if (evaluation != null) {
+                  setState(() => currentWriteScore = evaluation.score);
+                  await _pushWriteEvaluationToWebView(evaluation);
+                }
                 setState(() => isAnswerShown = true);
-                webViewController?.evaluateJavascript(source: "showAnswer()");
+                await webViewController?.evaluateJavascript(
+                  source: "showAnswer()",
+                );
                 // Defer tour-step transition a tick to avoid refreshing the
                 // web view in the same frame as the JS reveal.
                 Future<void>.delayed(const Duration(milliseconds: 80), () {
@@ -1059,4 +1419,82 @@ class _OverlayPlacement {
   final double? bottom;
 
   const _OverlayPlacement({this.top, this.bottom});
+}
+
+class _WriteModeCardData {
+  final List<String> prompts;
+  final List<String> targets;
+
+  const _WriteModeCardData({required this.prompts, required this.targets});
+}
+
+class _WriteDiffResult {
+  final String html;
+  final int percent;
+
+  const _WriteDiffResult({required this.html, required this.percent});
+}
+
+class _WriteModeEvaluation {
+  final int score;
+  final String resultHtml;
+  final String userRawHtml;
+
+  const _WriteModeEvaluation({
+    required this.score,
+    required this.resultHtml,
+    required this.userRawHtml,
+  });
+}
+
+class _StudyWritePalette {
+  final Color card;
+  final Color panel;
+  final Color text;
+  final Color soft;
+  final Color accent;
+  final Color accentDark;
+  final Color line;
+  final Color shadow;
+
+  const _StudyWritePalette({
+    required this.card,
+    required this.panel,
+    required this.text,
+    required this.soft,
+    required this.accent,
+    required this.accentDark,
+    required this.line,
+    required this.shadow,
+  });
+
+  factory _StudyWritePalette.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _StudyWritePalette(
+      card: isDark
+          ? const Color.fromRGBO(19, 12, 34, 1)
+          : const Color.fromRGBO(255, 255, 255, 1),
+      panel: isDark
+          ? const Color.fromRGBO(26, 18, 61, 1)
+          : const Color.fromRGBO(246, 245, 253, 1),
+      text: isDark
+          ? const Color.fromRGBO(255, 255, 255, 0.85)
+          : const Color.fromRGBO(48, 32, 111, 1),
+      soft: isDark
+          ? const Color.fromRGBO(255, 255, 255, 0.72)
+          : const Color.fromRGBO(48, 32, 111, 0.72),
+      accent: isDark
+          ? const Color.fromRGBO(153, 128, 255, 1)
+          : const Color.fromRGBO(101, 68, 233, 1),
+      accentDark: isDark
+          ? const Color.fromRGBO(133, 102, 255, 1)
+          : const Color.fromRGBO(75, 50, 174, 1),
+      line: isDark
+          ? const Color.fromRGBO(48, 32, 111, 1)
+          : const Color.fromRGBO(216, 208, 249, 1),
+      shadow: isDark
+          ? const Color.fromRGBO(0, 0, 0, 0.75)
+          : const Color.fromRGBO(133, 102, 255, 0.24),
+    );
+  }
 }

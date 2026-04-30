@@ -155,6 +155,7 @@ class HtmlGenerator {
     Flashcard card, {
     required AppLocalizations l10n,
     bool writeMode = false,
+    bool nativeWriteInput = false,
     Brightness brightness = Brightness.light,
   }) {
     Map<String, dynamic> extraData = {};
@@ -190,7 +191,7 @@ class HtmlGenerator {
     String jsInit = (isRecog && !isComplexRecog)
         ? "playSequence('q-view');"
         : "";
-    if (writeMode && !isRecog) {
+    if (writeMode && !isRecog && !nativeWriteInput) {
       jsInit += " initWriteMode();";
     }
 
@@ -199,7 +200,13 @@ class HtmlGenerator {
     } else if (isRecog) {
       bodyContent = _generateSimpleRecogBody(card, extraData, l10n);
     } else {
-      bodyContent = _generateProdBody(card, extraData, writeMode, l10n);
+      bodyContent = _generateProdBody(
+        card,
+        extraData,
+        writeMode,
+        l10n,
+        nativeWriteInput: nativeWriteInput,
+      );
     }
 
     final writePlaceholder = _safeJsString(l10n.tr('html_write_placeholder'));
@@ -270,6 +277,18 @@ class HtmlGenerator {
       if (t) t.style.display = (t.style.display === 'none') ? 'block' : 'none';
     }
 
+    function setNativeWriteResults(resultHtml, fullUserText, score) {
+      var resBox = document.getElementById('diff-results-box');
+      if (resBox) resBox.innerHTML = resultHtml || "";
+
+      var rawBox = document.getElementById('user-raw-text');
+      if (rawBox) rawBox.innerHTML = fullUserText || "";
+
+      if (typeof score === 'number' && window.flutter_inappwebview) {
+        window.flutter_inappwebview.callHandler('submitScore', score);
+      }
+    }
+
     // --- ESCRITURA ---
     var targetSegments = [];
 
@@ -311,7 +330,7 @@ class HtmlGenerator {
           html += '<div class="write-prompt-text">' + sourceSegments[i] + '</div>';
         }
         html += '</div>';
-        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="$writePlaceholder"></textarea>';
+        html += '<textarea id="input-' + i + '" class="write-input" rows="2" placeholder="$writePlaceholder" autocorrect="off" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>';
         html += '</div>';
       }
       container.innerHTML = html;
@@ -498,8 +517,9 @@ class HtmlGenerator {
     Flashcard card,
     Map<String, dynamic> extra,
     bool writeMode,
-    AppLocalizations l10n,
-  ) {
+    AppLocalizations l10n, {
+    bool nativeWriteInput = false,
+  }) {
     final String questionHtml = _safeHtml(card.question);
     final String answerHtml = _safeHtml(card.answer);
     final String sentenceHtml = _safeHtml(card.sentence);
@@ -530,8 +550,9 @@ class HtmlGenerator {
     String sentenceArea = targetSentenceWithReading;
 
     if (writeMode) {
-      inputHtml =
-          """
+      if (!nativeWriteInput) {
+        inputHtml =
+            """
 <div class="write-section">
   <div class="write-label">${_safeHtml(l10n.tr('html_write_sentences'))}</div>
   <div id="source-hidden-raw" style="display:none;">$sentenceHtml</div>
@@ -539,6 +560,7 @@ class HtmlGenerator {
   <div id="target-hidden-raw" style="display:none;">$translationHtml</div>
 </div>
 """;
+      }
       promptHtml = '';
 
       sentenceArea =
