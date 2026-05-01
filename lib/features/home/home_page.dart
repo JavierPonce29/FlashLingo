@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:isar/isar.dart';
 import 'package:url_launcher/link.dart';
 
@@ -66,6 +65,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final page = Scaffold(
       appBar: AppBar(
         toolbarHeight: 76,
+        centerTitle: false,
+        titleSpacing: 20,
         title: const _HomeBrandTitle(),
         actions: [
           _HighlightedActionButton(
@@ -94,6 +95,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             highlighted: step == GuidedTourStep.homeImportStarter,
             tooltip: l10n.tr('home_tooltip_import'),
             icon: Icons.add,
+            filled: true,
             onPressed: canUseImport
                 ? () {
                     if (step == GuidedTourStep.homeImportStarter) {
@@ -1023,18 +1025,22 @@ class _HighlightedActionButton extends StatelessWidget {
   final bool highlighted;
   final String tooltip;
   final IconData icon;
+  final bool filled;
   final VoidCallback? onPressed;
 
   const _HighlightedActionButton({
     required this.highlighted,
     required this.tooltip,
     required this.icon,
+    this.filled = false,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
+    final radius = filled ? 999.0 : 12.0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -1042,7 +1048,7 @@ class _HighlightedActionButton extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       decoration: highlighted
           ? BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(radius),
               border: Border.all(color: primary, width: 2.4),
               boxShadow: [
                 BoxShadow(
@@ -1054,6 +1060,14 @@ class _HighlightedActionButton extends StatelessWidget {
             )
           : null,
       child: IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: filled ? primary : Colors.transparent,
+          foregroundColor: filled ? onPrimary : primary,
+          minimumSize: filled ? const Size(44, 44) : null,
+          fixedSize: filled ? const Size(44, 44) : null,
+          padding: EdgeInsets.zero,
+          shape: filled ? const CircleBorder() : null,
+        ),
         icon: Icon(icon),
         tooltip: tooltip,
         onPressed: onPressed,
@@ -1085,8 +1099,8 @@ class _DeckIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final fallback = ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: SvgPicture.asset(
-        'lib/assets/images/deck_default.svg',
+      child: Image.asset(
+        'lib/assets/images/deck_default_2.png',
         width: 52,
         height: 52,
         fit: BoxFit.cover,
@@ -1126,28 +1140,36 @@ class _HomeBrandTitle extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SvgPicture.asset('lib/assets/images/ICO.svg', width: 34, height: 34),
-        const SizedBox(width: 12),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: 'Flash',
-                style: baseStyle?.copyWith(
-                  color: AppUiColors.primary(context),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              TextSpan(
-                text: 'Lingo',
-                style: baseStyle?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+        Image.asset(
+          'lib/assets/images/ICO_2.png',
+          width: 42,
+          height: 42,
+          fit: BoxFit.contain,
+          alignment: Alignment.centerLeft,
         ),
+        if (baseStyle != null) ...[
+          const SizedBox(width: 12),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Flash',
+                  style: baseStyle.copyWith(
+                    color: AppUiColors.primary(context),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Lingo',
+                  style: baseStyle.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

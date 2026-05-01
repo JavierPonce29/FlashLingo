@@ -55,7 +55,6 @@ dependencies:
   url_launcher: ^6.3.2
   share_plus: ^10.0.2
   cross_file: ^0.3.4+2
-  flutter_svg: ^2.2.4
 
   #Utilidades JSON
   json_annotation: ^4.8.1
@@ -105,8 +104,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - lib/assets/images/deck_default.svg
-    - lib/assets/images/ICO.svg
+    - lib/assets/images/deck_default_2.png
+    - lib/assets/images/ICO.png
+    - lib/assets/images/ICO_2.png
     - lib/assets/starter/FlashLingo.flashjp
     - lib/assets/fonts/ArialUnicodeMS.ttf
     - lib/assets/fonts/DejaVuSans.ttf

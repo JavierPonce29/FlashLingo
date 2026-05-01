@@ -34,6 +34,42 @@ class _StatsRangeLoadingState {
   const _StatsRangeLoadingState({required this.progress, required this.phase});
 }
 
+class _SummaryMetricData {
+  final String label;
+  final String value;
+  final Color? color;
+
+  const _SummaryMetricData({
+    required this.label,
+    required this.value,
+    this.color,
+  });
+}
+
+class _ComparisonMetricData {
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final String recentLabel;
+  final String recentValue;
+  final String baselineLabel;
+  final String baselineValue;
+  final String delta;
+  final Color deltaColor;
+
+  const _ComparisonMetricData({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.recentLabel,
+    required this.recentValue,
+    required this.baselineLabel,
+    required this.baselineValue,
+    required this.delta,
+    required this.deltaColor,
+  });
+}
+
 class StatsPage extends ConsumerStatefulWidget {
   final String packName;
 
@@ -782,71 +818,94 @@ class _StatsPageState extends ConsumerState<StatsPage> {
 
   Widget _buildHeaderCard(BuildContext context, DeckStatsData stats) {
     final l10n = context.l10n;
+    final metrics = <_SummaryMetricData>[
+      _SummaryMetricData(
+        label: l10n.tr('stats_total'),
+        value: '${stats.totalCards}',
+        color: AppUiColors.primary(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_new_today'),
+        value: '${stats.newAvailableToday}',
+        color: AppUiColors.secondary(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_learning_now'),
+        value: '${stats.learningDueNow}',
+        color: AppUiColors.warning(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_review_now'),
+        value: '${stats.reviewDueNow}',
+        color: AppUiColors.success(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_overdue'),
+        value: '${stats.overdueCards}',
+        color: AppUiColors.overdue(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_accuracy_lifetime'),
+        value: _formatPercent(stats.lifetimeAccuracy),
+        color: AppUiColors.lavender(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_accuracy_7d'),
+        value: _formatPercent(stats.accuracy7d),
+        color: AppUiColors.lavender(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_accuracy_30d'),
+        value: _formatPercent(stats.accuracy30d),
+        color: AppUiColors.lavender(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_lifetime_reviews'),
+        value: '${stats.lifetimeReviewCount}',
+        color: AppUiColors.primary(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_total_study_time'),
+        value: _formatDuration(stats.totalStudyTimeMs),
+        color: AppUiColors.primary(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_avg_answer_time'),
+        value: _formatDuration(stats.averageAnswerTimeMs),
+        color: AppUiColors.mint(context),
+      ),
+      _SummaryMetricData(
+        label: l10n.tr('stats_active_days_30d'),
+        value: '${stats.activeDays30d}/30',
+        color: AppUiColors.peach(context),
+      ),
+    ];
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _metricTile(context, l10n.tr('stats_total'), '${stats.totalCards}'),
-            _metricTile(
+        child: GridView.builder(
+          shrinkWrap: true,
+          primary: false,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: metrics.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 108,
+          ),
+          itemBuilder: (context, index) {
+            final metric = metrics[index];
+            return _metricTile(
               context,
-              l10n.tr('stats_new_today'),
-              '${stats.newAvailableToday}',
-              AppUiColors.info(context),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_learning_now'),
-              '${stats.learningDueNow}',
-              AppUiColors.warning(context),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_review_now'),
-              '${stats.reviewDueNow}',
-              AppUiColors.success(context),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_overdue'),
-              '${stats.overdueCards}',
-              AppUiColors.overdue(context),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_accuracy_lifetime'),
-              _formatPercent(stats.lifetimeAccuracy),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_accuracy_7d'),
-              _formatPercent(stats.accuracy7d),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_accuracy_30d'),
-              _formatPercent(stats.accuracy30d),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_lifetime_reviews'),
-              '${stats.lifetimeReviewCount}',
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_total_study_time'),
-              _formatDuration(stats.totalStudyTimeMs),
-            ),
-            _metricTile(
-              context,
-              l10n.tr('stats_avg_answer_time'),
-              _formatDuration(stats.averageAnswerTimeMs),
-            ),
-          ],
+              metric.label,
+              metric.value,
+              metric.color,
+            );
+          },
         ),
       ),
     );
@@ -858,34 +917,46 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     String value, [
     Color? color,
   ]) {
-    final scheme = Theme.of(context).colorScheme;
     final muted = AppUiColors.mutedText(context);
-    final fill = color == null
-        ? scheme.surfaceContainerHighest
-        : AppUiColors.panelFill(context, color);
+    final accent = color ?? Theme.of(context).colorScheme.primary;
+    final fill = AppUiColors.panelFill(context, accent);
     return Container(
-      width: 150,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      height: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(12),
-        border: color == null
-            ? null
-            : Border.all(color: AppUiColors.panelBorder(context, color)),
+        border: Border.all(color: AppUiColors.panelBorder(context, accent)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color ?? scheme.onSurface,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: muted)),
+          const SizedBox(height: 6),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: muted,
+                height: 1.16,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -893,79 +964,97 @@ class _StatsPageState extends ConsumerState<StatsPage> {
 
   Widget _buildComparisonCard(BuildContext context, DeckStatsData stats) {
     final l10n = context.l10n;
+    final comparisons = <_ComparisonMetricData>[
+      _ComparisonMetricData(
+        label: l10n.tr('stats_accuracy_lifetime'),
+        icon: Icons.gps_fixed_rounded,
+        accent: AppUiColors.lavender(context),
+        recentLabel: '7d',
+        recentValue: _formatPercent(stats.accuracy7d),
+        baselineLabel: '30d',
+        baselineValue: _formatPercent(stats.accuracy30d),
+        delta: _formatPercentPointDelta(stats.accuracy7d - stats.accuracy30d),
+        deltaColor: _deltaColor(context, stats.accuracy7d - stats.accuracy30d),
+      ),
+      _ComparisonMetricData(
+        label: l10n.tr('stats_reviews_per_day'),
+        icon: Icons.sync_rounded,
+        accent: AppUiColors.primary(context),
+        recentLabel: '7d',
+        recentValue: _formatPerDay(stats.reviewsPerDay7d),
+        baselineLabel: '30d',
+        baselineValue: _formatPerDay(stats.reviewsPerDay30d),
+        delta: _formatDelta(stats.reviewsPerDay7d - stats.reviewsPerDay30d),
+        deltaColor: _deltaColor(
+          context,
+          stats.reviewsPerDay7d - stats.reviewsPerDay30d,
+          positive: AppUiColors.primary(context),
+        ),
+      ),
+      _ComparisonMetricData(
+        label: l10n.tr('stats_study_time_per_day'),
+        icon: Icons.schedule_rounded,
+        accent: AppUiColors.secondary(context),
+        recentLabel: '7d',
+        recentValue: _formatDuration(stats.studyTimePerDay7dMs),
+        baselineLabel: '30d',
+        baselineValue: _formatDuration(stats.studyTimePerDay30dMs),
+        delta: _formatDuration(
+          (stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs).abs(),
+          withSign: stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs,
+        ),
+        deltaColor: _deltaColor(
+          context,
+          stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs,
+          positive: AppUiColors.secondary(context),
+        ),
+      ),
+      _ComparisonMetricData(
+        label: l10n.tr('stats_sessions_per_day'),
+        icon: Icons.event_note_rounded,
+        accent: AppUiColors.mint(context),
+        recentLabel: '7d',
+        recentValue: _formatPerDay(stats.sessionsPerDay7d),
+        baselineLabel: '30d',
+        baselineValue: _formatPerDay(stats.sessionsPerDay30d),
+        delta: _formatDelta(stats.sessionsPerDay7d - stats.sessionsPerDay30d),
+        deltaColor: _deltaColor(
+          context,
+          stats.sessionsPerDay7d - stats.sessionsPerDay30d,
+          positive: AppUiColors.mint(context),
+        ),
+      ),
+    ];
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _comparisonTile(
+        child: GridView.builder(
+          shrinkWrap: true,
+          primary: false,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: comparisons.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 164,
+          ),
+          itemBuilder: (context, index) {
+            final metric = comparisons[index];
+            return _comparisonTile(
               context,
-              label: l10n.tr('stats_accuracy_lifetime'),
-              recentLabel: '7d',
-              recentValue: _formatPercent(stats.accuracy7d),
-              baselineLabel: '30d',
-              baselineValue: _formatPercent(stats.accuracy30d),
-              delta: _formatPercentPointDelta(
-                stats.accuracy7d - stats.accuracy30d,
-              ),
-              deltaColor: _deltaColor(
-                context,
-                stats.accuracy7d - stats.accuracy30d,
-              ),
-            ),
-            _comparisonTile(
-              context,
-              label: l10n.tr('stats_reviews_per_day'),
-              recentLabel: '7d',
-              recentValue: _formatPerDay(stats.reviewsPerDay7d),
-              baselineLabel: '30d',
-              baselineValue: _formatPerDay(stats.reviewsPerDay30d),
-              delta: _formatDelta(
-                stats.reviewsPerDay7d - stats.reviewsPerDay30d,
-              ),
-              deltaColor: _deltaColor(
-                context,
-                stats.reviewsPerDay7d - stats.reviewsPerDay30d,
-                positive: AppUiColors.info(context),
-              ),
-            ),
-            _comparisonTile(
-              context,
-              label: l10n.tr('stats_study_time_per_day'),
-              recentLabel: '7d',
-              recentValue: _formatDuration(stats.studyTimePerDay7dMs),
-              baselineLabel: '30d',
-              baselineValue: _formatDuration(stats.studyTimePerDay30dMs),
-              delta: _formatDuration(
-                (stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs).abs(),
-                withSign:
-                    stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs,
-              ),
-              deltaColor: _deltaColor(
-                context,
-                stats.studyTimePerDay7dMs - stats.studyTimePerDay30dMs,
-                positive: AppUiColors.info(context),
-              ),
-            ),
-            _comparisonTile(
-              context,
-              label: l10n.tr('stats_sessions_per_day'),
-              recentLabel: '7d',
-              recentValue: _formatPerDay(stats.sessionsPerDay7d),
-              baselineLabel: '30d',
-              baselineValue: _formatPerDay(stats.sessionsPerDay30d),
-              delta: _formatDelta(
-                stats.sessionsPerDay7d - stats.sessionsPerDay30d,
-              ),
-              deltaColor: _deltaColor(
-                context,
-                stats.sessionsPerDay7d - stats.sessionsPerDay30d,
-                positive: AppUiColors.info(context),
-              ),
-            ),
-          ],
+              label: metric.label,
+              icon: metric.icon,
+              accent: metric.accent,
+              recentLabel: metric.recentLabel,
+              recentValue: metric.recentValue,
+              baselineLabel: metric.baselineLabel,
+              baselineValue: metric.baselineValue,
+              delta: metric.delta,
+              deltaColor: metric.deltaColor,
+            );
+          },
         ),
       ),
     );
@@ -974,6 +1063,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   Widget _comparisonTile(
     BuildContext context, {
     required String label,
+    required IconData icon,
+    required Color accent,
     required String recentLabel,
     required String recentValue,
     required String baselineLabel,
@@ -984,33 +1075,100 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final scheme = Theme.of(context).colorScheme;
     final muted = AppUiColors.mutedText(context);
     return Container(
-      width: 162,
-      padding: const EdgeInsets.all(12),
+      height: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: AppUiColors.panelFill(context, accent),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppUiColors.panelBorder(context, accent)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent.withValues(
+                    alpha: AppUiColors.isDark(context) ? 0.22 : 0.14,
+                  ),
+                ),
+                child: Icon(icon, size: 18, color: accent),
+              ),
+              const Spacer(),
+              Text(
+                delta,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: deltaColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Text(
             label,
-            style: TextStyle(color: muted, fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
           ),
-          const SizedBox(height: 8),
-          Text('$recentLabel: $recentValue'),
-          const SizedBox(height: 4),
-          Text(
-            '$baselineLabel: $baselineValue',
-            style: TextStyle(color: muted),
+          const SizedBox(height: 12),
+          _comparisonValueRow(
+            context,
+            periodLabel: recentLabel,
+            value: recentValue,
+            valueColor: accent,
+            emphasized: true,
           ),
-          const SizedBox(height: 8),
-          Text(
-            delta,
-            style: TextStyle(fontWeight: FontWeight.bold, color: deltaColor),
+          const SizedBox(height: 6),
+          _comparisonValueRow(
+            context,
+            periodLabel: baselineLabel,
+            value: baselineValue,
+            valueColor: muted,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _comparisonValueRow(
+    BuildContext context, {
+    required String periodLabel,
+    required String value,
+    required Color valueColor,
+    bool emphasized = false,
+  }) {
+    final muted = AppUiColors.mutedText(context);
+    return Row(
+      children: [
+        Text(
+          periodLabel,
+          style: TextStyle(
+            color: muted,
+            fontWeight: emphasized ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: valueColor,
+              fontWeight: emphasized ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
