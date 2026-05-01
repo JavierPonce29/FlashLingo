@@ -165,12 +165,32 @@ const Map<String, String> appStringsEs = <String, String>{
       'Ahora abre las estadisticas del mazo desde el boton de tres puntos.',
   'onboarding_tour_stats_intro':
       'Estas estadisticas resumen el total de tarjetas y su estado actual.',
+  'onboarding_tour_stats_comparison':
+      'Esta seccion compara tu rendimiento reciente con el periodo anterior.',
   'onboarding_tour_stats_activity':
       'El heatmap muestra en que dias estudiaste y cuanta actividad tuviste.',
+  'onboarding_tour_stats_study_time':
+      'Este grafico muestra cuanto tiempo dedicaste al estudio en el rango seleccionado.',
   'onboarding_tour_stats_distribution':
       'Este grafico reparte el mazo por tarjetas nuevas, aprendizaje y repaso.',
   'onboarding_tour_stats_forecast':
       'Aqui ves el pronostico de carga para los proximos dias.',
+  'onboarding_tour_stats_intervals':
+      'Este histograma muestra como se distribuyen los intervalos programados de tus tarjetas.',
+  'onboarding_tour_stats_hourly':
+      'Aqui puedes ver en que horas del dia estudias con mas frecuencia.',
+  'onboarding_tour_stats_prediction_repetitions':
+      'Estas predicciones estiman cuantas repeticiones podrias completar en los proximos dias.',
+  'onboarding_tour_stats_prediction_time':
+      'Este grafico estima el tiempo de estudio que podrian requerir esos repasos futuros.',
+  'onboarding_tour_stats_performance':
+      'En esta seccion puedes revisar precision, rachas y otros indicadores de rendimiento.',
+  'onboarding_tour_stats_problem_cards':
+      'Aqui aparecen las tarjetas problematicas para que detectes que contenido necesita mas atencion.',
+  'onboarding_tour_stats_recent_sessions':
+      'Estas sesiones recientes resumen cuando estudiaste y como fue cada sesion.',
+  'onboarding_tour_stats_hardest_cards':
+      'Esta lista ordena las tarjetas mas dificiles del mazo segun tu historial reciente.',
   'onboarding_tour_stats_exit':
       'Pulsa volver para salir de estadisticas y continuar el tour.',
   'onboarding_tour_stats_blocked':

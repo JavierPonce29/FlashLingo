@@ -58,6 +58,10 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   late final DateTime _sessionStartedAt;
   List<TextEditingController> _writeControllers = <TextEditingController>[];
   _WriteModeCardData? _writeModeCardData;
+  final GlobalKey _studyAppBarKey = GlobalKey();
+  final GlobalKey _showAnswerKey = GlobalKey();
+  final GlobalKey _ratingControlsKey = GlobalKey();
+  final GlobalKey _finishedBackButtonKey = GlobalKey();
   @override
   void initState() {
     super.initState();
@@ -410,18 +414,21 @@ class _StudyPageState extends ConsumerState<StudyPage> {
               style: const TextStyle(fontSize: 20),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                if (isTourFinishedStep) {
-                  ref
-                      .read(guidedTourProvider.notifier)
-                      .onStudyFinishedScreenClosed();
-                  Navigator.pop(context, 'tour_finished');
-                  return;
-                }
-                Navigator.pop(context);
-              },
-              child: Text(l10n.tr('common_back')),
+            KeyedSubtree(
+              key: _finishedBackButtonKey,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (isTourFinishedStep) {
+                    ref
+                        .read(guidedTourProvider.notifier)
+                        .onStudyFinishedScreenClosed();
+                    Navigator.pop(context, 'tour_finished');
+                    return;
+                  }
+                  Navigator.pop(context);
+                },
+                child: Text(l10n.tr('common_back')),
+              ),
             ),
           ],
         ),
@@ -438,13 +445,9 @@ class _StudyPageState extends ConsumerState<StudyPage> {
             child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 24,
-          child: TourMessageCard(
-            message: l10n.tr('onboarding_tour_study_finished'),
-          ),
+        TourOverlayCard(
+          targetKey: _finishedBackButtonKey,
+          message: l10n.tr('onboarding_tour_study_finished'),
         ),
       ],
     );
@@ -455,9 +458,12 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     final card = studyQueue[currentIndex];
     final tourStep = guidedTourState.step;
     final isTourInStudy = tourStep.isStudyStep;
+    final showTourOverlay =
+        isTourInStudy && tourStep != GuidedTourStep.studyFinishRemaining;
 
     final page = Scaffold(
       appBar: AppBar(
+        key: _studyAppBarKey,
         title: Text(
           l10n.tr(
             'study_progress',
@@ -528,9 +534,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       ),
     );
 
-    if (!isTourInStudy) return page;
-
-    final overlayPlacement = _studyOverlayPlacement(context, tourStep);
+    if (!showTourOverlay) return page;
 
     return Stack(
       children: [
@@ -540,22 +544,17 @@ class _StudyPageState extends ConsumerState<StudyPage> {
             child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
-        Positioned(
-          left: 16,
-          right: 16,
-          top: overlayPlacement.top,
-          bottom: overlayPlacement.bottom,
-          child: TourMessageCard(
-            message: _tourStudyMessage(l10n, tourStep),
-            actionLabel: _canAdvanceStudyStep(tourStep)
-                ? l10n.tr('onboarding_tour_next')
-                : null,
-            onActionPressed: _canAdvanceStudyStep(tourStep)
-                ? () => ref
-                      .read(guidedTourProvider.notifier)
-                      .nextStudyNarrationStep()
-                : null,
-          ),
+        TourOverlayCard(
+          targetKey: _targetKeyForStudyStep(tourStep),
+          message: _tourStudyMessage(l10n, tourStep),
+          actionLabel: _canAdvanceStudyStep(tourStep)
+              ? l10n.tr('onboarding_tour_next')
+              : null,
+          onActionPressed: _canAdvanceStudyStep(tourStep)
+              ? () => ref
+                    .read(guidedTourProvider.notifier)
+                    .nextStudyNarrationStep()
+              : null,
         ),
       ],
     );
@@ -836,29 +835,30 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         );
       }
 
-      return _singleButton(
-        label: l10n.tr('study_show_answer'),
-        color: AppUiColors.info(context),
-        onPressed: canShowAnswer
-            ? () async {
-                final evaluation = _evaluateWriteInputs();
-                if (evaluation != null) {
-                  setState(() => currentWriteScore = evaluation.score);
-                  await _pushWriteEvaluationToWebView(evaluation);
+      return KeyedSubtree(
+        key: _showAnswerKey,
+        child: _singleButton(
+          label: l10n.tr('study_show_answer'),
+          color: AppUiColors.info(context),
+          onPressed: canShowAnswer
+              ? () async {
+                  final evaluation = _evaluateWriteInputs();
+                  if (evaluation != null) {
+                    setState(() => currentWriteScore = evaluation.score);
+                    await _pushWriteEvaluationToWebView(evaluation);
+                  }
+                  setState(() => isAnswerShown = true);
+                  await webViewController?.evaluateJavascript(
+                    source: "showAnswer()",
+                  );
+                  Future<void>.delayed(const Duration(milliseconds: 80), () {
+                    if (!mounted) return;
+                    ref.read(guidedTourProvider.notifier).onStudyAnswerShown();
+                  });
+                  _persistStudySession();
                 }
-                setState(() => isAnswerShown = true);
-                await webViewController?.evaluateJavascript(
-                  source: "showAnswer()",
-                );
-                // Defer tour-step transition a tick to avoid refreshing the
-                // web view in the same frame as the JS reveal.
-                Future<void>.delayed(const Duration(milliseconds: 80), () {
-                  if (!mounted) return;
-                  ref.read(guidedTourProvider.notifier).onStudyAnswerShown();
-                });
-                _persistStudySession();
-              }
-            : () {},
+              : () {},
+        ),
       );
     }
 
@@ -876,23 +876,26 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
     final bool writePassed =
         !isWriteModeActive || (currentWriteScore >= minScoreRequired);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          _ratingButton(
-            l10n.tr('study_bad'),
-            AppUiColors.danger(context),
-            () => _submitAnswer(card, false),
-            canRateInTour,
-          ),
-          _ratingButton(
-            l10n.tr('study_good'),
-            AppUiColors.success(context),
-            () => _submitAnswer(card, true),
-            writePassed && canRateInTour,
-          ),
-        ],
+    return KeyedSubtree(
+      key: _ratingControlsKey,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            _ratingButton(
+              l10n.tr('study_bad'),
+              AppUiColors.danger(context),
+              () => _submitAnswer(card, false),
+              canRateInTour,
+            ),
+            _ratingButton(
+              l10n.tr('study_good'),
+              AppUiColors.success(context),
+              () => _submitAnswer(card, true),
+              writePassed && canRateInTour,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -901,35 +904,22 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     return step == GuidedTourStep.studyIntro ||
         step == GuidedTourStep.studyTopCounter ||
         step == GuidedTourStep.studyTypeBar ||
-        step == GuidedTourStep.studyWordArea ||
-        step == GuidedTourStep.studySentenceArea ||
-        step == GuidedTourStep.studyMeaningFirst ||
-        step == GuidedTourStep.studyFormsFirst ||
-        step == GuidedTourStep.studyTranslationFirst ||
         step == GuidedTourStep.studySecondCardIntro;
   }
 
-  _OverlayPlacement _studyOverlayPlacement(
-    BuildContext context,
-    GuidedTourStep step,
-  ) {
-    final topInset = MediaQuery.of(context).padding.top + kToolbarHeight + 8;
-    switch (step) {
-      case GuidedTourStep.studyShowAnswerFirst:
-      case GuidedTourStep.studyRateFirst:
-      case GuidedTourStep.studyShowAnswerSecond:
-      case GuidedTourStep.studyRateSecond:
-      case GuidedTourStep.studyFinishRemaining:
-        return _OverlayPlacement(top: topInset);
-      case GuidedTourStep.studyWordArea:
-      case GuidedTourStep.studySentenceArea:
-      case GuidedTourStep.studyMeaningFirst:
-      case GuidedTourStep.studyFormsFirst:
-      case GuidedTourStep.studyTranslationFirst:
-        return const _OverlayPlacement(bottom: 120);
-      default:
-        return const _OverlayPlacement(bottom: 24);
-    }
+  GlobalKey? _targetKeyForStudyStep(GuidedTourStep step) {
+    return switch (step) {
+      GuidedTourStep.studyIntro ||
+      GuidedTourStep.studyTopCounter ||
+      GuidedTourStep.studyTypeBar ||
+      GuidedTourStep.studySecondCardIntro => _studyAppBarKey,
+      GuidedTourStep.studyShowAnswerFirst ||
+      GuidedTourStep.studyShowAnswerSecond => _showAnswerKey,
+      GuidedTourStep.studyRateFirst ||
+      GuidedTourStep.studyRateSecond => _ratingControlsKey,
+      GuidedTourStep.studyFinishedExplain => _finishedBackButtonKey,
+      _ => null,
+    };
   }
 
   String _tourStudyMessage(AppLocalizations l10n, GuidedTourStep step) {
@@ -940,18 +930,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         return l10n.tr('onboarding_tour_study_counter');
       case GuidedTourStep.studyTypeBar:
         return l10n.tr('onboarding_tour_study_type_bar');
-      case GuidedTourStep.studyWordArea:
-        return l10n.tr('onboarding_tour_study_word_area');
-      case GuidedTourStep.studySentenceArea:
-        return l10n.tr('onboarding_tour_study_sentence_area');
       case GuidedTourStep.studyShowAnswerFirst:
         return l10n.tr('onboarding_tour_study_show_answer');
-      case GuidedTourStep.studyMeaningFirst:
-        return l10n.tr('onboarding_tour_study_meaning');
-      case GuidedTourStep.studyFormsFirst:
-        return l10n.tr('onboarding_tour_study_forms');
-      case GuidedTourStep.studyTranslationFirst:
-        return l10n.tr('onboarding_tour_study_translation');
       case GuidedTourStep.studyRateFirst:
         return l10n.tr('onboarding_tour_study_rate_first');
       case GuidedTourStep.studySecondCardIntro:
@@ -960,8 +940,6 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         return l10n.tr('onboarding_tour_study_show_answer_second');
       case GuidedTourStep.studyRateSecond:
         return l10n.tr('onboarding_tour_study_rate_second');
-      case GuidedTourStep.studyFinishRemaining:
-        return l10n.tr('onboarding_tour_study_finish_remaining');
       case GuidedTourStep.studyFinishedExplain:
         return l10n.tr('onboarding_tour_study_finished');
       default:
@@ -1411,13 +1389,6 @@ class _UndoAction {
     required this.cardId,
     required this.snapshot,
   });
-}
-
-class _OverlayPlacement {
-  final double? top;
-  final double? bottom;
-
-  const _OverlayPlacement({this.top, this.bottom});
 }
 
 class _WriteModeCardData {

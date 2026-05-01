@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,6 +35,18 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   bool _welcomeDialogQueued = false;
+  final ScrollController _deckListScrollController = ScrollController();
+  final GlobalKey _settingsActionKey = GlobalKey();
+  final GlobalKey _importActionKey = GlobalKey();
+  final GlobalKey _guidedDeckTileKey = GlobalKey();
+  final GlobalKey _guidedDeckMenuKey = GlobalKey();
+  GuidedTourStep? _lastSyncedTourStep;
+
+  @override
+  void dispose() {
+    _deckListScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +64,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     final decksAsync = ref.watch(decksStreamProvider);
     final step = guidedTourState.step;
     final guidedDeckName = guidedTourState.guidedDeckName?.trim();
+
+    if (_lastSyncedTourStep != step) {
+      _lastSyncedTourStep = step;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncHomeTourViewport(step);
+      });
+    }
+
     final blockHomeBody =
         step == GuidedTourStep.homeIntro ||
         step == GuidedTourStep.homeOpenSettings ||
@@ -69,42 +90,48 @@ class _HomePageState extends ConsumerState<HomePage> {
         titleSpacing: 20,
         title: const _HomeBrandTitle(),
         actions: [
-          _HighlightedActionButton(
-            highlighted: step == GuidedTourStep.homeOpenSettings,
-            tooltip: l10n.tr('home_tooltip_settings'),
-            icon: Icons.settings,
-            onPressed: canOpenSettings
-                ? () async {
-                    final tourController = ref.read(
-                      guidedTourProvider.notifier,
-                    );
-                    if (step == GuidedTourStep.homeOpenSettings) {
-                      tourController.onGeneralSettingsOpened();
+          KeyedSubtree(
+            key: _settingsActionKey,
+            child: _HighlightedActionButton(
+              highlighted: step == GuidedTourStep.homeOpenSettings,
+              tooltip: l10n.tr('home_tooltip_settings'),
+              icon: Icons.settings,
+              onPressed: canOpenSettings
+                  ? () async {
+                      final tourController = ref.read(
+                        guidedTourProvider.notifier,
+                      );
+                      if (step == GuidedTourStep.homeOpenSettings) {
+                        tourController.onGeneralSettingsOpened();
+                      }
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GeneralSettingsPage(),
+                        ),
+                      );
+                      tourController.onGeneralSettingsClosed();
                     }
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const GeneralSettingsPage(),
-                      ),
-                    );
-                    tourController.onGeneralSettingsClosed();
-                  }
-                : null,
+                  : null,
+            ),
           ),
-          _HighlightedActionButton(
-            highlighted: step == GuidedTourStep.homeImportStarter,
-            tooltip: l10n.tr('home_tooltip_import'),
-            icon: Icons.add,
-            filled: true,
-            onPressed: canUseImport
-                ? () {
-                    if (step == GuidedTourStep.homeImportStarter) {
-                      _runGuidedStarterImport();
-                      return;
+          KeyedSubtree(
+            key: _importActionKey,
+            child: _HighlightedActionButton(
+              highlighted: step == GuidedTourStep.homeImportStarter,
+              tooltip: l10n.tr('home_tooltip_import'),
+              icon: Icons.add,
+              filled: true,
+              onPressed: canUseImport
+                  ? () {
+                      if (step == GuidedTourStep.homeImportStarter) {
+                        _runGuidedStarterImport();
+                        return;
+                      }
+                      HomeImportHelper.pickAndImportFile(context, ref);
                     }
-                    HomeImportHelper.pickAndImportFile(context, ref);
-                  }
-                : null,
+                  : null,
+            ),
           ),
         ],
       ),
@@ -139,259 +166,300 @@ class _HomePageState extends ConsumerState<HomePage> {
               );
             }
 
-            return ListView.separated(
+            return ListView(
+              controller: _deckListScrollController,
               padding: const EdgeInsets.all(12),
-              itemCount: decks.length,
-              separatorBuilder: (_, index) => const Divider(height: 2),
-              itemBuilder: (context, index) {
-                final deck = decks[index];
-                final learningDueToday = deck.learningDueToday;
-                final isGuidedDeck =
-                    guidedDeckName != null && deck.name == guidedDeckName;
-                final highlightDeck =
-                    isGuidedDeck &&
-                    (step == GuidedTourStep.homeDeckHighlight ||
-                        step == GuidedTourStep.homeDeckStudyPrompt);
-                final highlightMenu =
-                    isGuidedDeck &&
-                    (step == GuidedTourStep.homeDeckMenuOpen ||
-                        step == GuidedTourStep.homeOpenStats ||
-                        step == GuidedTourStep.homeDeleteDeck ||
-                        step == GuidedTourStep.homeDeleteConfirm);
+              children: [
+                for (int index = 0; index < decks.length; index++) ...[
+                  Builder(
+                    builder: (context) {
+                      final deck = decks[index];
+                      final learningDueToday = deck.learningDueToday;
+                      final isGuidedDeck =
+                          guidedDeckName != null && deck.name == guidedDeckName;
+                      final highlightDeck =
+                          isGuidedDeck &&
+                          (step == GuidedTourStep.homeDeckHighlight ||
+                              step == GuidedTourStep.homeDeckStudyPrompt);
+                      final highlightMenu =
+                          isGuidedDeck &&
+                          (step == GuidedTourStep.homeDeckMenuOpen ||
+                              step == GuidedTourStep.homeOpenStats ||
+                              step == GuidedTourStep.homeDeleteDeck ||
+                              step == GuidedTourStep.homeDeleteConfirm);
 
-                return TourHighlight(
-                  highlighted: highlightDeck,
-                  child: Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      leading: _DeckIcon(iconUri: deck.iconUri),
-                      title: Text(
-                        deck.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      subtitle: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          if (deck.newCardsDue > 0)
-                            Text(
-                              l10n.tr(
-                                'home_new',
-                                params: <String, Object?>{
-                                  'count': deck.newCardsDue,
-                                },
-                              ),
-                              style: TextStyle(
-                                color: info,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      return KeyedSubtree(
+                        key: isGuidedDeck ? _guidedDeckTileKey : null,
+                        child: TourHighlight(
+                          highlighted: highlightDeck,
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          if (learningDueToday > 0)
-                            Text(
-                              l10n.tr(
-                                'home_learning_due',
-                                params: <String, Object?>{
-                                  'count': learningDueToday,
-                                },
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
                               ),
-                              style: TextStyle(
-                                color: warning,
-                                fontWeight: FontWeight.bold,
+                              leading: _DeckIcon(iconUri: deck.iconUri),
+                              title: Text(
+                                deck.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
                               ),
-                            ),
-                          if (deck.reviewCardsDueToday > 0)
-                            Text(
-                              l10n.tr(
-                                'home_review',
-                                params: <String, Object?>{
-                                  'count': deck.reviewCardsDueToday,
-                                },
-                              ),
-                              style: TextStyle(
-                                color: success,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          if (deck.overdueCards > 0)
-                            Text(
-                              l10n.tr(
-                                'home_overdue',
-                                params: <String, Object?>{
-                                  'count': deck.overdueCards,
-                                },
-                              ),
-                              style: TextStyle(
-                                color: overdue,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          if (deck.reviewCount7d > 0)
-                            Text(
-                              l10n.tr(
-                                'home_accuracy_7d',
-                                params: <String, Object?>{
-                                  'percent': (deck.accuracy7d * 100).round(),
-                                },
-                              ),
-                              style: TextStyle(
-                                color: muted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          if (deck.newCardsDue == 0 &&
-                              learningDueToday == 0 &&
-                              deck.reviewCardsDueToday == 0 &&
-                              deck.overdueCards == 0)
-                            Text(
-                              l10n.tr('home_all_caught_up'),
-                              style: TextStyle(color: muted),
-                            ),
-                        ],
-                      ),
-                      onTap: () async {
-                        final canTapDeck =
-                            !guidedTourState.isTourActive ||
-                            (isGuidedDeck &&
-                                step == GuidedTourStep.homeDeckStudyPrompt);
-                        if (!canTapDeck) return;
-                        if (step == GuidedTourStep.homeDeckStudyPrompt) {
-                          ref
-                              .read(guidedTourProvider.notifier)
-                              .onDeckOverviewOpenedForStudy();
-                        }
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                DeckOverviewPage(packName: deck.name),
-                          ),
-                        );
-                      },
-                      trailing: guidedTourState.isTourActive
-                          ? (highlightMenu
-                                ? _HighlightedActionButton(
-                                    highlighted: true,
-                                    icon: Icons.more_vert,
-                                    tooltip: l10n.tr('home_menu_settings'),
-                                    onPressed: () =>
-                                        _handleGuidedDeckMenuAction(deck.name),
-                                  )
-                                : const IconButton(
-                                    icon: Icon(Icons.more_vert),
-                                    onPressed: null,
-                                  ))
-                          : PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'settings') {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          DeckSettingsPage(packName: deck.name),
-                                    ),
-                                  );
-                                } else if (value == 'browse') {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => FlashcardBrowserPage(
-                                        packName: deck.name,
+                              subtitle: Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  if (deck.newCardsDue > 0)
+                                    Text(
+                                      l10n.tr(
+                                        'home_new',
+                                        params: <String, Object?>{
+                                          'count': deck.newCardsDue,
+                                        },
+                                      ),
+                                      style: TextStyle(
+                                        color: info,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  );
-                                } else if (value == 'stats') {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          StatsPage(packName: deck.name),
+                                  if (learningDueToday > 0)
+                                    Text(
+                                      l10n.tr(
+                                        'home_learning_due',
+                                        params: <String, Object?>{
+                                          'count': learningDueToday,
+                                        },
+                                      ),
+                                      style: TextStyle(
+                                        color: warning,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  );
-                                } else if (value == 'advance') {
-                                  _promptBringReviewsToToday(
-                                    context,
-                                    ref,
-                                    deck.name,
-                                  );
-                                } else if (value == 'rename') {
-                                  _showRenameDeckDialog(
-                                    context,
-                                    ref,
-                                    deck.name,
-                                  );
-                                } else if (value == 'delete') {
-                                  _confirmDelete(context, ref, deck.name);
+                                  if (deck.reviewCardsDueToday > 0)
+                                    Text(
+                                      l10n.tr(
+                                        'home_review',
+                                        params: <String, Object?>{
+                                          'count': deck.reviewCardsDueToday,
+                                        },
+                                      ),
+                                      style: TextStyle(
+                                        color: success,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  if (deck.overdueCards > 0)
+                                    Text(
+                                      l10n.tr(
+                                        'home_overdue',
+                                        params: <String, Object?>{
+                                          'count': deck.overdueCards,
+                                        },
+                                      ),
+                                      style: TextStyle(
+                                        color: overdue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  if (deck.reviewCount7d > 0)
+                                    Text(
+                                      l10n.tr(
+                                        'home_accuracy_7d',
+                                        params: <String, Object?>{
+                                          'percent': (deck.accuracy7d * 100)
+                                              .round(),
+                                        },
+                                      ),
+                                      style: TextStyle(
+                                        color: muted,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  if (deck.newCardsDue == 0 &&
+                                      learningDueToday == 0 &&
+                                      deck.reviewCardsDueToday == 0 &&
+                                      deck.overdueCards == 0)
+                                    Text(
+                                      l10n.tr('home_all_caught_up'),
+                                      style: TextStyle(color: muted),
+                                    ),
+                                ],
+                              ),
+                              onTap: () async {
+                                final canTapDeck =
+                                    !guidedTourState.isTourActive ||
+                                    (isGuidedDeck &&
+                                        step ==
+                                            GuidedTourStep.homeDeckStudyPrompt);
+                                if (!canTapDeck) return;
+                                if (step ==
+                                    GuidedTourStep.homeDeckStudyPrompt) {
+                                  ref
+                                      .read(guidedTourProvider.notifier)
+                                      .onDeckOverviewOpenedForStudy();
                                 }
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        DeckOverviewPage(packName: deck.name),
+                                  ),
+                                );
                               },
-                              itemBuilder: (context) => [
-                                PopupMenuItem<String>(
-                                  value: 'settings',
-                                  child: ListTile(
-                                    leading: const Icon(Icons.tune),
-                                    title: Text(l10n.tr('home_menu_settings')),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'browse',
-                                  child: ListTile(
-                                    leading: const Icon(Icons.list),
-                                    title: Text(l10n.tr('home_menu_browse')),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'stats',
-                                  child: ListTile(
-                                    leading: const Icon(Icons.bar_chart),
-                                    title: Text(l10n.tr('home_menu_stats')),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'advance',
-                                  child: ListTile(
-                                    leading: const Icon(Icons.today),
-                                    title: Text(l10n.tr('home_menu_advance')),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'rename',
-                                  child: ListTile(
-                                    leading: const Icon(Icons.edit),
-                                    title: Text(l10n.tr('home_menu_rename')),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                const PopupMenuDivider(),
-                                PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: ListTile(
-                                    leading: Icon(Icons.delete, color: danger),
-                                    title: Text(
-                                      l10n.tr('home_menu_delete'),
-                                      style: TextStyle(color: danger),
+                              trailing: guidedTourState.isTourActive
+                                  ? (highlightMenu
+                                        ? KeyedSubtree(
+                                            key: _guidedDeckMenuKey,
+                                            child: _HighlightedActionButton(
+                                              highlighted: true,
+                                              icon: Icons.more_vert,
+                                              tooltip: l10n.tr(
+                                                'home_menu_settings',
+                                              ),
+                                              onPressed: () =>
+                                                  _handleGuidedDeckMenuAction(
+                                                    deck.name,
+                                                  ),
+                                            ),
+                                          )
+                                        : const IconButton(
+                                            icon: Icon(Icons.more_vert),
+                                            onPressed: null,
+                                          ))
+                                  : PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'settings') {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => DeckSettingsPage(
+                                                packName: deck.name,
+                                              ),
+                                            ),
+                                          );
+                                        } else if (value == 'browse') {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  FlashcardBrowserPage(
+                                                    packName: deck.name,
+                                                  ),
+                                            ),
+                                          );
+                                        } else if (value == 'stats') {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => StatsPage(
+                                                packName: deck.name,
+                                              ),
+                                            ),
+                                          );
+                                        } else if (value == 'advance') {
+                                          _promptBringReviewsToToday(
+                                            context,
+                                            ref,
+                                            deck.name,
+                                          );
+                                        } else if (value == 'rename') {
+                                          _showRenameDeckDialog(
+                                            context,
+                                            ref,
+                                            deck.name,
+                                          );
+                                        } else if (value == 'delete') {
+                                          _confirmDelete(
+                                            context,
+                                            ref,
+                                            deck.name,
+                                          );
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem<String>(
+                                          value: 'settings',
+                                          child: ListTile(
+                                            leading: const Icon(Icons.tune),
+                                            title: Text(
+                                              l10n.tr('home_menu_settings'),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        PopupMenuItem<String>(
+                                          value: 'browse',
+                                          child: ListTile(
+                                            leading: const Icon(Icons.list),
+                                            title: Text(
+                                              l10n.tr('home_menu_browse'),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        PopupMenuItem<String>(
+                                          value: 'stats',
+                                          child: ListTile(
+                                            leading: const Icon(
+                                              Icons.bar_chart,
+                                            ),
+                                            title: Text(
+                                              l10n.tr('home_menu_stats'),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        PopupMenuItem<String>(
+                                          value: 'advance',
+                                          child: ListTile(
+                                            leading: const Icon(Icons.today),
+                                            title: Text(
+                                              l10n.tr('home_menu_advance'),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        PopupMenuItem<String>(
+                                          value: 'rename',
+                                          child: ListTile(
+                                            leading: const Icon(Icons.edit),
+                                            title: Text(
+                                              l10n.tr('home_menu_rename'),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        const PopupMenuDivider(),
+                                        PopupMenuItem<String>(
+                                          value: 'delete',
+                                          child: ListTile(
+                                            leading: Icon(
+                                              Icons.delete,
+                                              color: danger,
+                                            ),
+                                            title: Text(
+                                              l10n.tr('home_menu_delete'),
+                                              style: TextStyle(color: danger),
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                              ],
                             ),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                  if (index < decks.length - 1) const Divider(height: 2),
+                ],
+              ],
             );
           },
         ),
@@ -411,18 +479,13 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
-        Positioned(
-          left: 16,
-          right: 16,
-          top: overlay.showAtTop
-              ? MediaQuery.of(context).padding.top + kToolbarHeight + 8
-              : null,
-          bottom: overlay.showAtTop ? null : 24,
-          child: TourMessageCard(
-            message: overlay.message,
-            actionLabel: overlay.actionLabel,
-            onActionPressed: overlay.onActionPressed,
-          ),
+        TourOverlayCard(
+          targetKey: overlay.targetKey,
+          message: overlay.message,
+          actionLabel: overlay.actionLabel,
+          onActionPressed: overlay.onActionPressed,
+          fallbackPlacement: overlay.fallbackPlacement,
+          fallbackTop: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
         ),
       ],
     );
@@ -445,38 +508,45 @@ class _HomePageState extends ConsumerState<HomePage> {
       case GuidedTourStep.homeOpenSettings:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_open_settings'),
-          showAtTop: true,
+          targetKey: _settingsActionKey,
+          fallbackPlacement: TourCardFallbackPlacement.top,
         );
       case GuidedTourStep.homeImportStarter:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_import'),
-          showAtTop: true,
+          targetKey: _importActionKey,
+          fallbackPlacement: TourCardFallbackPlacement.top,
         );
       case GuidedTourStep.homeDeckHighlight:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_deck_highlight'),
           actionLabel: l10n.tr('onboarding_tour_next'),
           onActionPressed: controller.nextFromHomeDeckHighlight,
+          targetKey: _guidedDeckTileKey,
         );
       case GuidedTourStep.homeDeckMenuOpen:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_menu_open'),
-          showAtTop: true,
+          targetKey: _guidedDeckMenuKey,
+          fallbackPlacement: TourCardFallbackPlacement.top,
         );
       case GuidedTourStep.homeDeckStudyPrompt:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_open_deck'),
+          targetKey: _guidedDeckTileKey,
         );
       case GuidedTourStep.homeOpenStats:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_open_stats'),
-          showAtTop: true,
+          targetKey: _guidedDeckMenuKey,
+          fallbackPlacement: TourCardFallbackPlacement.top,
         );
       case GuidedTourStep.homeDeleteDeck:
       case GuidedTourStep.homeDeleteConfirm:
         return _HomeOverlayData(
           message: l10n.tr('onboarding_tour_home_delete_deck'),
-          showAtTop: true,
+          targetKey: _guidedDeckMenuKey,
+          fallbackPlacement: TourCardFallbackPlacement.top,
         );
       case GuidedTourStep.finalMessage:
         return _HomeOverlayData(
@@ -491,6 +561,24 @@ class _HomePageState extends ConsumerState<HomePage> {
         );
       default:
         return null;
+    }
+  }
+
+  Future<void> _syncHomeTourViewport(GuidedTourStep step) async {
+    switch (step) {
+      case GuidedTourStep.homeDeckHighlight:
+      case GuidedTourStep.homeDeckStudyPrompt:
+        await ensureTourTargetVisible(_guidedDeckTileKey);
+        return;
+      case GuidedTourStep.homeDeckMenuOpen:
+      case GuidedTourStep.homeOpenStats:
+      case GuidedTourStep.homeDeleteDeck:
+      case GuidedTourStep.homeDeleteConfirm:
+        await ensureTourTargetVisible(_guidedDeckTileKey);
+        await ensureTourTargetVisible(_guidedDeckMenuKey, alignment: 0.3);
+        return;
+      default:
+        return;
     }
   }
 
@@ -610,13 +698,31 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<bool?> _showDeckMenuTourDialog() async {
     final l10n = context.l10n;
-    final messages = <String>[
-      l10n.tr('onboarding_tour_menu_settings'),
-      l10n.tr('onboarding_tour_menu_browse'),
-      l10n.tr('onboarding_tour_menu_stats'),
-      l10n.tr('onboarding_tour_menu_advance'),
-      l10n.tr('onboarding_tour_menu_rename'),
-      l10n.tr('onboarding_tour_menu_delete'),
+    final pages = <_DeckMenuTourPage>[
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_settings'),
+        imageAssetPath: 'lib/assets/images/tour/settings.png',
+      ),
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_browse'),
+        imageAssetPath: 'lib/assets/images/tour/browse.png',
+      ),
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_stats'),
+        imageAssetPath: 'lib/assets/images/tour/statistics.png',
+      ),
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_advance'),
+        imageAssetPath: 'lib/assets/images/tour/advance_review.png',
+      ),
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_rename'),
+        imageAssetPath: 'lib/assets/images/tour/rename.png',
+      ),
+      _DeckMenuTourPage(
+        message: l10n.tr('onboarding_tour_menu_delete'),
+        imageAssetPath: 'lib/assets/images/tour/delete.png',
+      ),
     ];
 
     int page = 0;
@@ -624,22 +730,48 @@ class _HomePageState extends ConsumerState<HomePage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: Text(l10n.tr('onboarding_tour_menu_title')),
-          content: Text(messages[page]),
-          actions: [
-            if (page < messages.length - 1)
-              FilledButton(
-                onPressed: () => setState(() => page++),
-                child: Text(l10n.tr('onboarding_tour_next')),
-              )
-            else
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(l10n.tr('onboarding_tour_open_deck_settings')),
+        builder: (ctx, setState) {
+          final dialogWidth = math.max(
+            280.0,
+            math.min(MediaQuery.sizeOf(ctx).width - 80, 360.0),
+          );
+          return AlertDialog(
+            title: Text(l10n.tr('onboarding_tour_menu_title')),
+            content: SizedBox(
+              width: dialogWidth,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDialogImageFrame(
+                      ctx,
+                      assetPath: pages[page].imageAssetPath,
+                      maxHeight: math.min(
+                        MediaQuery.sizeOf(ctx).height * 0.42,
+                        320,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(pages[page].message),
+                  ],
+                ),
               ),
-          ],
-        ),
+            ),
+            actions: [
+              if (page < pages.length - 1)
+                FilledButton(
+                  onPressed: () => setState(() => page++),
+                  child: Text(l10n.tr('onboarding_tour_next')),
+                )
+              else
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(l10n.tr('onboarding_tour_open_deck_settings')),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -706,34 +838,56 @@ class _HomePageState extends ConsumerState<HomePage> {
     final wantsTour = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.tr('onboarding_welcome_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.tr('onboarding_welcome_body')),
-            const SizedBox(height: 12),
-            Text(l10n.tr('onboarding_welcome_question')),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(l10n.tr('onboarding_welcome_yes')),
+      builder: (ctx) {
+        final dialogWidth = math.max(
+          280.0,
+          math.min(MediaQuery.sizeOf(ctx).width - 80, 360.0),
+        );
+        return AlertDialog(
+          title: Text(l10n.tr('onboarding_welcome_title')),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDialogImageFrame(
+                    ctx,
+                    assetPath: Theme.of(ctx).brightness == Brightness.dark
+                        ? 'lib/assets/images/deck_default.png'
+                        : 'lib/assets/images/deck_default_2.png',
+                    maxHeight: math.min(
+                      MediaQuery.sizeOf(ctx).height * 0.28,
+                      220,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(l10n.tr('onboarding_welcome_body')),
+                  const SizedBox(height: 12),
+                  Text(l10n.tr('onboarding_welcome_question')),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(l10n.tr('onboarding_welcome_yes')),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(l10n.tr('onboarding_welcome_no')),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(l10n.tr('onboarding_welcome_no')),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
 
     if (!mounted) return;
@@ -1019,6 +1173,28 @@ class _HomePageState extends ConsumerState<HomePage> {
       ).showSnackBar(SnackBar(content: Text(l10n.tr('home_rename_error'))));
     }
   }
+
+  Widget _buildDialogImageFrame(
+    BuildContext context, {
+    required String assetPath,
+    required double maxHeight,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        padding: const EdgeInsets.all(12),
+        child: Image.asset(
+          assetPath,
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+        ),
+      ),
+    );
+  }
 }
 
 class _HighlightedActionButton extends StatelessWidget {
@@ -1080,13 +1256,25 @@ class _HomeOverlayData {
   final String message;
   final String? actionLabel;
   final VoidCallback? onActionPressed;
-  final bool showAtTop;
+  final GlobalKey? targetKey;
+  final TourCardFallbackPlacement fallbackPlacement;
 
   const _HomeOverlayData({
     required this.message,
     this.actionLabel,
     this.onActionPressed,
-    this.showAtTop = false,
+    this.targetKey,
+    this.fallbackPlacement = TourCardFallbackPlacement.bottom,
+  });
+}
+
+class _DeckMenuTourPage {
+  final String message;
+  final String imageAssetPath;
+
+  const _DeckMenuTourPage({
+    required this.message,
+    required this.imageAssetPath,
   });
 }
 

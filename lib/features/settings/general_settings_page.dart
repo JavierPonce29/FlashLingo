@@ -11,11 +11,31 @@ import 'package:flashcards_app/features/settings/app_theme_mode_controller.dart'
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
-class GeneralSettingsPage extends ConsumerWidget {
+class GeneralSettingsPage extends ConsumerStatefulWidget {
   const GeneralSettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GeneralSettingsPage> createState() =>
+      _GeneralSettingsPageState();
+}
+
+class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _appBarKey = GlobalKey();
+  final GlobalKey _appearanceKey = GlobalKey();
+  final GlobalKey _languageKey = GlobalKey();
+  final GlobalKey _timeMachineKey = GlobalKey();
+  final GlobalKey _tourButtonKey = GlobalKey();
+  GuidedTourStep? _lastSyncedTourStep;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final themeMode = ref.watch(appThemeModeProvider);
     final locale = ref.watch(appLocaleProvider);
@@ -24,6 +44,13 @@ class GeneralSettingsPage extends ConsumerWidget {
     final tourInsideSettings = tourStep.isGeneralSettingsStep;
     final canPopPage =
         !tourInsideSettings || tourStep == GuidedTourStep.settingsExit;
+
+    if (_lastSyncedTourStep != tourStep) {
+      _lastSyncedTourStep = tourStep;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncTourViewport(tourStep);
+      });
+    }
 
     return PopScope(
       canPop: canPopPage,
@@ -43,11 +70,16 @@ class GeneralSettingsPage extends ConsumerWidget {
       child: Stack(
         children: [
           Scaffold(
-            appBar: AppBar(title: Text(l10n.tr('settings_general_title'))),
+            appBar: AppBar(
+              key: _appBarKey,
+              title: Text(l10n.tr('settings_general_title')),
+            ),
             body: ListView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               children: [
                 TourHighlight(
+                  key: _appearanceKey,
                   highlighted: tourStep == GuidedTourStep.settingsAppearance,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,6 +124,7 @@ class GeneralSettingsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 TourHighlight(
+                  key: _languageKey,
                   highlighted: tourStep == GuidedTourStep.settingsLanguage,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,6 +166,7 @@ class GeneralSettingsPage extends ConsumerWidget {
                 const SizedBox(height: 24),
                 if (kDebugMode) ...[
                   TourHighlight(
+                    key: _timeMachineKey,
                     highlighted: tourStep == GuidedTourStep.settingsTimeMachine,
                     child: Card(
                       child: ListTile(
@@ -150,6 +184,7 @@ class GeneralSettingsPage extends ConsumerWidget {
                   const SizedBox(height: 12),
                 ],
                 TourHighlight(
+                  key: _tourButtonKey,
                   highlighted: tourStep == GuidedTourStep.settingsTourButton,
                   child: Card(
                     child: ListTile(
@@ -193,26 +228,29 @@ class GeneralSettingsPage extends ConsumerWidget {
                 child: Container(color: AppUiColors.scrim(context)),
               ),
             ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              child: TourMessageCard(
-                message: _tourMessageForStep(l10n, tourStep),
-                actionLabel: tourStep == GuidedTourStep.settingsExit
-                    ? null
-                    : l10n.tr('onboarding_tour_next'),
-                onActionPressed: tourStep == GuidedTourStep.settingsExit
-                    ? null
-                    : () => ref
-                          .read(guidedTourProvider.notifier)
-                          .nextInGeneralSettings(),
-              ),
+            TourOverlayCard(
+              targetKey: _targetKeyForStep(tourStep),
+              message: _tourMessageForStep(l10n, tourStep),
+              actionLabel: tourStep == GuidedTourStep.settingsExit
+                  ? null
+                  : l10n.tr('onboarding_tour_next'),
+              onActionPressed: tourStep == GuidedTourStep.settingsExit
+                  ? null
+                  : () => ref
+                        .read(guidedTourProvider.notifier)
+                        .nextInGeneralSettings(),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Future<void> _syncTourViewport(GuidedTourStep step) async {
+    final targetKey = _targetKeyForStep(step);
+    if (targetKey == null) return;
+    final alignment = step == GuidedTourStep.settingsExit ? 0.04 : 0.18;
+    await ensureTourTargetVisible(targetKey, alignment: alignment);
   }
 
   String _tourMessageForStep(AppLocalizations l10n, GuidedTourStep step) {
@@ -232,6 +270,18 @@ class GeneralSettingsPage extends ConsumerWidget {
       default:
         return '';
     }
+  }
+
+  GlobalKey? _targetKeyForStep(GuidedTourStep step) {
+    return switch (step) {
+      GuidedTourStep.settingsIntro ||
+      GuidedTourStep.settingsAppearance => _appearanceKey,
+      GuidedTourStep.settingsLanguage => _languageKey,
+      GuidedTourStep.settingsTimeMachine => _timeMachineKey,
+      GuidedTourStep.settingsTourButton => _tourButtonKey,
+      GuidedTourStep.settingsExit => _appBarKey,
+      _ => null,
+    };
   }
 
   String _languageNameForCode(AppLocalizations l10n, String code) {

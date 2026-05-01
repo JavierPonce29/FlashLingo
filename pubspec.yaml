@@ -104,9 +104,11 @@ flutter:
   uses-material-design: true
 
   assets:
+    - lib/assets/images/deck_default.png
     - lib/assets/images/deck_default_2.png
     - lib/assets/images/ICO.png
     - lib/assets/images/ICO_2.png
+    - lib/assets/images/tour/
     - lib/assets/starter/FlashLingo.flashjp
     - lib/assets/fonts/ArialUnicodeMS.ttf
     - lib/assets/fonts/DejaVuSans.ttf

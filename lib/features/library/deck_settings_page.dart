@@ -22,6 +22,13 @@ class DeckSettingsPage extends ConsumerStatefulWidget {
 
 class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   final _formKey = GlobalKey<FormState>();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _dailySectionKey = GlobalKey();
+  final GlobalKey _mixSectionKey = GlobalKey();
+  final GlobalKey _writeSectionKey = GlobalKey();
+  final GlobalKey _lapseSectionKey = GlobalKey();
+  final GlobalKey _saveSectionKey = GlobalKey();
+  GuidedTourStep? _lastSyncedTourStep;
 
   late final TextEditingController _newCardsLimitController;
   late final TextEditingController _reviewsLimitController;
@@ -76,6 +83,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _newCardsLimitController.dispose();
     _reviewsLimitController.dispose();
     _pMinController.dispose();
@@ -326,7 +334,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     final canSave =
         !_isLoading &&
         (!isTourInDeckSettings || tourStep == GuidedTourStep.deckSettingsExit);
-    final overlayPlacement = _deckSettingsOverlayPlacement(context, tourStep);
     final highlightDaily =
         tourStep == GuidedTourStep.deckSettingsIntro ||
         tourStep == GuidedTourStep.deckSettingsDaily;
@@ -340,6 +347,13 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
         tourStep == GuidedTourStep.deckSettingsLapseOptions ||
         tourStep == GuidedTourStep.deckSettingsLapseToggleOff;
     final highlightSave = tourStep == GuidedTourStep.deckSettingsExit;
+
+    if (_lastSyncedTourStep != tourStep) {
+      _lastSyncedTourStep = tourStep;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncTourViewport(tourStep);
+      });
+    }
 
     if (tourStep == GuidedTourStep.deckSettingsWriteToggleOn &&
         _enableWriteMode) {
@@ -372,6 +386,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,
@@ -379,6 +394,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TourHighlight(
+                      key: _dailySectionKey,
                       highlighted: highlightDaily,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,6 +546,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     ),
                     const SizedBox(height: 20),
                     TourHighlight(
+                      key: _mixSectionKey,
                       highlighted: highlightMix,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -664,6 +681,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     ),
                     const SizedBox(height: 20),
                     TourHighlight(
+                      key: _writeSectionKey,
                       highlighted: highlightWrite,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -692,6 +710,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     _buildAlgorithmSection(l10n),
                     const SizedBox(height: 20),
                     TourHighlight(
+                      key: _lapseSectionKey,
                       highlighted: highlightLapse,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -703,6 +722,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                     ),
                     const SizedBox(height: 40),
                     TourHighlight(
+                      key: _saveSectionKey,
                       highlighted: highlightSave,
                       child: SizedBox(
                         width: double.infinity,
@@ -740,26 +760,27 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
               child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            top: overlayPlacement.top,
-            bottom: overlayPlacement.bottom,
-            child: TourMessageCard(
-              message: _tourDeckSettingsMessage(l10n, tourStep),
-              actionLabel: _canAdvanceDeckSettingsStep(tourStep)
-                  ? l10n.tr('onboarding_tour_next')
-                  : null,
-              onActionPressed: _canAdvanceDeckSettingsStep(tourStep)
-                  ? () => ref
-                        .read(guidedTourProvider.notifier)
-                        .nextInDeckSettings()
-                  : null,
-            ),
+          TourOverlayCard(
+            targetKey: _targetKeyForStep(tourStep),
+            message: _tourDeckSettingsMessage(l10n, tourStep),
+            actionLabel: _canAdvanceDeckSettingsStep(tourStep)
+                ? l10n.tr('onboarding_tour_next')
+                : null,
+            onActionPressed: _canAdvanceDeckSettingsStep(tourStep)
+                ? () =>
+                      ref.read(guidedTourProvider.notifier).nextInDeckSettings()
+                : null,
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _syncTourViewport(GuidedTourStep step) async {
+    final targetKey = _targetKeyForStep(step);
+    if (targetKey == null) return;
+    final alignment = step == GuidedTourStep.deckSettingsExit ? 0.92 : 0.18;
+    await ensureTourTargetVisible(targetKey, alignment: alignment);
   }
 
   bool _canAdvanceDeckSettingsStep(GuidedTourStep step) {
@@ -797,24 +818,20 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     }
   }
 
-  _OverlayPlacement _deckSettingsOverlayPlacement(
-    BuildContext context,
-    GuidedTourStep step,
-  ) {
-    final topInset = MediaQuery.of(context).padding.top + kToolbarHeight + 8;
-    switch (step) {
-      case GuidedTourStep.deckSettingsWriteToggleOn:
-      case GuidedTourStep.deckSettingsWriteToggleOff:
-      case GuidedTourStep.deckSettingsLapseToggleOn:
-      case GuidedTourStep.deckSettingsLapseToggleOff:
-      case GuidedTourStep.deckSettingsExit:
-        return _OverlayPlacement(top: topInset);
-      case GuidedTourStep.deckSettingsWriteOptions:
-      case GuidedTourStep.deckSettingsLapseOptions:
-        return const _OverlayPlacement(bottom: 140);
-      default:
-        return const _OverlayPlacement(bottom: 24);
-    }
+  GlobalKey? _targetKeyForStep(GuidedTourStep step) {
+    return switch (step) {
+      GuidedTourStep.deckSettingsIntro ||
+      GuidedTourStep.deckSettingsDaily => _dailySectionKey,
+      GuidedTourStep.deckSettingsMix => _mixSectionKey,
+      GuidedTourStep.deckSettingsWriteToggleOn ||
+      GuidedTourStep.deckSettingsWriteOptions ||
+      GuidedTourStep.deckSettingsWriteToggleOff => _writeSectionKey,
+      GuidedTourStep.deckSettingsLapseToggleOn ||
+      GuidedTourStep.deckSettingsLapseOptions ||
+      GuidedTourStep.deckSettingsLapseToggleOff => _lapseSectionKey,
+      GuidedTourStep.deckSettingsExit => _saveSectionKey,
+      _ => null,
+    };
   }
 
   Widget _buildWriteModeSection(BuildContext context, AppLocalizations l10n) {
@@ -1105,11 +1122,4 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
       ),
     );
   }
-}
-
-class _OverlayPlacement {
-  final double? top;
-  final double? bottom;
-
-  const _OverlayPlacement({this.top, this.bottom});
 }

@@ -160,12 +160,32 @@ const Map<String, String> appStringsEn = <String, String>{
       'Now open deck statistics from the three-dot button.',
   'onboarding_tour_stats_intro':
       'These statistics summarize total cards and current states.',
+  'onboarding_tour_stats_comparison':
+      'This comparison section contrasts your recent performance against the previous period.',
   'onboarding_tour_stats_activity':
       'The heatmap shows when you studied and how active each day was.',
+  'onboarding_tour_stats_study_time':
+      'This chart shows how much time you spent studying across the selected range.',
   'onboarding_tour_stats_distribution':
       'This chart splits the deck into new, learning, and review states.',
   'onboarding_tour_stats_forecast':
       'Here you can see the expected review load for upcoming days.',
+  'onboarding_tour_stats_intervals':
+      'This histogram shows how your scheduled intervals are distributed.',
+  'onboarding_tour_stats_hourly':
+      'This section reveals the hours of the day when you study most often.',
+  'onboarding_tour_stats_prediction_repetitions':
+      'These predictions estimate how many reviews you may complete in the coming days.',
+  'onboarding_tour_stats_prediction_time':
+      'This chart estimates the study time that those future reviews may require.',
+  'onboarding_tour_stats_performance':
+      'Here you can inspect accuracy, streaks, and other performance indicators.',
+  'onboarding_tour_stats_problem_cards':
+      'This section surfaces cards that are causing repeated trouble so you can act on them.',
+  'onboarding_tour_stats_recent_sessions':
+      'These recent sessions summarize when you studied and how each session went.',
+  'onboarding_tour_stats_hardest_cards':
+      'This list ranks the hardest cards in the deck based on recent review history.',
   'onboarding_tour_stats_exit':
       'Press Back to leave statistics and continue the tour.',
   'onboarding_tour_stats_blocked':

@@ -80,6 +80,23 @@ class StatsPage extends ConsumerStatefulWidget {
 }
 
 class _StatsPageState extends ConsumerState<StatsPage> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _appBarKey = GlobalKey();
+  final GlobalKey _summaryKey = GlobalKey();
+  final GlobalKey _comparisonKey = GlobalKey();
+  final GlobalKey _activityKey = GlobalKey();
+  final GlobalKey _studyTimeKey = GlobalKey();
+  final GlobalKey _distributionKey = GlobalKey();
+  final GlobalKey _forecastKey = GlobalKey();
+  final GlobalKey _intervalsKey = GlobalKey();
+  final GlobalKey _hourlyKey = GlobalKey();
+  final GlobalKey _predictionRepetitionsKey = GlobalKey();
+  final GlobalKey _predictionTimeKey = GlobalKey();
+  final GlobalKey _performanceKey = GlobalKey();
+  final GlobalKey _problemCardsKey = GlobalKey();
+  final GlobalKey _recentSessionsKey = GlobalKey();
+  final GlobalKey _hardestCardsKey = GlobalKey();
+  GuidedTourStep? _lastSyncedTourStep;
   _HeatmapMode _heatmapMode = _HeatmapMode.answers;
   bool _isExportingCsv = false;
   bool _isExportingPdf = false;
@@ -101,6 +118,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
       {};
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final statsAsync = ref.watch(deckStatsProvider(widget.packName));
@@ -109,8 +132,16 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     final isTourInStats = tourStep.isStatsStep;
     final canPop = !isTourInStats || tourStep == GuidedTourStep.statsExit;
 
+    if (_lastSyncedTourStep != tourStep) {
+      _lastSyncedTourStep = tourStep;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncTourViewport(tourStep);
+      });
+    }
+
     final page = Scaffold(
       appBar: AppBar(
+        key: _appBarKey,
         title: Text(
           l10n.tr(
             'stats_title',
@@ -162,10 +193,10 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           }
 
           final sections = _buildSections(context, stats, tourStep);
-          return ListView.builder(
+          return ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.all(16),
-            itemCount: sections.length,
-            itemBuilder: (context, index) => sections[index](),
+            children: [for (final section in sections) section()],
           );
         },
       ),
@@ -192,23 +223,47 @@ class _StatsPageState extends ConsumerState<StatsPage> {
               child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24,
-            child: TourMessageCard(
-              message: _statsTourMessage(l10n, tourStep),
-              actionLabel: tourStep == GuidedTourStep.statsExit
-                  ? null
-                  : l10n.tr('onboarding_tour_next'),
-              onActionPressed: tourStep == GuidedTourStep.statsExit
-                  ? null
-                  : () => ref.read(guidedTourProvider.notifier).nextInStats(),
-            ),
+          TourOverlayCard(
+            targetKey: _targetKeyForStep(tourStep),
+            message: _statsTourMessage(l10n, tourStep),
+            actionLabel: tourStep == GuidedTourStep.statsExit
+                ? null
+                : l10n.tr('onboarding_tour_next'),
+            onActionPressed: tourStep == GuidedTourStep.statsExit
+                ? null
+                : () => ref.read(guidedTourProvider.notifier).nextInStats(),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _syncTourViewport(GuidedTourStep step) async {
+    final targetKey = _targetKeyForStep(step);
+    if (targetKey == null) return;
+    final alignment = step == GuidedTourStep.statsExit ? 0.04 : 0.18;
+    await ensureTourTargetVisible(targetKey, alignment: alignment);
+  }
+
+  GlobalKey? _targetKeyForStep(GuidedTourStep step) {
+    return switch (step) {
+      GuidedTourStep.statsIntro => _summaryKey,
+      GuidedTourStep.statsComparison => _comparisonKey,
+      GuidedTourStep.statsActivity => _activityKey,
+      GuidedTourStep.statsStudyTime => _studyTimeKey,
+      GuidedTourStep.statsDistribution => _distributionKey,
+      GuidedTourStep.statsForecast => _forecastKey,
+      GuidedTourStep.statsIntervals => _intervalsKey,
+      GuidedTourStep.statsHourly => _hourlyKey,
+      GuidedTourStep.statsPredictionRepetitions => _predictionRepetitionsKey,
+      GuidedTourStep.statsPredictionTime => _predictionTimeKey,
+      GuidedTourStep.statsPerformance => _performanceKey,
+      GuidedTourStep.statsProblemCards => _problemCardsKey,
+      GuidedTourStep.statsRecentSessions => _recentSessionsKey,
+      GuidedTourStep.statsHardestCards => _hardestCardsKey,
+      GuidedTourStep.statsExit => _appBarKey,
+      _ => null,
+    };
   }
 
   Future<void> _exportStats(BuildContext context, DeckStatsData stats) async {
@@ -352,12 +407,32 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     switch (step) {
       case GuidedTourStep.statsIntro:
         return l10n.tr('onboarding_tour_stats_intro');
+      case GuidedTourStep.statsComparison:
+        return l10n.tr('onboarding_tour_stats_comparison');
       case GuidedTourStep.statsActivity:
         return l10n.tr('onboarding_tour_stats_activity');
+      case GuidedTourStep.statsStudyTime:
+        return l10n.tr('onboarding_tour_stats_study_time');
       case GuidedTourStep.statsDistribution:
         return l10n.tr('onboarding_tour_stats_distribution');
       case GuidedTourStep.statsForecast:
         return l10n.tr('onboarding_tour_stats_forecast');
+      case GuidedTourStep.statsIntervals:
+        return l10n.tr('onboarding_tour_stats_intervals');
+      case GuidedTourStep.statsHourly:
+        return l10n.tr('onboarding_tour_stats_hourly');
+      case GuidedTourStep.statsPredictionRepetitions:
+        return l10n.tr('onboarding_tour_stats_prediction_repetitions');
+      case GuidedTourStep.statsPredictionTime:
+        return l10n.tr('onboarding_tour_stats_prediction_time');
+      case GuidedTourStep.statsPerformance:
+        return l10n.tr('onboarding_tour_stats_performance');
+      case GuidedTourStep.statsProblemCards:
+        return l10n.tr('onboarding_tour_stats_problem_cards');
+      case GuidedTourStep.statsRecentSessions:
+        return l10n.tr('onboarding_tour_stats_recent_sessions');
+      case GuidedTourStep.statsHardestCards:
+        return l10n.tr('onboarding_tour_stats_hardest_cards');
       case GuidedTourStep.statsExit:
         return l10n.tr('onboarding_tour_stats_exit');
       default:
@@ -699,87 +774,159 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   ) {
     final l10n = context.l10n;
     return <Widget Function()>[
-      () => TourHighlight(
-        highlighted: tourStep == GuidedTourStep.statsIntro,
-        child: _buildHeaderCard(context, stats),
-      ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_compare'),
-        child: _buildComparisonCard(context, stats),
-      ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_activity'),
-        titleSpacing: 10,
+      () => KeyedSubtree(
+        key: _summaryKey,
         child: TourHighlight(
-          highlighted: tourStep == GuidedTourStep.statsActivity,
-          child: _buildHeatmapCard(context, stats),
+          highlighted: tourStep == GuidedTourStep.statsIntro,
+          child: _buildHeaderCard(context, stats),
         ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_study_time_chart'),
-        child: _buildStudyTimeChartCard(context, stats),
-      ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_distribution'),
-        titleSpacing: 20,
-        child: TourHighlight(
-          highlighted: tourStep == GuidedTourStep.statsDistribution,
-          child: _buildDistributionChart(context, stats),
+      () => KeyedSubtree(
+        key: _comparisonKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_compare'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsComparison,
+            child: _buildComparisonCard(context, stats),
+          ),
         ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_forecast'),
-        titleSpacing: 20,
-        child: TourHighlight(
-          highlighted: tourStep == GuidedTourStep.statsForecast,
-          child: _buildForecastChart(context, stats),
+      () => KeyedSubtree(
+        key: _activityKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_activity'),
+          titleSpacing: 10,
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsActivity,
+            child: _buildHeatmapCard(context, stats),
+          ),
         ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_interval_histogram'),
-        child: _buildIntervalHistogramCard(context, stats),
+      () => KeyedSubtree(
+        key: _studyTimeKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_study_time_chart'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsStudyTime,
+            child: _buildStudyTimeChartCard(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_hourly_distribution'),
-        child: _buildHourlyDistributionCard(context, stats),
+      () => KeyedSubtree(
+        key: _distributionKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_distribution'),
+          titleSpacing: 20,
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsDistribution,
+            child: _buildDistributionChart(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_prediction_repetitions'),
-        child: _buildPredictionChartCard(context, stats),
+      () => KeyedSubtree(
+        key: _forecastKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_forecast'),
+          titleSpacing: 20,
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsForecast,
+            child: _buildForecastChart(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_prediction_time'),
-        child: _buildPredictionTimeCard(context, stats),
+      () => KeyedSubtree(
+        key: _intervalsKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_interval_histogram'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsIntervals,
+            child: _buildIntervalHistogramCard(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_performance'),
-        child: _buildPerformanceCard(context, stats),
+      () => KeyedSubtree(
+        key: _hourlyKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_hourly_distribution'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsHourly,
+            child: _buildHourlyDistributionCard(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_problem_cards'),
-        child: _buildProblemCards(context, stats),
+      () => KeyedSubtree(
+        key: _predictionRepetitionsKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_prediction_repetitions'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsPredictionRepetitions,
+            child: _buildPredictionChartCard(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_recent_sessions'),
-        child: _buildRecentSessions(context, stats),
+      () => KeyedSubtree(
+        key: _predictionTimeKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_prediction_time'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsPredictionTime,
+            child: _buildPredictionTimeCard(context, stats),
+          ),
+        ),
       ),
-      () => _sectionBlock(
-        context,
-        title: l10n.tr('stats_hardest_cards'),
-        bottomPadding: 24,
-        child: _buildHardestCards(context, stats),
+      () => KeyedSubtree(
+        key: _performanceKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_performance'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsPerformance,
+            child: _buildPerformanceCard(context, stats),
+          ),
+        ),
+      ),
+      () => KeyedSubtree(
+        key: _problemCardsKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_problem_cards'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsProblemCards,
+            child: _buildProblemCards(context, stats),
+          ),
+        ),
+      ),
+      () => KeyedSubtree(
+        key: _recentSessionsKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_recent_sessions'),
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsRecentSessions,
+            child: _buildRecentSessions(context, stats),
+          ),
+        ),
+      ),
+      () => KeyedSubtree(
+        key: _hardestCardsKey,
+        child: _sectionBlock(
+          context,
+          title: l10n.tr('stats_hardest_cards'),
+          bottomPadding: 24,
+          child: TourHighlight(
+            highlighted: tourStep == GuidedTourStep.statsHardestCards,
+            child: _buildHardestCards(context, stats),
+          ),
+        ),
       ),
     ];
   }

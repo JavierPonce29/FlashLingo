@@ -7,14 +7,28 @@ import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
 
-class ImportSummaryPage extends ConsumerWidget {
+class ImportSummaryPage extends ConsumerStatefulWidget {
   final ImportSummary summary;
 
   const ImportSummaryPage({super.key, required this.summary});
 
+  @override
+  ConsumerState<ImportSummaryPage> createState() => _ImportSummaryPageState();
+}
+
+class _ImportSummaryPageState extends ConsumerState<ImportSummaryPage> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _introKey = GlobalKey();
+  final GlobalKey _cardsKey = GlobalKey();
+  final GlobalKey _settingsKey = GlobalKey();
+  final GlobalKey _mediaKey = GlobalKey();
+  final GlobalKey _diagnosticsKey = GlobalKey();
+  final GlobalKey _exitKey = GlobalKey();
+  GuidedTourStep? _lastSyncedTourStep;
+
   T? _try<T>(T Function(dynamic value) getter) {
     try {
-      return getter(summary as dynamic);
+      return getter(widget.summary as dynamic);
     } catch (_) {
       return null;
     }
@@ -26,13 +40,26 @@ class ImportSummaryPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final guidedTourState = ref.watch(guidedTourProvider);
     final tourStep = guidedTourState.step;
     final isTourInSummary = tourStep.isImportSummaryStep;
     final canPop =
         !isTourInSummary || tourStep == GuidedTourStep.importSummaryExit;
+
+    if (_lastSyncedTourStep != tourStep) {
+      _lastSyncedTourStep = tourStep;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncTourViewport(tourStep);
+      });
+    }
 
     final action = _try<ImportDeckConflictAction?>((s) => s.action);
     final zipFileName = _safeText(_try<String?>((s) => s.zipFileName));
@@ -102,9 +129,11 @@ class ImportSummaryPage extends ConsumerWidget {
     final page = Scaffold(
       appBar: AppBar(title: Text(l10n.tr('import_summary_title'))),
       body: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
           TourHighlight(
+            key: _introKey,
             highlighted: tourStep == GuidedTourStep.importSummaryIntro,
             child: Card(
               child: Padding(
@@ -161,6 +190,7 @@ class ImportSummaryPage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TourHighlight(
+            key: _cardsKey,
             highlighted: tourStep == GuidedTourStep.importSummaryCards,
             child: Card(
               child: Padding(
@@ -235,6 +265,7 @@ class ImportSummaryPage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TourHighlight(
+            key: _settingsKey,
             highlighted: tourStep == GuidedTourStep.importSummarySettings,
             child: Card(
               child: Padding(
@@ -274,6 +305,7 @@ class ImportSummaryPage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TourHighlight(
+            key: _mediaKey,
             highlighted: tourStep == GuidedTourStep.importSummaryMedia,
             child: Card(
               child: Padding(
@@ -352,6 +384,7 @@ class ImportSummaryPage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TourHighlight(
+            key: _diagnosticsKey,
             highlighted: tourStep == GuidedTourStep.importSummaryDiagnostics,
             child: Card(
               child: Padding(
@@ -391,33 +424,36 @@ class ImportSummaryPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.arrow_back),
-                  label: Text(l10n.tr('common_back')),
-                  onPressed: () {
-                    if (!isTourInSummary || canPop) {
-                      if (isTourInSummary) {
-                        ref
-                            .read(guidedTourProvider.notifier)
-                            .onImportSummaryClosed();
+          KeyedSubtree(
+            key: _exitKey,
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.arrow_back),
+                    label: Text(l10n.tr('common_back')),
+                    onPressed: () {
+                      if (!isTourInSummary || canPop) {
+                        if (isTourInSummary) {
+                          ref
+                              .read(guidedTourProvider.notifier)
+                              .onImportSummaryClosed();
+                        }
+                        Navigator.pop(context);
+                        return;
                       }
-                      Navigator.pop(context);
-                      return;
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          l10n.tr('onboarding_tour_import_summary_blocked'),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            l10n.tr('onboarding_tour_import_summary_blocked'),
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -446,25 +482,40 @@ class ImportSummaryPage extends ConsumerWidget {
               child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24,
-            child: TourMessageCard(
-              message: _tourSummaryMessage(l10n, tourStep),
-              actionLabel: tourStep == GuidedTourStep.importSummaryExit
-                  ? null
-                  : l10n.tr('onboarding_tour_next'),
-              onActionPressed: tourStep == GuidedTourStep.importSummaryExit
-                  ? null
-                  : () => ref
-                        .read(guidedTourProvider.notifier)
-                        .nextInImportSummary(),
-            ),
+          TourOverlayCard(
+            targetKey: _targetKeyForStep(tourStep),
+            message: _tourSummaryMessage(l10n, tourStep),
+            actionLabel: tourStep == GuidedTourStep.importSummaryExit
+                ? null
+                : l10n.tr('onboarding_tour_next'),
+            onActionPressed: tourStep == GuidedTourStep.importSummaryExit
+                ? null
+                : () => ref
+                      .read(guidedTourProvider.notifier)
+                      .nextInImportSummary(),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _syncTourViewport(GuidedTourStep step) async {
+    final targetKey = _targetKeyForStep(step);
+    if (targetKey == null) return;
+    final alignment = step == GuidedTourStep.importSummaryExit ? 0.92 : 0.18;
+    await ensureTourTargetVisible(targetKey, alignment: alignment);
+  }
+
+  GlobalKey? _targetKeyForStep(GuidedTourStep step) {
+    return switch (step) {
+      GuidedTourStep.importSummaryIntro => _introKey,
+      GuidedTourStep.importSummaryCards => _cardsKey,
+      GuidedTourStep.importSummarySettings => _settingsKey,
+      GuidedTourStep.importSummaryMedia => _mediaKey,
+      GuidedTourStep.importSummaryDiagnostics => _diagnosticsKey,
+      GuidedTourStep.importSummaryExit => _exitKey,
+      _ => null,
+    };
   }
 
   String _tourSummaryMessage(AppLocalizations l10n, GuidedTourStep step) {

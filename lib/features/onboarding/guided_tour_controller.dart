@@ -55,9 +55,19 @@ enum GuidedTourStep {
   studyFinishedExplain,
   homeOpenStats,
   statsIntro,
+  statsComparison,
   statsActivity,
+  statsStudyTime,
   statsDistribution,
   statsForecast,
+  statsIntervals,
+  statsHourly,
+  statsPredictionRepetitions,
+  statsPredictionTime,
+  statsPerformance,
+  statsProblemCards,
+  statsRecentSessions,
+  statsHardestCards,
   statsExit,
   homeDeleteDeck,
   homeDeleteConfirm,
@@ -126,9 +136,19 @@ extension GuidedTourStepX on GuidedTourStep {
 
   bool get isStatsStep =>
       this == GuidedTourStep.statsIntro ||
+      this == GuidedTourStep.statsComparison ||
       this == GuidedTourStep.statsActivity ||
+      this == GuidedTourStep.statsStudyTime ||
       this == GuidedTourStep.statsDistribution ||
       this == GuidedTourStep.statsForecast ||
+      this == GuidedTourStep.statsIntervals ||
+      this == GuidedTourStep.statsHourly ||
+      this == GuidedTourStep.statsPredictionRepetitions ||
+      this == GuidedTourStep.statsPredictionTime ||
+      this == GuidedTourStep.statsPerformance ||
+      this == GuidedTourStep.statsProblemCards ||
+      this == GuidedTourStep.statsRecentSessions ||
+      this == GuidedTourStep.statsHardestCards ||
       this == GuidedTourStep.statsExit;
 }
 
@@ -378,22 +398,7 @@ class GuidedTourController extends StateNotifier<GuidedTourState> {
         state = state.copyWith(step: GuidedTourStep.studyTypeBar);
         return;
       case GuidedTourStep.studyTypeBar:
-        state = state.copyWith(step: GuidedTourStep.studyWordArea);
-        return;
-      case GuidedTourStep.studyWordArea:
-        state = state.copyWith(step: GuidedTourStep.studySentenceArea);
-        return;
-      case GuidedTourStep.studySentenceArea:
         state = state.copyWith(step: GuidedTourStep.studyShowAnswerFirst);
-        return;
-      case GuidedTourStep.studyMeaningFirst:
-        state = state.copyWith(step: GuidedTourStep.studyFormsFirst);
-        return;
-      case GuidedTourStep.studyFormsFirst:
-        state = state.copyWith(step: GuidedTourStep.studyTranslationFirst);
-        return;
-      case GuidedTourStep.studyTranslationFirst:
-        state = state.copyWith(step: GuidedTourStep.studyRateFirst);
         return;
       case GuidedTourStep.studySecondCardIntro:
         state = state.copyWith(step: GuidedTourStep.studyShowAnswerSecond);
@@ -405,7 +410,7 @@ class GuidedTourController extends StateNotifier<GuidedTourState> {
 
   void onStudyAnswerShown() {
     if (state.step == GuidedTourStep.studyShowAnswerFirst) {
-      state = state.copyWith(step: GuidedTourStep.studyMeaningFirst);
+      state = state.copyWith(step: GuidedTourStep.studyRateFirst);
       return;
     }
     if (state.step == GuidedTourStep.studyShowAnswerSecond) {
@@ -442,15 +447,45 @@ class GuidedTourController extends StateNotifier<GuidedTourState> {
   void nextInStats() {
     switch (state.step) {
       case GuidedTourStep.statsIntro:
+        state = state.copyWith(step: GuidedTourStep.statsComparison);
+        return;
+      case GuidedTourStep.statsComparison:
         state = state.copyWith(step: GuidedTourStep.statsActivity);
         return;
       case GuidedTourStep.statsActivity:
+        state = state.copyWith(step: GuidedTourStep.statsStudyTime);
+        return;
+      case GuidedTourStep.statsStudyTime:
         state = state.copyWith(step: GuidedTourStep.statsDistribution);
         return;
       case GuidedTourStep.statsDistribution:
         state = state.copyWith(step: GuidedTourStep.statsForecast);
         return;
       case GuidedTourStep.statsForecast:
+        state = state.copyWith(step: GuidedTourStep.statsIntervals);
+        return;
+      case GuidedTourStep.statsIntervals:
+        state = state.copyWith(step: GuidedTourStep.statsHourly);
+        return;
+      case GuidedTourStep.statsHourly:
+        state = state.copyWith(step: GuidedTourStep.statsPredictionRepetitions);
+        return;
+      case GuidedTourStep.statsPredictionRepetitions:
+        state = state.copyWith(step: GuidedTourStep.statsPredictionTime);
+        return;
+      case GuidedTourStep.statsPredictionTime:
+        state = state.copyWith(step: GuidedTourStep.statsPerformance);
+        return;
+      case GuidedTourStep.statsPerformance:
+        state = state.copyWith(step: GuidedTourStep.statsProblemCards);
+        return;
+      case GuidedTourStep.statsProblemCards:
+        state = state.copyWith(step: GuidedTourStep.statsRecentSessions);
+        return;
+      case GuidedTourStep.statsRecentSessions:
+        state = state.copyWith(step: GuidedTourStep.statsHardestCards);
+        return;
+      case GuidedTourStep.statsHardestCards:
         state = state.copyWith(step: GuidedTourStep.statsExit);
         return;
       default:
