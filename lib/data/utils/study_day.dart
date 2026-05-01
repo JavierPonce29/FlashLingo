@@ -16,10 +16,12 @@ class StudyDay {
     }
     return cutoffToday;
   }
+
   static DateTime label(DateTime dt, DeckSettings s) {
     final st = start(dt, s);
     return DateTime(st.year, st.month, st.day);
   }
+
   static bool sameLabel(DateTime a, DateTime b, DeckSettings s) {
     final la = label(a, s);
     final lb = label(b, s);

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -436,7 +435,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         page,
         Positioned.fill(
           child: IgnorePointer(
-            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+            child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
         Positioned(
@@ -538,7 +537,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         page,
         Positioned.fill(
           child: IgnorePointer(
-            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+            child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
         Positioned(
@@ -1470,31 +1469,20 @@ class _StudyWritePalette {
 
   factory _StudyWritePalette.of(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return _StudyWritePalette(
-      card: isDark
-          ? const Color.fromRGBO(19, 12, 34, 1)
-          : const Color.fromRGBO(255, 255, 255, 1),
-      panel: isDark
-          ? const Color.fromRGBO(26, 18, 61, 1)
-          : const Color.fromRGBO(246, 245, 253, 1),
-      text: isDark
-          ? const Color.fromRGBO(255, 255, 255, 0.85)
-          : const Color.fromRGBO(48, 32, 111, 1),
-      soft: isDark
-          ? const Color.fromRGBO(255, 255, 255, 0.72)
-          : const Color.fromRGBO(48, 32, 111, 0.72),
-      accent: isDark
-          ? const Color.fromRGBO(153, 128, 255, 1)
-          : const Color.fromRGBO(101, 68, 233, 1),
-      accentDark: isDark
-          ? const Color.fromRGBO(133, 102, 255, 1)
-          : const Color.fromRGBO(75, 50, 174, 1),
-      line: isDark
-          ? const Color.fromRGBO(48, 32, 111, 1)
-          : const Color.fromRGBO(216, 208, 249, 1),
+      card: scheme.surface,
+      panel: AppUiColors.lavender(
+        context,
+      ).withValues(alpha: isDark ? 0.16 : 0.12),
+      text: AppUiColors.studyText(context),
+      soft: AppUiColors.mutedText(context),
+      accent: AppUiColors.studyWord(context),
+      accentDark: AppUiColors.lavender(context),
+      line: AppUiColors.studyLine(context),
       shadow: isDark
-          ? const Color.fromRGBO(0, 0, 0, 0.75)
-          : const Color.fromRGBO(133, 102, 255, 0.24),
+          ? Colors.black.withValues(alpha: 0.32)
+          : AppUiColors.lavender(context).withValues(alpha: 0.18),
     );
   }
 }

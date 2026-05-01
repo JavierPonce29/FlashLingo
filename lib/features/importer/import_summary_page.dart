@@ -118,6 +118,7 @@ class ImportSummaryPage extends ConsumerWidget {
                           isUpdate
                               ? Icons.system_update_alt
                               : Icons.library_add,
+                          color: AppUiColors.primary(context),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -125,7 +126,11 @@ class ImportSummaryPage extends ConsumerWidget {
                             isUpdate
                                 ? l10n.tr('import_summary_update_title')
                                 : l10n.tr('import_summary_new_title'),
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: AppUiColors.primary(context),
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ),
                       ],
@@ -163,9 +168,11 @@ class ImportSummaryPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      l10n.tr('import_summary_cards_section'),
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _sectionHeader(
+                      context,
+                      icon: Icons.copy_all_outlined,
+                      title: l10n.tr('import_summary_cards_section'),
+                      color: AppUiColors.primary(context),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -176,13 +183,13 @@ class ImportSummaryPage extends ConsumerWidget {
                           context,
                           label: l10n.tr('import_summary_processed'),
                           value: cardsProcessed.toString(),
-                          color: Colors.blueGrey,
+                          color: AppUiColors.primary(context),
                         ),
                         _metricChip(
                           context,
                           label: l10n.tr('import_summary_created'),
                           value: cardsCreated.toString(),
-                          color: AppUiColors.info(context),
+                          color: AppUiColors.secondary(context),
                         ),
                         _metricChip(
                           context,
@@ -235,9 +242,11 @@ class ImportSummaryPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      l10n.tr('import_summary_settings_section'),
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _sectionHeader(
+                      context,
+                      icon: Icons.settings_suggest_outlined,
+                      title: l10n.tr('import_summary_settings_section'),
+                      color: AppUiColors.primary(context),
                     ),
                     const SizedBox(height: 12),
                     _kv(
@@ -272,9 +281,11 @@ class ImportSummaryPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      l10n.tr('import_summary_media_section'),
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _sectionHeader(
+                      context,
+                      icon: Icons.perm_media_outlined,
+                      title: l10n.tr('import_summary_media_section'),
+                      color: AppUiColors.primary(context),
                     ),
                     const SizedBox(height: 12),
                     if (zipEntriesTotal != null)
@@ -348,9 +359,11 @@ class ImportSummaryPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      l10n.tr('import_summary_media_diag_section'),
-                      style: Theme.of(context).textTheme.titleMedium,
+                    _sectionHeader(
+                      context,
+                      icon: Icons.fact_check_outlined,
+                      title: l10n.tr('import_summary_media_diag_section'),
+                      color: AppUiColors.primary(context),
                     ),
                     const SizedBox(height: 12),
                     if (missingWordAudio != null)
@@ -430,7 +443,7 @@ class ImportSummaryPage extends ConsumerWidget {
           page,
           Positioned.fill(
             child: IgnorePointer(
-              child: Container(color: Colors.black.withValues(alpha: 0.24)),
+              child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
           Positioned(
@@ -490,6 +503,29 @@ class ImportSummaryPage extends ConsumerWidget {
           Expanded(child: Text(value)),
         ],
       ),
+    );
+  }
+
+  Widget _sectionHeader(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

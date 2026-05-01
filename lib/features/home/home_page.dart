@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:isar/isar.dart';
 import 'package:url_launcher/link.dart';
 
@@ -42,7 +43,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final warning = AppUiColors.warning(context);
     final success = AppUiColors.success(context);
     final muted = AppUiColors.mutedText(context);
-    final danger = Theme.of(context).colorScheme.error;
+    final overdue = AppUiColors.overdue(context);
+    final danger = AppUiColors.danger(context);
     final guidedTourState = ref.watch(guidedTourProvider);
 
     _maybeShowWelcomeDialog(guidedTourState);
@@ -63,8 +65,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final page = Scaffold(
       appBar: AppBar(
-        title: Text(l10n.tr('home_title')),
-        elevation: 2,
+        toolbarHeight: 76,
+        title: const _HomeBrandTitle(),
         actions: [
           _HighlightedActionButton(
             highlighted: step == GuidedTourStep.homeOpenSettings,
@@ -227,7 +229,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 },
                               ),
                               style: TextStyle(
-                                color: danger,
+                                color: overdue,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -404,7 +406,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         page,
         Positioned.fill(
           child: IgnorePointer(
-            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+            child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
         Positioned(
@@ -1083,8 +1085,8 @@ class _DeckIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final fallback = ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: Image.asset(
-        'lib/assets/images/deck_default.png',
+      child: SvgPicture.asset(
+        'lib/assets/images/deck_default.svg',
         width: 52,
         height: 52,
         fit: BoxFit.cover,
@@ -1109,5 +1111,44 @@ class _DeckIcon extends StatelessWidget {
     } catch (_) {
       return fallback;
     }
+  }
+}
+
+class _HomeBrandTitle extends StatelessWidget {
+  const _HomeBrandTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle =
+        Theme.of(context).appBarTheme.titleTextStyle ??
+        Theme.of(context).textTheme.titleLarge;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SvgPicture.asset('lib/assets/images/ICO.svg', width: 34, height: 34),
+        const SizedBox(width: 12),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Flash',
+                style: baseStyle?.copyWith(
+                  color: AppUiColors.primary(context),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              TextSpan(
+                text: 'Lingo',
+                style: baseStyle?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

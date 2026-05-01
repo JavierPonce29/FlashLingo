@@ -151,10 +151,8 @@ const Map<String, String> appStringsRo = <String, String>{
       'Modificarile se aplica imediat. In sesiuni active, parametrii se actualizeaza la continuare.',
   'deck_settings_mix_new_first': 'Noi mai intai, apoi review',
   'deck_settings_mix_reviews_first': 'Review mai intai, apoi noi',
-  'deck_settings_mix_interleave_reviews_new':
-      'Intercalat: X review, X noi',
-  'deck_settings_mix_interleave_new_reviews':
-      'Intercalat: X noi, X review',
+  'deck_settings_mix_interleave_reviews_new': 'Intercalat: X review, X noi',
+  'deck_settings_mix_interleave_new_reviews': 'Intercalat: X noi, X review',
   'deck_settings_reviews_block': 'Review-uri pe bloc',
   'deck_settings_new_block': 'Noi pe bloc',
   'deck_settings_write_mode': 'Mod scriere (productie)',

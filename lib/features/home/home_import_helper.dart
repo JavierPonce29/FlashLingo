@@ -11,6 +11,7 @@ import 'package:flashcards_app/features/importer/import_summary_page.dart';
 import 'package:flashcards_app/features/importer/importer_provider.dart';
 import 'package:flashcards_app/features/importer/importer_service.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class HomeImportHelper {
   const HomeImportHelper._();
@@ -114,7 +115,7 @@ class HomeImportHelper {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.tr('import_completed')),
-          backgroundColor: Colors.green,
+          backgroundColor: AppUiColors.success(context),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -135,7 +136,7 @@ class HomeImportHelper {
               params: <String, Object?>{'name': e.preview.importedPackName},
             ),
           ),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppUiColors.warning(context),
           duration: const Duration(seconds: 4),
         ),
       );
@@ -146,7 +147,7 @@ class HomeImportHelper {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.tr('import_error')),
-          backgroundColor: Colors.red,
+          backgroundColor: AppUiColors.danger(context),
         ),
       );
     }

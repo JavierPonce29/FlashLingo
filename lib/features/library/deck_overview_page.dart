@@ -83,7 +83,7 @@ class DeckOverviewPage extends ConsumerWidget {
         page,
         Positioned.fill(
           child: IgnorePointer(
-            child: Container(color: Colors.black.withValues(alpha: 0.24)),
+            child: Container(color: AppUiColors.scrim(context)),
           ),
         ),
         Positioned(

@@ -51,11 +51,9 @@ const Map<String, String> appStringsDe = <String, String>{
   'home_menu_rename': 'Umbenennen',
   'home_menu_delete': 'Loschen',
   'home_delete_title': 'Deck loschen',
-  'home_delete_confirm':
-      'Mochtest du das Deck "{packName}" wirklich loschen?',
+  'home_delete_confirm': 'Mochtest du das Deck "{packName}" wirklich loschen?',
   'home_delete_success': 'Deck geloscht',
-  'home_no_future_reviews':
-      'Keine zukunftigen Wiederholungen zum Vorziehen.',
+  'home_no_future_reviews': 'Keine zukunftigen Wiederholungen zum Vorziehen.',
   'home_advance_title': 'Wiederholungen vorziehen',
   'home_future_available': 'Verfugbare zukunftige Wiederholungen: {count}',
   'home_advance_amount_label': 'Anzahl zum Vorziehen',

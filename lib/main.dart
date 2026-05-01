@@ -6,6 +6,7 @@ import 'package:flashcards_app/features/home/home_page.dart';
 import 'package:flashcards_app/features/settings/app_language_controller.dart';
 import 'package:flashcards_app/features/settings/app_theme_mode_controller.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
+import 'package:flashcards_app/theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,12 +34,8 @@ class MyApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       themeMode: themeMode,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: Colors.blue,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: const HomePage(),
     );
   }

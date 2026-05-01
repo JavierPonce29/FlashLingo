@@ -9,6 +9,7 @@ import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/settings/app_language_controller.dart';
 import 'package:flashcards_app/features/settings/app_theme_mode_controller.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
+import 'package:flashcards_app/theme/app_ui_colors.dart';
 
 class GeneralSettingsPage extends ConsumerWidget {
   const GeneralSettingsPage({super.key});
@@ -189,7 +190,7 @@ class GeneralSettingsPage extends ConsumerWidget {
           if (tourInsideSettings) ...[
             Positioned.fill(
               child: IgnorePointer(
-                child: Container(color: Colors.black.withValues(alpha: 0.24)),
+                child: Container(color: AppUiColors.scrim(context)),
               ),
             ),
             Positioned(

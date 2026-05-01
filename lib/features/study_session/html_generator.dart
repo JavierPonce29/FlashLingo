@@ -753,26 +753,24 @@ class HtmlGenerator {
 
   static String _getBaseCss(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final pageBg = isDark ? 'rgb(11, 7, 22)' : 'rgb(251, 250, 254)';
-    final cardBg = isDark ? 'rgb(19, 12, 34)' : 'rgb(255, 255, 255)';
-    final text = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgb(48, 32, 111)';
-    final soft = isDark
-        ? 'rgba(255, 255, 255, 0.72)'
-        : 'rgba(48, 32, 111, 0.72)';
-    final accent = isDark ? 'rgb(153, 128, 255)' : 'rgb(101, 68, 233)';
-    final accentDark = isDark ? 'rgb(133, 102, 255)' : 'rgb(75, 50, 174)';
-    final line = isDark ? 'rgb(48, 32, 111)' : 'rgb(216, 208, 249)';
-    final panel = isDark ? 'rgb(26, 18, 61)' : 'rgb(246, 245, 253)';
-    final audioFill = isDark ? 'rgb(26, 18, 61)' : 'rgb(246, 245, 253)';
-    final audioBorder = isDark ? 'rgb(48, 32, 111)' : 'rgb(216, 208, 249)';
-    final diffGood = isDark ? 'rgb(140, 224, 175)' : 'rgb(29, 122, 69)';
-    final diffBad = isDark ? 'rgb(255, 154, 154)' : 'rgb(179, 43, 43)';
+    final pageBg = isDark ? 'rgb(15, 23, 42)' : 'rgb(248, 250, 252)';
+    final cardBg = isDark ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)';
+    final text = isDark ? 'rgb(226, 232, 240)' : 'rgb(46, 36, 107)';
+    final soft = isDark ? 'rgb(148, 163, 184)' : 'rgb(107, 114, 128)';
+    final accent = isDark ? 'rgb(209, 184, 255)' : 'rgb(107, 77, 230)';
+    final accentDark = isDark ? 'rgb(233, 221, 255)' : 'rgb(81, 51, 199)';
+    final line = isDark ? 'rgb(51, 65, 85)' : 'rgb(230, 223, 255)';
+    final panel = isDark ? 'rgb(22, 34, 53)' : 'rgb(246, 241, 254)';
+    final audioFill = isDark ? 'rgb(22, 34, 53)' : 'rgb(244, 240, 255)';
+    final audioBorder = isDark ? 'rgb(51, 65, 85)' : 'rgb(230, 223, 255)';
+    final diffGood = isDark ? 'rgb(74, 222, 128)' : 'rgb(79, 180, 119)';
+    final diffBad = isDark ? 'rgb(255, 92, 92)' : 'rgb(246, 107, 107)';
     final cardShadow = isDark
-        ? 'rgba(0, 0, 0, 0.75)'
-        : 'rgba(133, 102, 255, 0.4)';
+        ? 'rgba(0, 0, 0, 0.45)'
+        : 'rgba(64, 192, 204, 0.18)';
     final focusRing = isDark
-        ? 'rgba(153, 128, 255, 0.28)'
-        : 'rgba(101, 68, 233, 0.16)';
+        ? 'rgba(209, 184, 255, 0.2)'
+        : 'rgba(107, 77, 230, 0.14)';
 
     return """
 html, body { margin: 0; padding: 0; }

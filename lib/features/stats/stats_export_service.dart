@@ -13,6 +13,7 @@ import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/features/stats/stats_provider.dart';
+import 'package:flashcards_app/theme/app_pdf_colors.dart';
 
 class DeckStatsExportResult {
   final Directory directory;
@@ -270,17 +271,14 @@ Future<List<int>> buildDeckStatsPdfBytes(
                 style: pw.TextStyle(
                   fontSize: 18,
                   fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blueGrey900,
+                  color: AppPdfColors.brand,
                 ),
               ),
               if (chart.subtitle != null && chart.subtitle!.isNotEmpty) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
                   chart.subtitle!,
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    color: PdfColors.blueGrey700,
-                  ),
+                  style: pw.TextStyle(fontSize: 10, color: AppPdfColors.muted),
                 ),
               ],
               pw.SizedBox(height: 12),
@@ -608,18 +606,18 @@ pw.Widget _pdfHeader(String packName) {
         style: pw.TextStyle(
           fontSize: 22,
           fontWeight: pw.FontWeight.bold,
-          color: PdfColors.blueGrey900,
+          color: AppPdfColors.brand,
         ),
       ),
       pw.SizedBox(height: 4),
       pw.Text(
         packName,
-        style: pw.TextStyle(fontSize: 15, color: PdfColors.blueGrey700),
+        style: pw.TextStyle(fontSize: 15, color: AppPdfColors.text),
       ),
       pw.SizedBox(height: 2),
       pw.Text(
         'Exported: ${_dateTime(DateTime.now())}',
-        style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+        style: pw.TextStyle(fontSize: 10, color: AppPdfColors.muted),
       ),
     ],
   );
@@ -633,7 +631,7 @@ pw.Widget _pdfSectionTitle(String title) {
       style: pw.TextStyle(
         fontSize: 14,
         fontWeight: pw.FontWeight.bold,
-        color: PdfColors.blueGrey900,
+        color: AppPdfColors.brand,
       ),
     ),
   );
@@ -649,9 +647,9 @@ pw.Widget _pdfMetricGrid(List<_PdfMetric> metrics) {
             width: 162,
             padding: const pw.EdgeInsets.all(10),
             decoration: pw.BoxDecoration(
-              color: PdfColors.blueGrey50,
+              color: AppPdfColors.surface,
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              border: pw.Border.all(color: PdfColors.blueGrey100),
+              border: pw.Border.all(color: AppPdfColors.border),
             ),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -661,16 +659,13 @@ pw.Widget _pdfMetricGrid(List<_PdfMetric> metrics) {
                   style: pw.TextStyle(
                     fontSize: 16,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blueGrey900,
+                    color: AppPdfColors.brand,
                   ),
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
                   metric.label,
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfColors.blueGrey700,
-                  ),
+                  style: pw.TextStyle(fontSize: 9, color: AppPdfColors.muted),
                 ),
               ],
             ),
@@ -690,12 +685,12 @@ pw.Widget _pdfSimpleTable({
       width: double.infinity,
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        color: PdfColors.grey100,
+        color: AppPdfColors.surfaceAlt,
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
       ),
       child: pw.Text(
         emptyLabel,
-        style: pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+        style: pw.TextStyle(fontSize: 10, color: AppPdfColors.muted),
       ),
     );
   }
@@ -703,17 +698,17 @@ pw.Widget _pdfSimpleTable({
   return pw.TableHelper.fromTextArray(
     headers: headers,
     data: rows,
-    headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
+    headerDecoration: pw.BoxDecoration(color: AppPdfColors.primarySoft),
     headerStyle: pw.TextStyle(
       fontSize: 9,
       fontWeight: pw.FontWeight.bold,
-      color: PdfColors.blueGrey900,
+      color: AppPdfColors.text,
     ),
-    cellStyle: const pw.TextStyle(fontSize: 8.5, color: PdfColors.black),
+    cellStyle: pw.TextStyle(fontSize: 8.5, color: AppPdfColors.text),
     cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-    border: pw.TableBorder.all(color: PdfColors.blueGrey100, width: 0.5),
-    oddRowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-    rowDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey50),
+    border: pw.TableBorder.all(color: AppPdfColors.border, width: 0.5),
+    oddRowDecoration: pw.BoxDecoration(color: AppPdfColors.surface),
+    rowDecoration: pw.BoxDecoration(color: AppPdfColors.surfaceAlt),
   );
 }
 

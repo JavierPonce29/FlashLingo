@@ -153,7 +153,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           page,
           Positioned.fill(
             child: IgnorePointer(
-              child: Container(color: Colors.black.withValues(alpha: 0.24)),
+              child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
           Positioned(
@@ -814,7 +814,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
               context,
               l10n.tr('stats_overdue'),
               '${stats.overdueCards}',
-              AppUiColors.danger(context),
+              AppUiColors.overdue(context),
             ),
             _metricTile(
               context,
@@ -860,12 +860,18 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   ]) {
     final scheme = Theme.of(context).colorScheme;
     final muted = AppUiColors.mutedText(context);
+    final fill = color == null
+        ? scheme.surfaceContainerHighest
+        : AppUiColors.panelFill(context, color);
     return Container(
       width: 150,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+        color: fill,
         borderRadius: BorderRadius.circular(12),
+        border: color == null
+            ? null
+            : Border.all(color: AppUiColors.panelBorder(context, color)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1936,7 +1942,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                       ),
                       _predictionBar(
                         points,
-                        color: Colors.purple,
+                        color: AppUiColors.chartNewActual(context),
                         selector: (point) => point.actualNew,
                       ),
                       _predictionBar(
@@ -1965,7 +1971,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                   Theme.of(context).colorScheme.onSurface,
                 ),
                 _legendItem(
-                  Colors.purple,
+                  AppUiColors.chartNewActual(context),
                   l10n.tr('stats_prediction_new_actual'),
                   Theme.of(context).colorScheme.onSurface,
                 ),
@@ -2094,7 +2100,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                     lineBarsData: [
                       LineChartBarData(
                         isCurved: false,
-                        color: Colors.brown,
+                        color: AppUiColors.chartDuration(context),
                         barWidth: 2.5,
                         dotData: FlDotData(show: points.length <= 90),
                         spots: List<FlSpot>.generate(
@@ -2500,17 +2506,22 @@ class _StatsPageState extends ConsumerState<StatsPage> {
   }
 
   Widget _tagChip(BuildContext context, String label) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: scheme.primaryContainer,
+        color: AppUiColors.panelFill(context, AppUiColors.lavender(context)),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppUiColors.panelBorder(
+            context,
+            AppUiColors.lavender(context),
+          ),
+        ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: scheme.onPrimaryContainer,
+          color: AppUiColors.lavender(context),
           fontWeight: FontWeight.w600,
         ),
       ),

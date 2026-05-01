@@ -430,19 +430,20 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                           const SizedBox(height: 20),
                           _buildSectionTitle(
                             l10n.tr('deck_settings_day_cutoff'),
+                            color: AppUiColors.secondary(context),
                           ),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: AppUiColors.panelFill(
                                 context,
-                                AppUiColors.info(context),
+                                AppUiColors.secondary(context),
                               ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: AppUiColors.panelBorder(
                                   context,
-                                  AppUiColors.info(context),
+                                  AppUiColors.secondary(context),
                                 ),
                               ),
                             ),
@@ -535,19 +536,20 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         children: [
                           _buildSectionTitle(
                             l10n.tr('deck_settings_mix_section'),
+                            color: AppUiColors.mint(context),
                           ),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: AppUiColors.panelFill(
                                 context,
-                                AppUiColors.success(context),
+                                AppUiColors.mint(context),
                               ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: AppUiColors.panelBorder(
                                   context,
-                                  AppUiColors.success(context),
+                                  AppUiColors.mint(context),
                                 ),
                               ),
                             ),
@@ -668,13 +670,17 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                         children: [
                           _buildSectionTitle(
                             l10n.tr('deck_settings_write_mode'),
+                            color: AppUiColors.lavender(context),
                           ),
                           _buildWriteModeSection(context, l10n),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _buildSectionTitle(l10n.tr('deck_settings_undo_section')),
+                    _buildSectionTitle(
+                      l10n.tr('deck_settings_undo_section'),
+                      color: AppUiColors.peach(context),
+                    ),
                     _buildUndoSection(context, l10n),
                     const SizedBox(height: 20),
                     _buildSectionTitle(
@@ -731,7 +737,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           page,
           Positioned.fill(
             child: IgnorePointer(
-              child: Container(color: Colors.black.withValues(alpha: 0.24)),
+              child: Container(color: AppUiColors.scrim(context)),
             ),
           ),
           Positioned(
@@ -882,10 +888,10 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppUiColors.panelFill(context, AppUiColors.warning(context)),
+        color: AppUiColors.panelFill(context, AppUiColors.peach(context)),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppUiColors.panelBorder(context, AppUiColors.warning(context)),
+          color: AppUiColors.panelBorder(context, AppUiColors.peach(context)),
         ),
       ),
       child: SwitchListTile(
@@ -1063,12 +1069,16 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: color ?? AppUiColors.primary(context),
+        ),
       ),
     );
   }

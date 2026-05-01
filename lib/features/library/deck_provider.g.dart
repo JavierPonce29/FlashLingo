@@ -13,8 +13,9 @@ String _$decksStreamHash() => r'1254efa918b71dda662d51259ff1d6469f671df2';
 final decksStreamProvider = StreamProvider<List<DeckSummary>>.internal(
   decksStream,
   name: r'decksStreamProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$decksStreamHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$decksStreamHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
@@ -53,21 +54,15 @@ class DeleteDeckFamily extends Family<AsyncValue<void>> {
   const DeleteDeckFamily();
 
   /// See also [deleteDeck].
-  DeleteDeckProvider call(
-    String packName,
-  ) {
-    return DeleteDeckProvider(
-      packName,
-    );
+  DeleteDeckProvider call(String packName) {
+    return DeleteDeckProvider(packName);
   }
 
   @override
   DeleteDeckProvider getProviderOverride(
     covariant DeleteDeckProvider provider,
   ) {
-    return call(
-      provider.packName,
-    );
+    return call(provider.packName);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -88,24 +83,18 @@ class DeleteDeckFamily extends Family<AsyncValue<void>> {
 /// See also [deleteDeck].
 class DeleteDeckProvider extends FutureProvider<void> {
   /// See also [deleteDeck].
-  DeleteDeckProvider(
-    String packName,
-  ) : this._internal(
-          (ref) => deleteDeck(
-            ref as DeleteDeckRef,
-            packName,
-          ),
-          from: deleteDeckProvider,
-          name: r'deleteDeckProvider',
-          debugGetCreateSourceHash:
-              const bool.fromEnvironment('dart.vm.product')
-                  ? null
-                  : _$deleteDeckHash,
-          dependencies: DeleteDeckFamily._dependencies,
-          allTransitiveDependencies:
-              DeleteDeckFamily._allTransitiveDependencies,
-          packName: packName,
-        );
+  DeleteDeckProvider(String packName)
+    : this._internal(
+        (ref) => deleteDeck(ref as DeleteDeckRef, packName),
+        from: deleteDeckProvider,
+        name: r'deleteDeckProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$deleteDeckHash,
+        dependencies: DeleteDeckFamily._dependencies,
+        allTransitiveDependencies: DeleteDeckFamily._allTransitiveDependencies,
+        packName: packName,
+      );
 
   DeleteDeckProvider._internal(
     super._createNotifier, {
@@ -181,24 +170,15 @@ class RenameDeckFamily extends Family<AsyncValue<void>> {
   const RenameDeckFamily();
 
   /// See also [renameDeck].
-  RenameDeckProvider call(
-    String oldPackName,
-    String newPackName,
-  ) {
-    return RenameDeckProvider(
-      oldPackName,
-      newPackName,
-    );
+  RenameDeckProvider call(String oldPackName, String newPackName) {
+    return RenameDeckProvider(oldPackName, newPackName);
   }
 
   @override
   RenameDeckProvider getProviderOverride(
     covariant RenameDeckProvider provider,
   ) {
-    return call(
-      provider.oldPackName,
-      provider.newPackName,
-    );
+    return call(provider.oldPackName, provider.newPackName);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -219,27 +199,19 @@ class RenameDeckFamily extends Family<AsyncValue<void>> {
 /// See also [renameDeck].
 class RenameDeckProvider extends FutureProvider<void> {
   /// See also [renameDeck].
-  RenameDeckProvider(
-    String oldPackName,
-    String newPackName,
-  ) : this._internal(
-          (ref) => renameDeck(
-            ref as RenameDeckRef,
-            oldPackName,
-            newPackName,
-          ),
-          from: renameDeckProvider,
-          name: r'renameDeckProvider',
-          debugGetCreateSourceHash:
-              const bool.fromEnvironment('dart.vm.product')
-                  ? null
-                  : _$renameDeckHash,
-          dependencies: RenameDeckFamily._dependencies,
-          allTransitiveDependencies:
-              RenameDeckFamily._allTransitiveDependencies,
-          oldPackName: oldPackName,
-          newPackName: newPackName,
-        );
+  RenameDeckProvider(String oldPackName, String newPackName)
+    : this._internal(
+        (ref) => renameDeck(ref as RenameDeckRef, oldPackName, newPackName),
+        from: renameDeckProvider,
+        name: r'renameDeckProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$renameDeckHash,
+        dependencies: RenameDeckFamily._dependencies,
+        allTransitiveDependencies: RenameDeckFamily._allTransitiveDependencies,
+        oldPackName: oldPackName,
+        newPackName: newPackName,
+      );
 
   RenameDeckProvider._internal(
     super._createNotifier, {
@@ -313,5 +285,6 @@ class _RenameDeckProviderElement extends FutureProviderElement<void>
   @override
   String get newPackName => (origin as RenameDeckProvider).newPackName;
 }
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

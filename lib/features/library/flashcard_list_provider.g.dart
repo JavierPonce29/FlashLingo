@@ -12,14 +12,14 @@ String _$flashcardsStreamHash() => r'76b8e3c52f74dc783cd2988992f33af331300a5b';
 @ProviderFor(flashcardsStream)
 final flashcardsStreamProvider =
     AutoDisposeStreamProvider<List<Flashcard>>.internal(
-  flashcardsStream,
-  name: r'flashcardsStreamProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$flashcardsStreamHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      flashcardsStream,
+      name: r'flashcardsStreamProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$flashcardsStreamHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef FlashcardsStreamRef = AutoDisposeStreamProviderRef<List<Flashcard>>;
 // ignore_for_file: type=lint

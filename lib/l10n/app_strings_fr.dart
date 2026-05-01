@@ -51,8 +51,7 @@ const Map<String, String> appStringsFr = <String, String>{
   'home_menu_rename': 'Renommer',
   'home_menu_delete': 'Supprimer',
   'home_delete_title': 'Supprimer le deck',
-  'home_delete_confirm':
-      'Voulez-vous vraiment supprimer le deck "{packName}"?',
+  'home_delete_confirm': 'Voulez-vous vraiment supprimer le deck "{packName}"?',
   'home_delete_success': 'Deck supprime',
   'home_no_future_reviews': 'Aucune revision future a avancer.',
   'home_advance_title': 'Avancer les revisions',

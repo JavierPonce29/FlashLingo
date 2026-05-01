@@ -17,16 +17,8 @@ const DeckSettingsSchema = CollectionSchema(
   name: r'DeckSettings',
   id: 3489020271710213188,
   properties: {
-    r'alpha': PropertySchema(
-      id: 0,
-      name: r'alpha',
-      type: IsarType.double,
-    ),
-    r'beta': PropertySchema(
-      id: 1,
-      name: r'beta',
-      type: IsarType.double,
-    ),
+    r'alpha': PropertySchema(id: 0, name: r'alpha', type: IsarType.double),
+    r'beta': PropertySchema(id: 1, name: r'beta', type: IsarType.double),
     r'dayCutoffHour': PropertySchema(
       id: 2,
       name: r'dayCutoffHour',
@@ -112,16 +104,8 @@ const DeckSettingsSchema = CollectionSchema(
       name: r'newCardsSeenToday',
       type: IsarType.long,
     ),
-    r'offset': PropertySchema(
-      id: 19,
-      name: r'offset',
-      type: IsarType.double,
-    ),
-    r'pMin': PropertySchema(
-      id: 20,
-      name: r'pMin',
-      type: IsarType.double,
-    ),
+    r'offset': PropertySchema(id: 19, name: r'offset', type: IsarType.double),
+    r'pMin': PropertySchema(id: 20, name: r'pMin', type: IsarType.double),
     r'packName': PropertySchema(
       id: 21,
       name: r'packName',
@@ -146,7 +130,7 @@ const DeckSettingsSchema = CollectionSchema(
       id: 25,
       name: r'writeModeThreshold',
       type: IsarType.long,
-    )
+    ),
   },
   estimateSize: _deckSettingsEstimateSize,
   serialize: _deckSettingsSerialize,
@@ -164,9 +148,9 @@ const DeckSettingsSchema = CollectionSchema(
           name: r'packName',
           type: IndexType.hash,
           caseSensitive: true,
-        )
+        ),
       ],
-    )
+    ),
   },
   links: {},
   embeddedSchemas: {},
@@ -338,7 +322,10 @@ List<IsarLinkBase<dynamic>> _deckSettingsGetLinks(DeckSettings object) {
 }
 
 void _deckSettingsAttach(
-    IsarCollection<dynamic> col, Id id, DeckSettings object) {
+  IsarCollection<dynamic> col,
+  Id id,
+  DeckSettings object,
+) {
   object.id = id;
 }
 
@@ -391,8 +378,10 @@ extension DeckSettingsByIndex on IsarCollection<DeckSettings> {
     return putAllByIndex(r'packName', objects);
   }
 
-  List<Id> putAllByPackNameSync(List<DeckSettings> objects,
-      {bool saveLinks = true}) {
+  List<Id> putAllByPackNameSync(
+    List<DeckSettings> objects, {
+    bool saveLinks = true,
+  }) {
     return putAllByIndexSync(r'packName', objects, saveLinks: saveLinks);
   }
 }
@@ -410,15 +399,13 @@ extension DeckSettingsQueryWhere
     on QueryBuilder<DeckSettings, DeckSettings, QWhereClause> {
   QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> idEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: id,
-        upper: id,
-      ));
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> idNotEqualTo(
-      Id id) {
+    Id id,
+  ) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
@@ -441,8 +428,9 @@ extension DeckSettingsQueryWhere
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> idGreaterThan(
-      Id id,
-      {bool include = false}) {
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.greaterThan(lower: id, includeLower: include),
@@ -450,8 +438,10 @@ extension DeckSettingsQueryWhere
     });
   }
 
-  QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> idLessThan(Id id,
-      {bool include = false}) {
+  QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> idLessThan(
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.lessThan(upper: id, includeUpper: include),
@@ -466,56 +456,66 @@ extension DeckSettingsQueryWhere
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: lowerId,
-        includeLower: includeLower,
-        upper: upperId,
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause> packNameEqualTo(
-      String packName) {
+    String packName,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'packName',
-        value: [packName],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'packName', value: [packName]),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterWhereClause>
-      packNameNotEqualTo(String packName) {
+  packNameNotEqualTo(String packName) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'packName',
-              lower: [],
-              upper: [packName],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'packName',
-              lower: [packName],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'packName',
+                lower: [],
+                upper: [packName],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'packName',
+                lower: [packName],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'packName',
-              lower: [packName],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'packName',
-              lower: [],
-              upper: [packName],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'packName',
+                lower: [packName],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'packName',
+                lower: [],
+                upper: [packName],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
@@ -528,27 +528,31 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'alpha',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'alpha',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      alphaGreaterThan(
+  alphaGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'alpha',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'alpha',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -558,12 +562,14 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'alpha',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'alpha',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -575,14 +581,16 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'alpha',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'alpha',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -591,27 +599,31 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'beta',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'beta',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      betaGreaterThan(
+  betaGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'beta',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'beta',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -621,12 +633,14 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'beta',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'beta',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -638,231 +652,234 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'beta',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'beta',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourIsNull() {
+  dayCutoffHourIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'dayCutoffHour',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'dayCutoffHour'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourIsNotNull() {
+  dayCutoffHourIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'dayCutoffHour',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'dayCutoffHour'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourEqualTo(int? value) {
+  dayCutoffHourEqualTo(int? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'dayCutoffHour',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dayCutoffHour', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourGreaterThan(
-    int? value, {
-    bool include = false,
-  }) {
+  dayCutoffHourGreaterThan(int? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'dayCutoffHour',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dayCutoffHour',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourLessThan(
-    int? value, {
-    bool include = false,
-  }) {
+  dayCutoffHourLessThan(int? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'dayCutoffHour',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dayCutoffHour',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffHourBetween(
+  dayCutoffHourBetween(
     int? lower,
     int? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'dayCutoffHour',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dayCutoffHour',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteIsNull() {
+  dayCutoffMinuteIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'dayCutoffMinute',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'dayCutoffMinute'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteIsNotNull() {
+  dayCutoffMinuteIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'dayCutoffMinute',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'dayCutoffMinute'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteEqualTo(int? value) {
+  dayCutoffMinuteEqualTo(int? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'dayCutoffMinute',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dayCutoffMinute', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteGreaterThan(
-    int? value, {
-    bool include = false,
-  }) {
+  dayCutoffMinuteGreaterThan(int? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'dayCutoffMinute',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dayCutoffMinute',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteLessThan(
-    int? value, {
-    bool include = false,
-  }) {
+  dayCutoffMinuteLessThan(int? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'dayCutoffMinute',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dayCutoffMinute',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      dayCutoffMinuteBetween(
+  dayCutoffMinuteBetween(
     int? lower,
     int? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'dayCutoffMinute',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dayCutoffMinute',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriIsNull() {
+  deckIconUriIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'deckIconUri',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'deckIconUri'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriIsNotNull() {
+  deckIconUriIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'deckIconUri',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'deckIconUri'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriEqualTo(
-    String? value, {
-    bool caseSensitive = true,
-  }) {
+  deckIconUriEqualTo(String? value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriGreaterThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriLessThan(
+  deckIconUriGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriBetween(
+  deckIconUriLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  deckIconUriBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -870,114 +887,114 @@ extension DeckSettingsQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'deckIconUri',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'deckIconUri',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  deckIconUriStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  deckIconUriEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriContains(String value, {bool caseSensitive = true}) {
+  deckIconUriContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'deckIconUri',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'deckIconUri',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriMatches(String pattern, {bool caseSensitive = true}) {
+  deckIconUriMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'deckIconUri',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'deckIconUri',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriIsEmpty() {
+  deckIconUriIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'deckIconUri',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'deckIconUri', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      deckIconUriIsNotEmpty() {
+  deckIconUriIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'deckIconUri',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'deckIconUri', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      enableUndoEqualTo(bool value) {
+  enableUndoEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'enableUndo',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'enableUndo', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      enableWriteModeEqualTo(bool value) {
+  enableWriteModeEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'enableWriteMode',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'enableWriteMode', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition> idEqualTo(
-      Id value) {
+    Id value,
+  ) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
     });
   }
 
@@ -986,11 +1003,13 @@ extension DeckSettingsQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -999,11 +1018,13 @@ extension DeckSettingsQueryFilter
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -1014,64 +1035,69 @@ extension DeckSettingsQueryFilter
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      initialNtEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
+  initialNtEqualTo(double value, {double epsilon = Query.epsilon}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'initialNt',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'initialNt',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      initialNtGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'initialNt',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      initialNtLessThan(
+  initialNtGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'initialNt',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'initialNt',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      initialNtBetween(
+  initialNtLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'initialNt',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  initialNtBetween(
     double lower,
     double upper, {
     bool includeLower = true,
@@ -1079,177 +1105,186 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'initialNt',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'initialNt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveNewCardsCountEqualTo(int value) {
+  interleaveNewCardsCountEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'interleaveNewCardsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'interleaveNewCardsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveNewCardsCountGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  interleaveNewCardsCountGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'interleaveNewCardsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'interleaveNewCardsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveNewCardsCountLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  interleaveNewCardsCountLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'interleaveNewCardsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'interleaveNewCardsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveNewCardsCountBetween(
+  interleaveNewCardsCountBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'interleaveNewCardsCount',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'interleaveNewCardsCount',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveReviewsCountEqualTo(int value) {
+  interleaveReviewsCountEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'interleaveReviewsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'interleaveReviewsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveReviewsCountGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  interleaveReviewsCountGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'interleaveReviewsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'interleaveReviewsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveReviewsCountLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  interleaveReviewsCountLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'interleaveReviewsCount',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'interleaveReviewsCount',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      interleaveReviewsCountBetween(
+  interleaveReviewsCountBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'interleaveReviewsCount',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'interleaveReviewsCount',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseFixedIntervalEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
+  lapseFixedIntervalEqualTo(double value, {double epsilon = Query.epsilon}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lapseFixedInterval',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lapseFixedInterval',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseFixedIntervalGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lapseFixedInterval',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseFixedIntervalLessThan(
+  lapseFixedIntervalGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lapseFixedInterval',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lapseFixedInterval',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseFixedIntervalBetween(
+  lapseFixedIntervalLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lapseFixedInterval',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  lapseFixedIntervalBetween(
     double lower,
     double upper, {
     bool includeLower = true,
@@ -1257,195 +1292,201 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lapseFixedInterval',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lapseFixedInterval',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseToleranceEqualTo(int value) {
+  lapseToleranceEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lapseTolerance',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lapseTolerance', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseToleranceGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  lapseToleranceGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lapseTolerance',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lapseTolerance',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseToleranceLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  lapseToleranceLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lapseTolerance',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lapseTolerance',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lapseToleranceBetween(
+  lapseToleranceBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lapseTolerance',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lapseTolerance',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateIsNull() {
+  lastNewCardStudyDateIsNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNull(
-        property: r'lastNewCardStudyDate',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastNewCardStudyDate'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateIsNotNull() {
+  lastNewCardStudyDateIsNotNull() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(const FilterCondition.isNotNull(
-        property: r'lastNewCardStudyDate',
-      ));
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastNewCardStudyDate'),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateEqualTo(DateTime? value) {
+  lastNewCardStudyDateEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastNewCardStudyDate',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastNewCardStudyDate',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateGreaterThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastNewCardStudyDateGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'lastNewCardStudyDate',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastNewCardStudyDate',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateLessThan(
-    DateTime? value, {
-    bool include = false,
-  }) {
+  lastNewCardStudyDateLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'lastNewCardStudyDate',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastNewCardStudyDate',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      lastNewCardStudyDateBetween(
+  lastNewCardStudyDateBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'lastNewCardStudyDate',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastNewCardStudyDate',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsElementEqualTo(
-    double value, {
-    double epsilon = Query.epsilon,
-  }) {
+  learningStepsElementEqualTo(double value, {double epsilon = Query.epsilon}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'learningSteps',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'learningSteps',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsElementGreaterThan(
-    double value, {
-    bool include = false,
-    double epsilon = Query.epsilon,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'learningSteps',
-        value: value,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsElementLessThan(
+  learningStepsElementGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'learningSteps',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'learningSteps',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsElementBetween(
+  learningStepsElementLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'learningSteps',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  learningStepsElementBetween(
     double lower,
     double upper, {
     bool includeLower = true,
@@ -1453,90 +1494,56 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'learningSteps',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsLengthEqualTo(int length) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'learningSteps',
-        length,
-        true,
-        length,
-        true,
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'learningSteps',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
       );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsIsEmpty() {
+  learningStepsLengthEqualTo(int length) {
     return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'learningSteps',
-        0,
-        true,
-        0,
-        true,
-      );
+      return query.listLength(r'learningSteps', length, true, length, true);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsIsNotEmpty() {
+  learningStepsIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'learningSteps',
-        0,
-        false,
-        999999,
-        true,
-      );
+      return query.listLength(r'learningSteps', 0, true, 0, true);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsLengthLessThan(
-    int length, {
-    bool include = false,
-  }) {
+  learningStepsIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'learningSteps',
-        0,
-        true,
-        length,
-        include,
-      );
+      return query.listLength(r'learningSteps', 0, false, 999999, true);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsLengthGreaterThan(
-    int length, {
-    bool include = false,
-  }) {
+  learningStepsLengthLessThan(int length, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'learningSteps',
-        length,
-        include,
-        999999,
-        true,
-      );
+      return query.listLength(r'learningSteps', 0, true, length, include);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      learningStepsLengthBetween(
+  learningStepsLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'learningSteps', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  learningStepsLengthBetween(
     int lower,
     int upper, {
     bool includeLower = true,
@@ -1554,282 +1561,283 @@ extension DeckSettingsQueryFilter
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      maxReviewsPerDayEqualTo(int value) {
+  maxReviewsPerDayEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'maxReviewsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'maxReviewsPerDay', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      maxReviewsPerDayGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  maxReviewsPerDayGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'maxReviewsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'maxReviewsPerDay',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      maxReviewsPerDayLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  maxReviewsPerDayLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'maxReviewsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'maxReviewsPerDay',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      maxReviewsPerDayBetween(
+  maxReviewsPerDayBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'maxReviewsPerDay',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'maxReviewsPerDay',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardIntraDayMinutesEqualTo(int value) {
+  newCardIntraDayMinutesEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'newCardIntraDayMinutes',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'newCardIntraDayMinutes',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardIntraDayMinutesGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardIntraDayMinutesGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'newCardIntraDayMinutes',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'newCardIntraDayMinutes',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardIntraDayMinutesLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardIntraDayMinutesLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'newCardIntraDayMinutes',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'newCardIntraDayMinutes',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardIntraDayMinutesBetween(
+  newCardIntraDayMinutesBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'newCardIntraDayMinutes',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'newCardIntraDayMinutes',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardMinCorrectRepsEqualTo(int value) {
+  newCardMinCorrectRepsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'newCardMinCorrectReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'newCardMinCorrectReps',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardMinCorrectRepsGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardMinCorrectRepsGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'newCardMinCorrectReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'newCardMinCorrectReps',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardMinCorrectRepsLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardMinCorrectRepsLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'newCardMinCorrectReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'newCardMinCorrectReps',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardMinCorrectRepsBetween(
+  newCardMinCorrectRepsBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'newCardMinCorrectReps',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'newCardMinCorrectReps',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsPerDayEqualTo(int value) {
+  newCardsPerDayEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'newCardsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'newCardsPerDay', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsPerDayGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardsPerDayGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'newCardsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'newCardsPerDay',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsPerDayLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardsPerDayLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'newCardsPerDay',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'newCardsPerDay',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsPerDayBetween(
+  newCardsPerDayBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'newCardsPerDay',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'newCardsPerDay',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsSeenTodayEqualTo(int value) {
+  newCardsSeenTodayEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'newCardsSeenToday',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'newCardsSeenToday', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsSeenTodayGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardsSeenTodayGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'newCardsSeenToday',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'newCardsSeenToday',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsSeenTodayLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  newCardsSeenTodayLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'newCardsSeenToday',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'newCardsSeenToday',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      newCardsSeenTodayBetween(
+  newCardsSeenTodayBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'newCardsSeenToday',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'newCardsSeenToday',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
@@ -1838,43 +1846,49 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'offset',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'offset',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      offsetGreaterThan(
+  offsetGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'offset',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'offset',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      offsetLessThan(
+  offsetLessThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'offset',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'offset',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -1886,14 +1900,16 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'offset',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'offset',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -1902,27 +1918,31 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'pMin',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'pMin',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      pMinGreaterThan(
+  pMinGreaterThan(
     double value, {
     bool include = false,
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'pMin',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'pMin',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -1932,12 +1952,14 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'pMin',
-        value: value,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'pMin',
+          value: value,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
@@ -1949,65 +1971,70 @@ extension DeckSettingsQueryFilter
     double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'pMin',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        epsilon: epsilon,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'pMin',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          epsilon: epsilon,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  packNameEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameLessThan(
+  packNameGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameBetween(
+  packNameLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  packNameBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -2015,135 +2042,140 @@ extension DeckSettingsQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'packName',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'packName',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  packNameStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  packNameEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameContains(String value, {bool caseSensitive = true}) {
+  packNameContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'packName',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'packName',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameMatches(String pattern, {bool caseSensitive = true}) {
+  packNameMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'packName',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'packName',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameIsEmpty() {
+  packNameIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'packName',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'packName', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      packNameIsNotEmpty() {
+  packNameIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'packName',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'packName', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  studyMixModeEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeLessThan(
+  studyMixModeGreaterThan(
     String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeBetween(
+  studyMixModeLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
+  studyMixModeBetween(
     String lower,
     String upper, {
     bool includeLower = true,
@@ -2151,206 +2183,208 @@ extension DeckSettingsQueryFilter
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'studyMixMode',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'studyMixMode',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  studyMixModeStartsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
+  studyMixModeEndsWith(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeContains(String value, {bool caseSensitive = true}) {
+  studyMixModeContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'studyMixMode',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'studyMixMode',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeMatches(String pattern, {bool caseSensitive = true}) {
+  studyMixModeMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'studyMixMode',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'studyMixMode',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeIsEmpty() {
+  studyMixModeIsEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'studyMixMode',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'studyMixMode', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      studyMixModeIsNotEmpty() {
+  studyMixModeIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'studyMixMode',
-        value: '',
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'studyMixMode', value: ''),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      useFixedIntervalOnLapseEqualTo(bool value) {
+  useFixedIntervalOnLapseEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'useFixedIntervalOnLapse',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'useFixedIntervalOnLapse',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeMaxRepsEqualTo(int value) {
+  writeModeMaxRepsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'writeModeMaxReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'writeModeMaxReps', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeMaxRepsGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  writeModeMaxRepsGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'writeModeMaxReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'writeModeMaxReps',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeMaxRepsLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  writeModeMaxRepsLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'writeModeMaxReps',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'writeModeMaxReps',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeMaxRepsBetween(
+  writeModeMaxRepsBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'writeModeMaxReps',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'writeModeMaxReps',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeThresholdEqualTo(int value) {
+  writeModeThresholdEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'writeModeThreshold',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'writeModeThreshold', value: value),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeThresholdGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
+  writeModeThresholdGreaterThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'writeModeThreshold',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'writeModeThreshold',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeThresholdLessThan(
-    int value, {
-    bool include = false,
-  }) {
+  writeModeThresholdLessThan(int value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'writeModeThreshold',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'writeModeThreshold',
+          value: value,
+        ),
+      );
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterFilterCondition>
-      writeModeThresholdBetween(
+  writeModeThresholdBetween(
     int lower,
     int upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'writeModeThreshold',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'writeModeThreshold',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 }
@@ -2394,21 +2428,21 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByDayCutoffHourDesc() {
+  sortByDayCutoffHourDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffHour', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByDayCutoffMinute() {
+  sortByDayCutoffMinute() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffMinute', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByDayCutoffMinuteDesc() {
+  sortByDayCutoffMinuteDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffMinute', Sort.desc);
     });
@@ -2421,7 +2455,7 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByDeckIconUriDesc() {
+  sortByDeckIconUriDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'deckIconUri', Sort.desc);
     });
@@ -2434,21 +2468,21 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByEnableUndoDesc() {
+  sortByEnableUndoDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableUndo', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByEnableWriteMode() {
+  sortByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableWriteMode', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByEnableWriteModeDesc() {
+  sortByEnableWriteModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableWriteMode', Sort.desc);
     });
@@ -2467,140 +2501,140 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByInterleaveNewCardsCount() {
+  sortByInterleaveNewCardsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveNewCardsCount', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByInterleaveNewCardsCountDesc() {
+  sortByInterleaveNewCardsCountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveNewCardsCount', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByInterleaveReviewsCount() {
+  sortByInterleaveReviewsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveReviewsCount', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByInterleaveReviewsCountDesc() {
+  sortByInterleaveReviewsCountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveReviewsCount', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLapseFixedInterval() {
+  sortByLapseFixedInterval() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseFixedInterval', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLapseFixedIntervalDesc() {
+  sortByLapseFixedIntervalDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseFixedInterval', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLapseTolerance() {
+  sortByLapseTolerance() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseTolerance', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLapseToleranceDesc() {
+  sortByLapseToleranceDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseTolerance', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLastNewCardStudyDate() {
+  sortByLastNewCardStudyDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastNewCardStudyDate', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByLastNewCardStudyDateDesc() {
+  sortByLastNewCardStudyDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastNewCardStudyDate', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByMaxReviewsPerDay() {
+  sortByMaxReviewsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxReviewsPerDay', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByMaxReviewsPerDayDesc() {
+  sortByMaxReviewsPerDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxReviewsPerDay', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardIntraDayMinutes() {
+  sortByNewCardIntraDayMinutes() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardIntraDayMinutes', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardIntraDayMinutesDesc() {
+  sortByNewCardIntraDayMinutesDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardIntraDayMinutes', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardMinCorrectReps() {
+  sortByNewCardMinCorrectReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardMinCorrectReps', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardMinCorrectRepsDesc() {
+  sortByNewCardMinCorrectRepsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardMinCorrectReps', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardsPerDay() {
+  sortByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardsPerDayDesc() {
+  sortByNewCardsPerDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardsSeenToday() {
+  sortByNewCardsSeenToday() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsSeenToday', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByNewCardsSeenTodayDesc() {
+  sortByNewCardsSeenTodayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsSeenToday', Sort.desc);
     });
@@ -2649,49 +2683,49 @@ extension DeckSettingsQuerySortBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByStudyMixModeDesc() {
+  sortByStudyMixModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'studyMixMode', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByUseFixedIntervalOnLapse() {
+  sortByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'useFixedIntervalOnLapse', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByUseFixedIntervalOnLapseDesc() {
+  sortByUseFixedIntervalOnLapseDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'useFixedIntervalOnLapse', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByWriteModeMaxReps() {
+  sortByWriteModeMaxReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeMaxReps', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByWriteModeMaxRepsDesc() {
+  sortByWriteModeMaxRepsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeMaxReps', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByWriteModeThreshold() {
+  sortByWriteModeThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeThreshold', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      sortByWriteModeThresholdDesc() {
+  sortByWriteModeThresholdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeThreshold', Sort.desc);
     });
@@ -2731,21 +2765,21 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByDayCutoffHourDesc() {
+  thenByDayCutoffHourDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffHour', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByDayCutoffMinute() {
+  thenByDayCutoffMinute() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffMinute', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByDayCutoffMinuteDesc() {
+  thenByDayCutoffMinuteDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dayCutoffMinute', Sort.desc);
     });
@@ -2758,7 +2792,7 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByDeckIconUriDesc() {
+  thenByDeckIconUriDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'deckIconUri', Sort.desc);
     });
@@ -2771,21 +2805,21 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByEnableUndoDesc() {
+  thenByEnableUndoDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableUndo', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByEnableWriteMode() {
+  thenByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableWriteMode', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByEnableWriteModeDesc() {
+  thenByEnableWriteModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'enableWriteMode', Sort.desc);
     });
@@ -2816,140 +2850,140 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByInterleaveNewCardsCount() {
+  thenByInterleaveNewCardsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveNewCardsCount', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByInterleaveNewCardsCountDesc() {
+  thenByInterleaveNewCardsCountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveNewCardsCount', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByInterleaveReviewsCount() {
+  thenByInterleaveReviewsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveReviewsCount', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByInterleaveReviewsCountDesc() {
+  thenByInterleaveReviewsCountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'interleaveReviewsCount', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLapseFixedInterval() {
+  thenByLapseFixedInterval() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseFixedInterval', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLapseFixedIntervalDesc() {
+  thenByLapseFixedIntervalDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseFixedInterval', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLapseTolerance() {
+  thenByLapseTolerance() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseTolerance', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLapseToleranceDesc() {
+  thenByLapseToleranceDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lapseTolerance', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLastNewCardStudyDate() {
+  thenByLastNewCardStudyDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastNewCardStudyDate', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByLastNewCardStudyDateDesc() {
+  thenByLastNewCardStudyDateDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastNewCardStudyDate', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByMaxReviewsPerDay() {
+  thenByMaxReviewsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxReviewsPerDay', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByMaxReviewsPerDayDesc() {
+  thenByMaxReviewsPerDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxReviewsPerDay', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardIntraDayMinutes() {
+  thenByNewCardIntraDayMinutes() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardIntraDayMinutes', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardIntraDayMinutesDesc() {
+  thenByNewCardIntraDayMinutesDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardIntraDayMinutes', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardMinCorrectReps() {
+  thenByNewCardMinCorrectReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardMinCorrectReps', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardMinCorrectRepsDesc() {
+  thenByNewCardMinCorrectRepsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardMinCorrectReps', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardsPerDay() {
+  thenByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardsPerDayDesc() {
+  thenByNewCardsPerDayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsPerDay', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardsSeenToday() {
+  thenByNewCardsSeenToday() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsSeenToday', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByNewCardsSeenTodayDesc() {
+  thenByNewCardsSeenTodayDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'newCardsSeenToday', Sort.desc);
     });
@@ -2998,49 +3032,49 @@ extension DeckSettingsQuerySortThenBy
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByStudyMixModeDesc() {
+  thenByStudyMixModeDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'studyMixMode', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByUseFixedIntervalOnLapse() {
+  thenByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'useFixedIntervalOnLapse', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByUseFixedIntervalOnLapseDesc() {
+  thenByUseFixedIntervalOnLapseDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'useFixedIntervalOnLapse', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByWriteModeMaxReps() {
+  thenByWriteModeMaxReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeMaxReps', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByWriteModeMaxRepsDesc() {
+  thenByWriteModeMaxRepsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeMaxReps', Sort.desc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByWriteModeThreshold() {
+  thenByWriteModeThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeThreshold', Sort.asc);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QAfterSortBy>
-      thenByWriteModeThresholdDesc() {
+  thenByWriteModeThresholdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'writeModeThreshold', Sort.desc);
     });
@@ -3062,21 +3096,22 @@ extension DeckSettingsQueryWhereDistinct
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByDayCutoffHour() {
+  distinctByDayCutoffHour() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'dayCutoffHour');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByDayCutoffMinute() {
+  distinctByDayCutoffMinute() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'dayCutoffMinute');
     });
   }
 
-  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByDeckIconUri(
-      {bool caseSensitive = true}) {
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByDeckIconUri({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'deckIconUri', caseSensitive: caseSensitive);
     });
@@ -3089,7 +3124,7 @@ extension DeckSettingsQueryWhereDistinct
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByEnableWriteMode() {
+  distinctByEnableWriteMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'enableWriteMode');
     });
@@ -3102,77 +3137,77 @@ extension DeckSettingsQueryWhereDistinct
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByInterleaveNewCardsCount() {
+  distinctByInterleaveNewCardsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'interleaveNewCardsCount');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByInterleaveReviewsCount() {
+  distinctByInterleaveReviewsCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'interleaveReviewsCount');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByLapseFixedInterval() {
+  distinctByLapseFixedInterval() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lapseFixedInterval');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByLapseTolerance() {
+  distinctByLapseTolerance() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lapseTolerance');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByLastNewCardStudyDate() {
+  distinctByLastNewCardStudyDate() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastNewCardStudyDate');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByLearningSteps() {
+  distinctByLearningSteps() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'learningSteps');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByMaxReviewsPerDay() {
+  distinctByMaxReviewsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'maxReviewsPerDay');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByNewCardIntraDayMinutes() {
+  distinctByNewCardIntraDayMinutes() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'newCardIntraDayMinutes');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByNewCardMinCorrectReps() {
+  distinctByNewCardMinCorrectReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'newCardMinCorrectReps');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByNewCardsPerDay() {
+  distinctByNewCardsPerDay() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'newCardsPerDay');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByNewCardsSeenToday() {
+  distinctByNewCardsSeenToday() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'newCardsSeenToday');
     });
@@ -3190,36 +3225,38 @@ extension DeckSettingsQueryWhereDistinct
     });
   }
 
-  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByPackName(
-      {bool caseSensitive = true}) {
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByPackName({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'packName', caseSensitive: caseSensitive);
     });
   }
 
-  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByStudyMixMode(
-      {bool caseSensitive = true}) {
+  QueryBuilder<DeckSettings, DeckSettings, QDistinct> distinctByStudyMixMode({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'studyMixMode', caseSensitive: caseSensitive);
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByUseFixedIntervalOnLapse() {
+  distinctByUseFixedIntervalOnLapse() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'useFixedIntervalOnLapse');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByWriteModeMaxReps() {
+  distinctByWriteModeMaxReps() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'writeModeMaxReps');
     });
   }
 
   QueryBuilder<DeckSettings, DeckSettings, QDistinct>
-      distinctByWriteModeThreshold() {
+  distinctByWriteModeThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'writeModeThreshold');
     });
@@ -3283,21 +3320,21 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      interleaveNewCardsCountProperty() {
+  interleaveNewCardsCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'interleaveNewCardsCount');
     });
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      interleaveReviewsCountProperty() {
+  interleaveReviewsCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'interleaveReviewsCount');
     });
   }
 
   QueryBuilder<DeckSettings, double, QQueryOperations>
-      lapseFixedIntervalProperty() {
+  lapseFixedIntervalProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lapseFixedInterval');
     });
@@ -3310,14 +3347,14 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, DateTime?, QQueryOperations>
-      lastNewCardStudyDateProperty() {
+  lastNewCardStudyDateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastNewCardStudyDate');
     });
   }
 
   QueryBuilder<DeckSettings, List<double>, QQueryOperations>
-      learningStepsProperty() {
+  learningStepsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'learningSteps');
     });
@@ -3330,14 +3367,14 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      newCardIntraDayMinutesProperty() {
+  newCardIntraDayMinutesProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'newCardIntraDayMinutes');
     });
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      newCardMinCorrectRepsProperty() {
+  newCardMinCorrectRepsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'newCardMinCorrectReps');
     });
@@ -3350,7 +3387,7 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      newCardsSeenTodayProperty() {
+  newCardsSeenTodayProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'newCardsSeenToday');
     });
@@ -3381,7 +3418,7 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, bool, QQueryOperations>
-      useFixedIntervalOnLapseProperty() {
+  useFixedIntervalOnLapseProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'useFixedIntervalOnLapse');
     });
@@ -3394,7 +3431,7 @@ extension DeckSettingsQueryProperty
   }
 
   QueryBuilder<DeckSettings, int, QQueryOperations>
-      writeModeThresholdProperty() {
+  writeModeThresholdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'writeModeThreshold');
     });

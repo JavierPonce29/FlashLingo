@@ -9,6 +9,7 @@ import 'package:flashcards_app/features/stats/stats_analysis.dart';
 import 'package:flashcards_app/features/stats/stats_export_service.dart';
 import 'package:flashcards_app/features/stats/stats_provider.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
+import 'package:flashcards_app/theme/app_pdf_colors.dart';
 
 class DeckStatsPdfChartSelection {
   final String heatmapModeLabel;
@@ -155,7 +156,7 @@ pw.Widget _buildMonthHeatmap(MonthHeatmapSlice slice) {
   final cells = <pw.Widget>[];
 
   for (int i = 0; i < leading; i++) {
-    cells.add(_heatCell(label: '', color: PdfColors.white));
+    cells.add(_heatCell(label: '', color: AppPdfColors.surface));
   }
   for (int day = 1; day <= daysInMonth; day++) {
     final date = DateTime(slice.monthStart.year, slice.monthStart.month, day);
@@ -164,12 +165,12 @@ pw.Widget _buildMonthHeatmap(MonthHeatmapSlice slice) {
       _heatCell(
         label: '$day',
         color: _heatColor(value),
-        textColor: value >= 6 ? PdfColors.white : PdfColors.blueGrey900,
+        textColor: value >= 6 ? AppPdfColors.surface : AppPdfColors.text,
       ),
     );
   }
   for (int i = totalCells; i % 7 != 0; i++) {
-    cells.add(_heatCell(label: '', color: PdfColors.white));
+    cells.add(_heatCell(label: '', color: AppPdfColors.surface));
   }
 
   return pw.Column(
@@ -180,7 +181,7 @@ pw.Widget _buildMonthHeatmap(MonthHeatmapSlice slice) {
         style: pw.TextStyle(
           fontSize: 14,
           fontWeight: pw.FontWeight.bold,
-          color: PdfColors.blueGrey900,
+          color: AppPdfColors.text,
         ),
       ),
       pw.SizedBox(height: 8),
@@ -193,10 +194,7 @@ pw.Widget _buildMonthHeatmap(MonthHeatmapSlice slice) {
                 margin: const pw.EdgeInsets.only(right: spacing),
                 child: pw.Text(
                   label,
-                  style: pw.TextStyle(
-                    fontSize: 7,
-                    color: PdfColors.blueGrey600,
-                  ),
+                  style: pw.TextStyle(fontSize: 7, color: AppPdfColors.muted),
                 ),
               ),
             )
@@ -214,7 +212,7 @@ pw.Widget _buildMonthHeatmap(MonthHeatmapSlice slice) {
 pw.Widget _heatCell({
   required String label,
   required PdfColor color,
-  PdfColor textColor = PdfColors.blueGrey800,
+  PdfColor? textColor,
 }) {
   return pw.Container(
     width: 16,
@@ -223,20 +221,26 @@ pw.Widget _heatCell({
     decoration: pw.BoxDecoration(
       color: color,
       borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-      border: pw.Border.all(color: PdfColors.blueGrey100, width: .4),
+      border: pw.Border.all(color: AppPdfColors.border, width: .4),
     ),
     child: label.isEmpty
         ? null
-        : pw.Text(label, style: pw.TextStyle(fontSize: 6, color: textColor)),
+        : pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 6,
+              color: textColor ?? AppPdfColors.text,
+            ),
+          ),
   );
 }
 
 PdfColor _heatColor(int value) {
-  if (value <= 0) return PdfColor.fromInt(0xFFF8FAFC);
-  if (value < 3) return PdfColor.fromInt(0xFFBFDBFE);
-  if (value < 6) return PdfColor.fromInt(0xFF60A5FA);
-  if (value < 10) return PdfColor.fromInt(0xFF2563EB);
-  return PdfColor.fromInt(0xFF1D4ED8);
+  if (value <= 0) return AppPdfColors.surfaceAlt;
+  if (value < 3) return AppPdfColors.primarySoft;
+  if (value < 6) return AppPdfColors.mint;
+  if (value < 10) return AppPdfColors.blue;
+  return AppPdfColors.brand;
 }
 
 pw.Widget _buildStudyTimeChart(List<StudyTimePoint> points) {
@@ -247,7 +251,7 @@ pw.Widget _buildStudyTimeChart(List<StudyTimePoint> points) {
     datasets: [
       pw.LineDataSet(
         legend: 'Study time',
-        color: PdfColor.fromInt(0xFF3B82F6),
+        color: AppPdfColors.brand,
         drawSurface: true,
         data: _pointData(minutes),
       ),
@@ -262,22 +266,22 @@ pw.Widget _buildDistributionChart(AppLocalizations l10n, DeckStatsData stats) {
     (
       label: l10n.tr('stats_new'),
       value: stats.newCards,
-      color: PdfColor.fromInt(0xFF3B82F6),
+      color: AppPdfColors.brand,
     ),
     (
       label: l10n.tr('stats_learning'),
       value: stats.learningCards,
-      color: PdfColor.fromInt(0xFFF59E0B),
+      color: AppPdfColors.learning,
     ),
     (
       label: l10n.tr('stats_review'),
       value: stats.reviewCards,
-      color: PdfColor.fromInt(0xFF10B981),
+      color: AppPdfColors.success,
     ),
     (
       label: l10n.tr('stats_difficult'),
       value: stats.relearningCards,
-      color: PdfColor.fromInt(0xFFEF4444),
+      color: AppPdfColors.danger,
     ),
   ].where((segment) => segment.value > 0).toList();
 
@@ -340,25 +344,25 @@ pw.Widget _buildForecastChart(
       <({String legend, PdfColor color, List<double> values, double offset})>[
         (
           legend: l10n.tr('stats_forecast_overdue'),
-          color: PdfColor.fromInt(0xFFEF4444),
+          color: AppPdfColors.overdue,
           values: points.map((point) => point.overdue.toDouble()).toList(),
           offset: -8,
         ),
         (
           legend: l10n.tr('stats_forecast_learning'),
-          color: PdfColor.fromInt(0xFFF59E0B),
+          color: AppPdfColors.learning,
           values: points.map((point) => point.learning.toDouble()).toList(),
           offset: -2.5,
         ),
         (
           legend: l10n.tr('stats_forecast_review'),
-          color: PdfColor.fromInt(0xFF10B981),
+          color: AppPdfColors.success,
           values: points.map((point) => point.review.toDouble()).toList(),
           offset: 2.5,
         ),
         (
           legend: l10n.tr('stats_forecast_new'),
-          color: PdfColor.fromInt(0xFF3B82F6),
+          color: AppPdfColors.brand,
           values: points.map((point) => point.newCards.toDouble()).toList(),
           offset: 8,
         ),
@@ -396,7 +400,7 @@ pw.Widget _buildIntervalHistogramChart(List<IntervalHistogramPoint> points) {
     datasets: [
       pw.BarDataSet(
         legend: 'Cards',
-        color: PdfColor.fromInt(0xFF10B981),
+        color: AppPdfColors.success,
         width: _barWidth(points.length),
         data: List<pw.PointChartValue>.generate(
           points.length,
@@ -422,7 +426,7 @@ pw.Widget _buildHourlyDistributionChart(List<HourlyDistributionPoint> points) {
     datasets: [
       pw.BarDataSet(
         legend: 'Cards',
-        color: PdfColor.fromInt(0xFFF59E0B),
+        color: AppPdfColors.blue,
         width: points.length > 48 ? 4 : 7,
         data: List<pw.PointChartValue>.generate(
           points.length,
@@ -459,26 +463,26 @@ pw.Widget _buildPredictionChart(
     datasets: [
       pw.LineDataSet(
         legend: l10n.tr('stats_prediction_new_predicted'),
-        color: PdfColor.fromInt(0xFF3B82F6),
+        color: AppPdfColors.brand,
         data: _pointData(
           points.map((point) => point.predictedNew.toDouble()).toList(),
         ),
       ),
       pw.LineDataSet(
         legend: l10n.tr('stats_prediction_review_predicted'),
-        color: PdfColor.fromInt(0xFFEF4444),
+        color: AppPdfColors.danger,
         data: _pointData(predictedReviews),
       ),
       pw.LineDataSet(
         legend: l10n.tr('stats_prediction_new_actual'),
-        color: PdfColor.fromInt(0xFF7C3AED),
+        color: AppPdfColors.lavender,
         data: _pointData(
           points.map((point) => point.actualNew.toDouble()).toList(),
         ),
       ),
       pw.LineDataSet(
         legend: l10n.tr('stats_prediction_review_actual'),
-        color: PdfColor.fromInt(0xFF10B981),
+        color: AppPdfColors.success,
         data: _pointData(
           points.map((point) => point.actualReview.toDouble()).toList(),
         ),
@@ -495,7 +499,7 @@ pw.Widget _buildPredictionTimeChart(List<PredictionTimelinePoint> points) {
     datasets: [
       pw.LineDataSet(
         legend: 'Predicted time',
-        color: PdfColor.fromInt(0xFF8B5E3C),
+        color: AppPdfColors.brand,
         drawSurface: true,
         surfaceOpacity: .12,
         data: _pointData(minutes),
@@ -551,7 +555,7 @@ pw.FixedAxis<int> _xAxis(List<String> labels) {
     safeLabels,
     angle: .55,
     divisions: true,
-    textStyle: const pw.TextStyle(fontSize: 7, color: PdfColors.blueGrey700),
+    textStyle: pw.TextStyle(fontSize: 7, color: AppPdfColors.muted),
   );
 }
 
@@ -564,7 +568,7 @@ pw.FixedAxis<double> _yAxis(
     safeTicks,
     divisions: true,
     format: formatter ?? (value) => value.toStringAsFixed(value >= 10 ? 0 : 1),
-    textStyle: const pw.TextStyle(fontSize: 7, color: PdfColors.blueGrey700),
+    textStyle: pw.TextStyle(fontSize: 7, color: AppPdfColors.muted),
   );
 }
 
@@ -574,9 +578,9 @@ pw.Widget _chartCard(
 }) {
   return pw.Container(
     decoration: pw.BoxDecoration(
-      color: PdfColor.fromInt(0xFFF8FAFC),
+      color: AppPdfColors.surface,
       borderRadius: const pw.BorderRadius.all(pw.Radius.circular(16)),
-      border: pw.Border.all(color: PdfColor.fromInt(0xFFE2E8F0), width: .8),
+      border: pw.Border.all(color: AppPdfColors.border, width: .8),
     ),
     padding: padding,
     child: child,
@@ -598,7 +602,7 @@ pw.Widget _legendItem(PdfColor color, String text) {
       pw.Expanded(
         child: pw.Text(
           text,
-          style: const pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey900),
+          style: pw.TextStyle(fontSize: 10, color: AppPdfColors.text),
         ),
       ),
     ],

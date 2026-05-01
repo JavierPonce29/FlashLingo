@@ -28,14 +28,14 @@ String _$importerControllerHash() =>
 @ProviderFor(ImporterController)
 final importerControllerProvider =
     AutoDisposeNotifierProvider<ImporterController, AsyncValue<void>>.internal(
-  ImporterController.new,
-  name: r'importerControllerProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$importerControllerHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+      ImporterController.new,
+      name: r'importerControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$importerControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 typedef _$ImporterController = AutoDisposeNotifier<AsyncValue<void>>;
 // ignore_for_file: type=lint
