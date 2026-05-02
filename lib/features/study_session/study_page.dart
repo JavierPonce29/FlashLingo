@@ -11,6 +11,8 @@ import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
+import 'package:flashcards_app/features/ads/app_ads.dart';
+import 'package:flashcards_app/features/ads/fixed_banner_ad_slot.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
@@ -62,6 +64,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   final GlobalKey _showAnswerKey = GlobalKey();
   final GlobalKey _ratingControlsKey = GlobalKey();
   final GlobalKey _finishedBackButtonKey = GlobalKey();
+  Timer? _finishedAdTimer;
+  int _finishedAdSecondsRemaining = 0;
   @override
   void initState() {
     super.initState();
@@ -73,6 +77,10 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         ? widget.sessionId!.trim()
         : '${widget.packName}-${DateTime.now().microsecondsSinceEpoch}';
     _sessionStartedAt = widget.sessionStartedAt ?? DateTime.now();
+    if (_isFinished && AppAds.isSupportedPlatform) {
+      _finishedAdSecondsRemaining = AppAds.finishedScreenLock.inSeconds;
+      _startFinishedAdCountdown();
+    }
     _markCurrentCardShown();
     _startDeckSettingsWatcher();
     _refreshDeckSettingsFromDb(reloadHtml: true);
@@ -85,12 +93,15 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   @override
   void dispose() {
     _deckSettingsSubscription?.cancel();
+    _finishedAdTimer?.cancel();
     _disposeWriteControllers();
     super.dispose();
   }
 
   bool get _isFinished => currentIndex >= studyQueue.length;
   bool get _undoEnabled => _currentDeckSettings?.enableUndo ?? true;
+  bool get _isFinishedAdLocked =>
+      AppAds.isSupportedPlatform && _finishedAdSecondsRemaining > 0;
 
   Map<String, dynamic> _decodeExtraData(String? rawExtra) {
     if (rawExtra == null || rawExtra.isEmpty) return <String, dynamic>{};
@@ -370,12 +381,33 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     }
   }
 
+  void _startFinishedAdCountdown() {
+    if (!AppAds.isSupportedPlatform || _finishedAdTimer != null) return;
+    _finishedAdTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_finishedAdSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() {
+          _finishedAdTimer = null;
+          _finishedAdSecondsRemaining = 0;
+        });
+        return;
+      }
+      setState(() {
+        _finishedAdSecondsRemaining--;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final guidedTourState = ref.watch(guidedTourProvider);
 
     return PopScope(
-      canPop: !guidedTourState.step.isStudyStep,
+      canPop: !guidedTourState.step.isStudyStep && !_isFinishedAdLocked,
       onPopInvokedWithResult: (didPop, _) async {
         if (!didPop) {
           return;
@@ -396,41 +428,77 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     final l10n = context.l10n;
     final isTourFinishedStep =
         guidedTourState.step == GuidedTourStep.studyFinishedExplain;
+    final isLocked = _isFinishedAdLocked;
 
     final page = Scaffold(
       appBar: AppBar(title: Text(l10n.tr('study_finished_title'))),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 80,
-              color: AppUiColors.success(context),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 80,
+                  color: AppUiColors.success(context),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  l10n.tr('study_finished_message'),
+                  style: const TextStyle(fontSize: 20),
+                  textAlign: TextAlign.center,
+                ),
+                if (AppAds.isSupportedPlatform) ...[
+                  const SizedBox(height: 28),
+                  Text(
+                    l10n.tr('study_ad_support_message'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FixedBannerAdSlot(
+                    key: const ValueKey('finished-session-ad'),
+                    adUnitId: AppAds.finishedBannerUnitId,
+                    size: AppAds.finishedBannerSize,
+                    loadingLabel: l10n.tr('study_ad_loading'),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                KeyedSubtree(
+                  key: _finishedBackButtonKey,
+                  child: ElevatedButton(
+                    onPressed: isLocked
+                        ? null
+                        : () {
+                            if (isTourFinishedStep) {
+                              ref
+                                  .read(guidedTourProvider.notifier)
+                                  .onStudyFinishedScreenClosed();
+                              Navigator.pop(context, 'tour_finished');
+                              return;
+                            }
+                            Navigator.pop(context);
+                          },
+                    child: Text(
+                      isLocked
+                          ? l10n.tr(
+                              'study_ad_continue_in',
+                              params: <String, Object?>{
+                                'seconds': _finishedAdSecondsRemaining,
+                              },
+                            )
+                          : l10n.tr('common_back'),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              l10n.tr('study_finished_message'),
-              style: const TextStyle(fontSize: 20),
-            ),
-            const SizedBox(height: 20),
-            KeyedSubtree(
-              key: _finishedBackButtonKey,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (isTourFinishedStep) {
-                    ref
-                        .read(guidedTourProvider.notifier)
-                        .onStudyFinishedScreenClosed();
-                    Navigator.pop(context, 'tour_finished');
-                    return;
-                  }
-                  Navigator.pop(context);
-                },
-                child: Text(l10n.tr('common_back')),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -488,6 +556,18 @@ class _StudyPageState extends ConsumerState<StudyPage> {
       ),
       body: Column(
         children: [
+          if (AppAds.isSupportedPlatform)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+              child: Center(
+                child: FixedBannerAdSlot(
+                  key: ValueKey('study-ad-${card.id}-$currentIndex'),
+                  adUnitId: AppAds.studyBannerUnitId,
+                  size: AppAds.studyBannerSize,
+                  loadingLabel: l10n.tr('study_ad_loading'),
+                ),
+              ),
+            ),
           Expanded(
             child: InAppWebView(
               initialSettings: InAppWebViewSettings(
@@ -1199,6 +1279,10 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         currentIndex++;
         _cardShownAt = null;
       });
+      if (AppAds.isSupportedPlatform) {
+        _finishedAdSecondsRemaining = AppAds.finishedScreenLock.inSeconds;
+        _startFinishedAdCountdown();
+      }
       ref.read(guidedTourProvider.notifier).onStudyQueueFinished();
       await _completeSessionIfNeeded();
     }

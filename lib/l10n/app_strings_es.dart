@@ -525,6 +525,10 @@ const Map<String, String> appStringsEs = <String, String>{
   'stats_tomorrow': 'Man',
   'study_finished_title': 'Sesion finalizada',
   'study_finished_message': 'Has terminado por ahora!',
+  'study_ad_support_message':
+      'La publicidad permite que la educacion sea gratuita. Gracias!',
+  'study_ad_loading': 'Cargando publicidad...',
+  'study_ad_continue_in': 'Continuar en {seconds}s',
   'study_progress': 'Estudiando ({current}/{total})',
   'study_undo': 'Deshacer ultimo',
   'study_show_reading': 'Mostrar lectura / notas',

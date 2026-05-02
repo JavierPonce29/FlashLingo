@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flashcards_app/features/ads/app_ads.dart';
 import 'package:flashcards_app/features/home/home_page.dart';
 import 'package:flashcards_app/features/settings/app_language_controller.dart';
 import 'package:flashcards_app/features/settings/app_theme_mode_controller.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeAppAds();
 
   runApp(const ProviderScope(child: MyApp()));
 }
