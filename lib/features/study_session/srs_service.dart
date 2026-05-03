@@ -26,7 +26,12 @@ class SrsService {
       } else {
         // Si falla, se queda como new y vuelve a aparecer pronto (intra-día).
         card.learningStep = 0;
-        _scheduleNextReview(card, _minutesToDays(1), now, settings); // 1 minuto
+        _scheduleNextReview(
+          card,
+          _minutesToDays(max(1, settings.newCardIntraDayMinutes)),
+          now,
+          settings,
+        );
         return true;
       }
     }

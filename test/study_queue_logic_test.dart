@@ -118,6 +118,66 @@ void main() {
       expect(queue.map((card) => card.id), <int>[1, 1]);
     });
   });
+
+  group('insertTimedRepeatStudyCard', () {
+    test('places timed repeats near the estimated due point in non-interleave modes', () {
+      final settings = DeckSettings()
+        ..packName = 'Demo'
+        ..studyMixMode = DeckStudyMixMode.reviewsFirst;
+      final queue = <Flashcard>[
+        _card(id: 1, originalId: 'a', type: 'en_recog', state: CardState.review),
+        _card(id: 2, originalId: 'b', type: 'en_recog', state: CardState.review),
+        _card(id: 3, originalId: 'c', type: 'en_recog', state: CardState.review),
+        _card(id: 4, originalId: 'd', type: 'en_recog', state: CardState.review),
+        _card(id: 5, originalId: 'e', type: 'en_recog', state: CardState.review),
+        _card(id: 6, originalId: 'f', type: 'en_recog', state: CardState.review),
+        _card(id: 7, originalId: 'g', type: 'en_recog', state: CardState.review),
+        _card(id: 8, originalId: 'h', type: 'en_recog', state: CardState.review),
+      ];
+
+      final insertedIndex = insertTimedRepeatStudyCard(
+        queue,
+        _card(id: 9, originalId: 'z', type: 'en_recog', state: CardState.learning),
+        minimumIndex: 1,
+        settings: settings,
+        delayMinutes: 10,
+        averageAnswerTimeMs: 120000,
+      );
+
+      expect(insertedIndex, 6);
+      expect(queue[6].id, 9);
+    });
+
+    test('rounds timed repeats to the end of the active interleave block', () {
+      final settings = DeckSettings()
+        ..packName = 'Demo'
+        ..studyMixMode = DeckStudyMixMode.interleaveReviewsThenNew
+        ..interleaveReviewsCount = 2
+        ..interleaveNewCardsCount = 1;
+      final queue = <Flashcard>[
+        _card(id: 1, originalId: 'a', type: 'en_recog', state: CardState.review),
+        _card(id: 2, originalId: 'b', type: 'en_recog', state: CardState.review),
+        _card(id: 3, originalId: 'c', type: 'en_recog', state: CardState.review),
+        _card(id: 4, originalId: 'd', type: 'en_recog', state: CardState.review),
+        _card(id: 5, originalId: 'e', type: 'en_recog', state: CardState.review),
+        _card(id: 6, originalId: 'f', type: 'en_recog', state: CardState.review),
+        _card(id: 7, originalId: 'g', type: 'en_recog', state: CardState.review),
+        _card(id: 8, originalId: 'h', type: 'en_recog', state: CardState.review),
+      ];
+
+      final insertedIndex = insertTimedRepeatStudyCard(
+        queue,
+        _card(id: 9, originalId: 'z', type: 'en_recog', state: CardState.learning),
+        minimumIndex: 1,
+        settings: settings,
+        delayMinutes: 10,
+        averageAnswerTimeMs: 120000,
+      );
+
+      expect(insertedIndex, 7);
+      expect(queue[7].id, 9);
+    });
+  });
 }
 
 bool _hasAdjacentSiblings(List<Flashcard> cards) {

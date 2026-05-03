@@ -40,6 +40,10 @@ class StudyPage extends ConsumerStatefulWidget {
 }
 
 class _StudyPageState extends ConsumerState<StudyPage> {
+  static const int _defaultTimedRepeatAnswerTimeMs = 20000;
+  static const int _minTimedRepeatAnswerTimeMs = 5000;
+  static const int _maxTimedRepeatAnswerTimeMs = 120000;
+
   InAppWebViewController? webViewController;
   late List<Flashcard> studyQueue;
   int currentIndex = 0;
@@ -57,6 +61,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   _UndoAction? _lastUndo;
   StreamSubscription<void>? _deckSettingsSubscription;
   DateTime? _cardShownAt;
+  int _sessionAnsweredCardCount = 0;
+  int _sessionTotalAnswerTimeMs = 0;
   late final String _activeSessionId;
   late final DateTime _sessionStartedAt;
   List<TextEditingController> _writeControllers = <TextEditingController>[];
@@ -225,6 +231,15 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     if (shownAt == null) return 0;
     final elapsed = now.difference(shownAt).inMilliseconds;
     return elapsed < 0 ? 0 : elapsed;
+  }
+
+  int _estimatedSessionAnswerTimeMs() {
+    if (_sessionAnsweredCardCount < 3) {
+      return _defaultTimedRepeatAnswerTimeMs;
+    }
+    return (_sessionTotalAnswerTimeMs / _sessionAnsweredCardCount)
+        .round()
+        .clamp(_minTimedRepeatAnswerTimeMs, _maxTimedRepeatAnswerTimeMs);
   }
 
   void _startDeckSettingsWatcher() {
@@ -1171,6 +1186,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
     undo.reviewLogId = logId;
     undo.reviewStudyDay = studyDay;
+    _sessionAnsweredCardCount++;
+    _sessionTotalAnswerTimeMs += studyDurationMs;
 
     if (shouldCountNew && prevSeen != null) {
       undo.didIncrementNewCounter = true;
@@ -1180,11 +1197,20 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     }
 
     if (repeatToday) {
-      final insertedIndex = insertRepeatedStudyCard(
-        studyQueue,
-        card,
-        minimumIndex: currentIndex + 1,
-      );
+      final insertedIndex = undo.snapshot.state == CardState.newCard
+          ? insertTimedRepeatStudyCard(
+              studyQueue,
+              card,
+              minimumIndex: currentIndex + 1,
+              settings: settings,
+              delayMinutes: settings.newCardIntraDayMinutes,
+              averageAnswerTimeMs: _estimatedSessionAnswerTimeMs(),
+            )
+          : insertRepeatedStudyCard(
+              studyQueue,
+              card,
+              minimumIndex: currentIndex + 1,
+            );
       setState(() {});
       undo.didAppendToQueue = true;
       undo.appendedQueueIndex = insertedIndex;

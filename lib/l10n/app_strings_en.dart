@@ -359,7 +359,7 @@ const Map<String, String> appStringsEn = <String, String>{
       'Example: 2 means a new card must be correct twice before next day.',
   'deck_settings_intra_minutes': 'Intra-day minutes',
   'deck_settings_intra_minutes_hint':
-      'Stored in nextReview after first "Good" (does not force waiting).',
+      'Target delay for first-day new repeats. In interleave modes it waits until the end of the current mixed block.',
   'deck_settings_algorithm': 'Ebbinghaus algorithm',
   'deck_settings_p_min': 'P_min',
   'deck_settings_p_min_hint': 'Minimum probability (0 < P_min < 1).',

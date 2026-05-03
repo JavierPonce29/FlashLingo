@@ -647,6 +647,24 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                                     ),
                                   ),
                                 ),
+                                const SizedBox(height: 12),
+                                _buildTextField(
+                                  controller: _newIntraDayMinutesController,
+                                  label: l10n.tr('deck_settings_intra_minutes'),
+                                  helper: l10n.tr(
+                                    'deck_settings_intra_minutes_hint',
+                                  ),
+                                  inputType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) => _validateInt(
+                                    v,
+                                    label: l10n.tr('deck_settings_intra_minutes'),
+                                    min: 1,
+                                    max: 1440,
+                                  ),
+                                ),
                                 if (_isInterleaveMode) ...[
                                   const SizedBox(height: 12),
                                   Row(
@@ -987,22 +1005,6 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                   label: l10n.tr('deck_settings_min_correct'),
                   min: 1,
                   max: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: _buildTextField(
-                controller: _newIntraDayMinutesController,
-                label: l10n.tr('deck_settings_intra_minutes'),
-                helper: l10n.tr('deck_settings_intra_minutes_hint'),
-                inputType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) => _validateInt(
-                  v,
-                  label: l10n.tr('deck_settings_intra_minutes'),
-                  min: 1,
-                  max: 1440,
                 ),
               ),
             ),

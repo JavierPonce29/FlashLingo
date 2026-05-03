@@ -76,6 +76,32 @@ void main() {
       },
     );
 
+    test('repeats a failed new card using the configured intra-day minutes', () {
+      final settings = DeckSettings()
+        ..packName = 'Demo'
+        ..newCardIntraDayMinutes = 10;
+      final card = Flashcard()
+        ..originalId = '2b'
+        ..isoCode = 'ja'
+        ..packName = 'Demo'
+        ..cardType = 'ja_recog'
+        ..question = '川'
+        ..answer = 'river'
+        ..state = CardState.newCard;
+      final service = SrsService();
+      final before = DateTime.now();
+
+      final repeatToday = service.reviewCard(card, false, settings);
+
+      expect(repeatToday, isTrue);
+      expect(card.state, CardState.newCard);
+      expect(card.learningStep, 0);
+      expect(
+        card.nextReview.difference(before).inMinutes,
+        inInclusiveRange(9, 11),
+      );
+    });
+
     test('increments repetition count for production cards on success', () {
       final settings = DeckSettings()
         ..packName = 'Demo'

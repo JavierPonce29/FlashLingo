@@ -368,7 +368,7 @@ const Map<String, String> appStringsEs = <String, String>{
       'Ej: 2 = una tarjeta nueva debe acertarse 2 veces antes de otro dia.',
   'deck_settings_intra_minutes': 'Minutos intra-dia',
   'deck_settings_intra_minutes_hint':
-      'Se guarda en nextReview tras el primer "Bien" (no fuerza espera).',
+      'Retraso objetivo para las primeras repeticiones intra-dia de nuevas. En modos intercalados espera al final del bloque mixto actual.',
   'deck_settings_algorithm': 'Algoritmo Ebbinghaus',
   'deck_settings_p_min': 'P_min',
   'deck_settings_p_min_hint': 'Probabilidad minima (0 < P_min < 1).',
