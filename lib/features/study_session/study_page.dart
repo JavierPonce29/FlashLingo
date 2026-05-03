@@ -1395,6 +1395,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
 class _FlashcardSnapshot {
   final DateTime nextReview;
+  final DateTime reviewPriorityAnchor;
+  final DateTime manualReviewOverrideDay;
   final DateTime lastReview;
   final double decayRate;
   final List<double> fixedPhaseQueue;
@@ -1409,6 +1411,8 @@ class _FlashcardSnapshot {
 
   _FlashcardSnapshot({
     required this.nextReview,
+    required this.reviewPriorityAnchor,
+    required this.manualReviewOverrideDay,
     required this.lastReview,
     required this.decayRate,
     required this.fixedPhaseQueue,
@@ -1425,6 +1429,8 @@ class _FlashcardSnapshot {
   factory _FlashcardSnapshot.fromCard(Flashcard c) {
     return _FlashcardSnapshot(
       nextReview: c.nextReview,
+      reviewPriorityAnchor: c.reviewPriorityAnchor,
+      manualReviewOverrideDay: c.manualReviewOverrideDay,
       lastReview: c.lastReview,
       decayRate: c.decayRate,
       fixedPhaseQueue: List<double>.from(c.fixedPhaseQueue),
@@ -1441,6 +1447,8 @@ class _FlashcardSnapshot {
 
   void applyTo(Flashcard c) {
     c.nextReview = nextReview;
+    c.reviewPriorityAnchor = reviewPriorityAnchor;
+    c.manualReviewOverrideDay = manualReviewOverrideDay;
     c.lastReview = lastReview;
     c.decayRate = decayRate;
     c.fixedPhaseQueue = List<double>.from(fixedPhaseQueue);

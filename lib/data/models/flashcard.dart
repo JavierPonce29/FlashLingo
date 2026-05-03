@@ -24,6 +24,8 @@ class Flashcard {
   // --- VARIABLES DE ESTADO DEL ALGORITMO EBBINGHAUS ---
   @Index()
   DateTime nextReview = DateTime.now();
+  DateTime reviewPriorityAnchor = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime manualReviewOverrideDay = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime lastReview = DateTime.fromMillisecondsSinceEpoch(0);
   // Tasa de olvido actual (nt).
   double decayRate = 0.015;

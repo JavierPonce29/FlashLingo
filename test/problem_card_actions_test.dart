@@ -1,3 +1,4 @@
+import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/features/stats/problem_card_actions.dart';
 import 'package:flashcards_app/features/stats/stats_provider.dart';
@@ -51,6 +52,7 @@ void main() {
 
     setUp(() async {
       harness = await openTestIsarHarness(<CollectionSchema<dynamic>>[
+        DeckSettingsSchema,
         FlashcardSchema,
       ]);
     });

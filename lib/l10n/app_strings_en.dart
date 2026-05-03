@@ -316,6 +316,10 @@ const Map<String, String> appStringsEn = <String, String>{
   'deck_settings_daily_limits': 'Daily limits',
   'deck_settings_new_per_day': 'New/day',
   'deck_settings_reviews_per_day': 'Max reviews/day',
+  'deck_settings_hide_new_on_review_overflow':
+      'Hide new cards when review load overflows',
+  'deck_settings_hide_new_on_review_overflow_hint':
+      'If enabled, new cards are paused on days where due non-new cards exceed the daily review cap.',
   'deck_settings_day_cutoff': 'Day cutoff (study day start)',
   'deck_settings_day_cutoff_help':
       'Defines when your study day starts. Example: 04:00 means 02:00 counts as previous day.',

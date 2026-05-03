@@ -8,8 +8,10 @@ import 'package:isar/isar.dart';
 import 'package:url_launcher/link.dart';
 
 import 'package:flashcards_app/data/local/isar_provider.dart';
+import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/features/home/home_import_helper.dart';
 import 'package:flashcards_app/features/importer/import_summary_page.dart';
 import 'package:flashcards_app/features/importer/importer_provider.dart';
@@ -1076,6 +1078,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final isar = await ref.read(isarDbProvider.future);
     final now = DateTime.now();
+    final settings =
+        await isar.deckSettings
+            .filter()
+            .packNameEqualTo(normalizedPackName)
+            .findFirst() ??
+        (DeckSettings()..packName = normalizedPackName);
 
     final cardsToAdvance = await isar.flashcards
         .filter()
@@ -1092,7 +1100,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     await isar.writeTxn(() async {
       for (final card in cardsToAdvance) {
-        card.nextReview = now;
+        markFlashcardManuallyAvailableToday(card, settings, now);
       }
       await isar.flashcards.putAll(cardsToAdvance);
       await isar.studySessions

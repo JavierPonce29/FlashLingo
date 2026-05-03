@@ -30,6 +30,7 @@ class DeckSettings {
   // =========================
   int newCardsPerDay = 40;
   int maxReviewsPerDay = 500;
+  bool hideNewCardsOnReviewOverflow = false;
 
   // Tracking diario (para cupo)
   int newCardsSeenToday = 0;

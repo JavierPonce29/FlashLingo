@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
+import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/stats/stats_provider.dart';
 
@@ -121,13 +122,16 @@ int forecastRangeDaysForOption(StatsRangeOption option, DeckStatsData data) {
   if (option != StatsRangeOption.life) {
     return rangeDaysForOption(option, data);
   }
+  final plan = planFlashcardReviewDailyLimit(
+    cards: data.cardSnapshots
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
   int maxExisting = 0;
-  for (final card in data.cardSnapshots) {
-    if (card.state == CardState.newCard) continue;
-    final diff = StudyDay.label(
-      card.nextReview,
-      data.settings,
-    ).difference(data.labelToday).inDays;
+  for (final assignment in plan.assignments) {
+    final diff = assignment.assignedDay.difference(data.labelToday).inDays;
     if (diff > maxExisting) {
       maxExisting = diff;
     }
@@ -143,13 +147,17 @@ int forecastRangeDaysForOption(StatsRangeOption option, DeckStatsData data) {
 
 int intervalRangeMaxDays(IntervalRangeOption option, DeckStatsData data) {
   int maxInterval = 0;
-  for (final card in data.cardSnapshots) {
+  final plan = planFlashcardReviewDailyLimit(
+    cards: data.cardSnapshots
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
+  for (final assignment in plan.assignments) {
     final interval = math.max(
       0,
-      StudyDay.label(
-        card.nextReview,
-        data.settings,
-      ).difference(data.labelToday).inDays,
+      assignment.assignedDay.difference(data.labelToday).inDays,
     );
     if (interval > maxInterval) {
       maxInterval = interval;
@@ -235,16 +243,24 @@ List<StackedForecastPoint> buildForecastSeries(
     (index) => _MutableForecastBucket(day: points[index].day),
   );
 
-  for (final card in data.cardSnapshots) {
-    if (card.state == CardState.newCard) continue;
-    final reviewLabel = StudyDay.label(card.nextReview, data.settings);
+  final plan = planFlashcardReviewDailyLimit(
+    cards: data.cardSnapshots
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
+
+  for (final assignment in plan.assignments) {
+    final card = assignment.item;
     final isLearning =
         card.state == CardState.learning || card.state == CardState.relearning;
-    if (reviewLabel.isBefore(data.labelToday)) {
+    if (!assignment.assignedDay.isAfter(data.labelToday) &&
+        assignment.scheduledDay.isBefore(data.labelToday)) {
       buckets.first.overdue++;
       continue;
     }
-    final diff = reviewLabel.difference(data.labelToday).inDays;
+    final diff = assignment.assignedDay.difference(data.labelToday).inDays;
     if (diff < 0 || diff >= days) continue;
     if (isLearning) {
       buckets[diff].learning++;
@@ -259,6 +275,7 @@ List<StackedForecastPoint> buildForecastSeries(
   final remainingQuotaToday = _remainingNewQuotaToday(
     data.settings,
     data.labelToday,
+    hasOverflowToday: plan.hasOverflowToday,
   );
   if (remainingNew > 0 && remainingQuotaToday > 0) {
     buckets.first.newCards = math.min(remainingNew, remainingQuotaToday);
@@ -299,19 +316,33 @@ Future<List<StackedForecastPoint>> buildForecastSeriesAsync(
   );
 
   final cards = data.cardSnapshots;
+  final plan = planFlashcardReviewDailyLimit(
+    cards: cards
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
+  final planByCardId = <int, ReviewDailyLimitAssignment<Flashcard>>{
+    for (final assignment in plan.assignments) assignment.item.id: assignment,
+  };
   final progressStep = _progressStep(cards.length);
   _reportProgress(onProgress, 0);
   for (int index = 0; index < cards.length; index++) {
     final card = cards[index];
     if (card.state != CardState.newCard) {
-      final reviewLabel = StudyDay.label(card.nextReview, data.settings);
+      final assignment = planByCardId[card.id];
+      if (assignment == null) {
+        continue;
+      }
       final isLearning =
           card.state == CardState.learning ||
           card.state == CardState.relearning;
-      if (reviewLabel.isBefore(data.labelToday)) {
+      if (!assignment.assignedDay.isAfter(data.labelToday) &&
+          assignment.scheduledDay.isBefore(data.labelToday)) {
         buckets.first.overdue++;
       } else {
-        final diff = reviewLabel.difference(data.labelToday).inDays;
+        final diff = assignment.assignedDay.difference(data.labelToday).inDays;
         if (diff >= 0 && diff < days) {
           if (isLearning) {
             buckets[diff].learning++;
@@ -336,6 +367,7 @@ Future<List<StackedForecastPoint>> buildForecastSeriesAsync(
   final remainingQuotaToday = _remainingNewQuotaToday(
     data.settings,
     data.labelToday,
+    hasOverflowToday: plan.hasOverflowToday,
   );
   if (remainingNew > 0 && remainingQuotaToday > 0) {
     buckets.first.newCards = math.min(remainingNew, remainingQuotaToday);
@@ -355,7 +387,14 @@ Future<List<StackedForecastPoint>> buildForecastSeriesAsync(
       .toList();
 }
 
-int _remainingNewQuotaToday(DeckSettings settings, DateTime labelToday) {
+int _remainingNewQuotaToday(
+  DeckSettings settings,
+  DateTime labelToday, {
+  required bool hasOverflowToday,
+}) {
+  if (settings.hideNewCardsOnReviewOverflow && hasOverflowToday) {
+    return 0;
+  }
   final last = settings.lastNewCardStudyDate;
   if (last == null) {
     return settings.newCardsPerDay;
@@ -432,13 +471,17 @@ List<IntervalHistogramPoint> buildIntervalHistogram(
     return const <IntervalHistogramPoint>[];
   }
   final counts = <int, int>{for (int i = 1; i <= maxDays; i++) i: 0};
-  for (final card in data.cardSnapshots) {
+  final plan = planFlashcardReviewDailyLimit(
+    cards: data.cardSnapshots
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
+  for (final assignment in plan.assignments) {
     final interval = math.max(
       0,
-      StudyDay.label(
-        card.nextReview,
-        data.settings,
-      ).difference(data.labelToday).inDays,
+      assignment.assignedDay.difference(data.labelToday).inDays,
     );
     if (interval <= 0 || interval > maxDays) continue;
     counts[interval] = (counts[interval] ?? 0) + 1;
@@ -472,24 +515,28 @@ Future<List<IntervalHistogramPoint>> buildIntervalHistogramAsync(
     }
   }
 
-  final cards = data.cardSnapshots;
-  final cardStep = _progressStep(cards.length);
-  for (int index = 0; index < cards.length; index++) {
-    final card = cards[index];
+  final plan = planFlashcardReviewDailyLimit(
+    cards: data.cardSnapshots
+        .where((card) => card.state != CardState.newCard)
+        .toList(growable: false),
+    settings: data.settings,
+    now: reviewDayAnchor(data.labelToday, data.settings),
+  );
+  final assignments = plan.assignments;
+  final cardStep = _progressStep(assignments.length);
+  for (int index = 0; index < assignments.length; index++) {
+    final assignment = assignments[index];
     final interval = math.max(
       0,
-      StudyDay.label(
-        card.nextReview,
-        data.settings,
-      ).difference(data.labelToday).inDays,
+      assignment.assignedDay.difference(data.labelToday).inDays,
     );
     if (interval > 0 && interval <= maxDays) {
       counts[interval] = (counts[interval] ?? 0) + 1;
     }
-    if (_shouldYieldProgress(index + 1, cards.length, cardStep)) {
+    if (_shouldYieldProgress(index + 1, assignments.length, cardStep)) {
       await _yieldProgress(
         onProgress,
-        0.25 + (_fraction(index + 1, cards.length) * 0.55),
+        0.25 + (_fraction(index + 1, assignments.length) * 0.55),
       );
     }
   }
@@ -806,6 +853,7 @@ class _StageAverages {
 class _SimCard {
   CardState state;
   DateTime nextReview;
+  DateTime reviewPriorityAnchor;
   double decayRate;
   List<double> fixedPhaseQueue;
   int learningStep;
@@ -815,6 +863,7 @@ class _SimCard {
   _SimCard({
     required this.state,
     required this.nextReview,
+    required this.reviewPriorityAnchor,
     required this.decayRate,
     required this.fixedPhaseQueue,
     required this.learningStep,
@@ -837,6 +886,7 @@ class _SimCard {
     return _SimCard(
       state: CardState.newCard,
       nextReview: anchor,
+      reviewPriorityAnchor: anchor,
       decayRate: settings.initialNt,
       fixedPhaseQueue: const <double>[],
       learningStep: 0,
@@ -876,6 +926,42 @@ _StageAverages _stageAveragesFromDailyRows(
   );
 }
 
+ReviewDailyLimitPlan<_SimCard> _planSimReviewDailyLimit(
+  List<_SimCard> activeCards,
+  DeckSettings settings,
+  DateTime day,
+) {
+  final reviewCards = activeCards
+      .where((card) => card.state != CardState.newCard)
+      .toList(growable: false);
+  return planReviewDailyLimit<_SimCard>(
+    today: day,
+    maxReviewsPerDay: settings.maxReviewsPerDay,
+    entries: [
+      for (int index = 0; index < reviewCards.length; index++)
+        ReviewDailyLimitEntry<_SimCard>(
+          item: reviewCards[index],
+          scheduledDay: StudyDay.label(reviewCards[index].nextReview, settings),
+          priorityAnchor: reviewCards[index].reviewPriorityAnchor,
+          manualOverrideDay: null,
+          stableOrder: index,
+        ),
+    ],
+  );
+}
+
+void _applySimReviewDailyLimitAssignments(
+  ReviewDailyLimitPlan<_SimCard> plan,
+  DeckSettings settings,
+) {
+  for (final assignment in plan.assignments) {
+    if (!assignment.assignedDay.isAfter(assignment.scheduledDay)) {
+      continue;
+    }
+    assignment.item.nextReview = reviewDayAnchor(assignment.assignedDay, settings);
+  }
+}
+
 Map<DateTime, _PredictedDayStats> _simulateDeckFromStart(
   DeckStatsData data, {
   required DateTime startDay,
@@ -892,14 +978,17 @@ Map<DateTime, _PredictedDayStats> _simulateDeckFromStart(
 
   for (int offset = 0; offset < totalDays; offset++) {
     final day = startDay.add(Duration(days: offset));
-    final queue = <_SimCard>[];
-    for (final card in activeCards) {
-      if (!StudyDay.label(card.nextReview, settings).isAfter(day)) {
-        queue.add(card);
-      }
-    }
+    final reviewPlan = _planSimReviewDailyLimit(activeCards, settings, day);
+    _applySimReviewDailyLimitAssignments(reviewPlan, settings);
+    final queue = <_SimCard>[
+      for (final assignment in reviewPlan.assignments)
+        if (!assignment.assignedDay.isAfter(day)) assignment.item,
+    ];
 
-    final quota = settings.newCardsPerDay;
+    final quota =
+        settings.hideNewCardsOnReviewOverflow && reviewPlan.hasOverflowToday
+            ? 0
+            : settings.newCardsPerDay;
     if (quota > 0 && newPool.isNotEmpty) {
       final toIntroduce = math.min(quota, newPool.length);
       for (int i = 0; i < toIntroduce; i++) {
@@ -964,14 +1053,17 @@ Future<Map<DateTime, _PredictedDayStats>> _simulateDeckFromStartAsync(
   _reportProgress(onProgress, 0);
   for (int offset = 0; offset < totalDays; offset++) {
     final day = startDay.add(Duration(days: offset));
-    final queue = <_SimCard>[];
-    for (final card in activeCards) {
-      if (!StudyDay.label(card.nextReview, settings).isAfter(day)) {
-        queue.add(card);
-      }
-    }
+    final reviewPlan = _planSimReviewDailyLimit(activeCards, settings, day);
+    _applySimReviewDailyLimitAssignments(reviewPlan, settings);
+    final queue = <_SimCard>[
+      for (final assignment in reviewPlan.assignments)
+        if (!assignment.assignedDay.isAfter(day)) assignment.item,
+    ];
 
-    final quota = settings.newCardsPerDay;
+    final quota =
+        settings.hideNewCardsOnReviewOverflow && reviewPlan.hasOverflowToday
+            ? 0
+            : settings.newCardsPerDay;
     int toIntroduce = 0;
     if (quota > 0 && newPool.isNotEmpty) {
       toIntroduce = math.min(quota, newPool.length);
@@ -1158,9 +1250,11 @@ void _scheduleNextReview(
   if (intervalDays < 1.0) {
     final minutes = math.max(1, (intervalDays * 1440).round());
     card.nextReview = now.add(Duration(minutes: minutes));
+    card.reviewPriorityAnchor = card.nextReview;
     return;
   }
   final days = math.max(1, intervalDays.ceil());
   final base = StudyDay.start(now, settings);
   card.nextReview = base.add(Duration(days: days));
+  card.reviewPriorityAnchor = card.nextReview;
 }

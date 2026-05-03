@@ -50,6 +50,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
   bool _useFixedIntervalOnLapse = true;
   bool _enableWriteMode = false;
   bool _enableUndo = true;
+  bool _hideNewCardsOnReviewOverflow = false;
   String _studyMixMode = DeckStudyMixMode.reviewsFirst;
   int _dayCutoffHour = 4;
   int _dayCutoffMinute = 0;
@@ -137,6 +138,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
     _writeMaxRepsController.text = settings.writeModeMaxReps.toString();
     _useFixedIntervalOnLapse = settings.useFixedIntervalOnLapse;
     _enableUndo = settings.enableUndo;
+    _hideNewCardsOnReviewOverflow = settings.hideNewCardsOnReviewOverflow;
     _studyMixMode = DeckStudyMixMode.values.contains(settings.studyMixMode)
         ? settings.studyMixMode
         : DeckStudyMixMode.reviewsFirst;
@@ -202,6 +204,7 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
           ..packName = widget.packName
           ..newCardsPerDay = newLimit
           ..maxReviewsPerDay = revLimit
+          ..hideNewCardsOnReviewOverflow = _hideNewCardsOnReviewOverflow
           ..dayCutoffHour = newCutoffHour
           ..dayCutoffMinute = newCutoffMinute
           ..lapseTolerance = tolerance
@@ -442,6 +445,29 @@ class _DeckSettingsPageState extends ConsumerState<DeckSettingsPage> {
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 10),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              l10n.tr(
+                                'deck_settings_hide_new_on_review_overflow',
+                              ),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              l10n.tr(
+                                'deck_settings_hide_new_on_review_overflow_hint',
+                              ),
+                            ),
+                            value: _hideNewCardsOnReviewOverflow,
+                            onChanged: (value) {
+                              setState(
+                                () => _hideNewCardsOnReviewOverflow = value,
+                              );
+                            },
                           ),
                           const SizedBox(height: 20),
                           _buildSectionTitle(

@@ -1382,6 +1382,7 @@ class ImporterService {
       ..packName = packName
       ..newCardsPerDay = 20
       ..maxReviewsPerDay = 200
+      ..hideNewCardsOnReviewOverflow = false
       ..lapseTolerance = 0
       ..useFixedIntervalOnLapse = true
       ..lapseFixedInterval = 1.0
@@ -1417,6 +1418,10 @@ class ImporterService {
       settings.maxReviewsPerDay = _asInt(
         custom['max_reviews_per_day'],
         fallback: settings.maxReviewsPerDay,
+      );
+      settings.hideNewCardsOnReviewOverflow = _asBool(
+        custom['hide_new_cards_on_review_overflow'],
+        fallback: settings.hideNewCardsOnReviewOverflow,
       );
       settings.lapseTolerance = _asInt(
         custom['lapse_tolerance'],

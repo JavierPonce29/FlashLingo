@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:isar/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,6 +10,7 @@ import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/review_log.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
 import 'package:flashcards_app/data/models/study_session_history.dart';
+import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/importer/media_asset_cleanup.dart';
 part 'deck_provider.g.dart';
@@ -47,8 +49,6 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
     for (final s in decks) {
       // Keep this read-only: writing here can race with deletions and recreate rows.
       final currentLabel = StudyDay.label(now, s);
-      final currentStudyStart = StudyDay.start(now, s);
-      final nextStudyStart = currentStudyStart.add(const Duration(days: 1));
       final last = s.lastNewCardStudyDate;
       final lastLabel = last == null ? null : StudyDay.label(last, s);
       final bool sameStudyDay =
@@ -62,51 +62,42 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
       final remainingQuota = (s.newCardsPerDay - effectiveNewCardsSeenToday)
           .clamp(0, 999999);
 
-      final newCount = remainingQuota > 0
-          ? await isar.flashcards
-                .filter()
-                .packNameEqualTo(s.packName)
-                .stateEqualTo(CardState.newCard)
-                .limit(remainingQuota)
-                .count()
+      final cards = await isar.flashcards
+          .filter()
+          .packNameEqualTo(s.packName)
+          .findAll();
+      final totalNewCards = cards
+          .where((card) => card.state == CardState.newCard)
+          .length;
+      final nonNewCards = cards
+          .where((card) => card.state != CardState.newCard)
+          .toList(growable: false);
+      final reviewPlan = planFlashcardReviewDailyLimit(
+        cards: nonNewCards,
+        settings: s,
+        now: now,
+      );
+
+      int overdueCards = 0;
+      int learningDueToday = 0;
+      int reviewDueToday = 0;
+      for (final assignment in reviewPlan.assignmentsForDay(currentLabel)) {
+        final card = assignment.item;
+        if (card.state == CardState.learning ||
+            card.state == CardState.relearning) {
+          learningDueToday++;
+        } else if (card.state == CardState.review) {
+          reviewDueToday++;
+        }
+        if (assignment.scheduledDay.isBefore(currentLabel)) {
+          overdueCards++;
+        }
+      }
+      final allowNewCardsToday =
+          !s.hideNewCardsOnReviewOverflow || !reviewPlan.hasOverflowToday;
+      final newCount = allowNewCardsToday
+          ? math.min(totalNewCards, remainingQuota)
           : 0;
-
-      final overdueCards = await isar.flashcards
-          .filter()
-          .packNameEqualTo(s.packName)
-          .not()
-          .stateEqualTo(CardState.newCard)
-          .and()
-          .nextReviewLessThan(currentStudyStart)
-          .count();
-
-      final learningDueToday = await isar.flashcards
-          .filter()
-          .packNameEqualTo(s.packName)
-          .stateEqualTo(CardState.learning)
-          .and()
-          .nextReviewGreaterThan(currentStudyStart, include: true)
-          .and()
-          .nextReviewLessThan(nextStudyStart)
-          .count();
-      final relearningDueToday = await isar.flashcards
-          .filter()
-          .packNameEqualTo(s.packName)
-          .stateEqualTo(CardState.relearning)
-          .and()
-          .nextReviewGreaterThan(currentStudyStart, include: true)
-          .and()
-          .nextReviewLessThan(nextStudyStart)
-          .count();
-      final reviewDueToday = await isar.flashcards
-          .filter()
-          .packNameEqualTo(s.packName)
-          .stateEqualTo(CardState.review)
-          .and()
-          .nextReviewGreaterThan(currentStudyStart, include: true)
-          .and()
-          .nextReviewLessThan(nextStudyStart)
-          .count();
 
       final recentDailyStats = await isar.deckDailyStats
           .filter()
@@ -132,7 +123,7 @@ Stream<List<DeckSummary>> decksStream(DecksStreamRef ref) async* {
           packName: s.packName,
           iconUri: s.deckIconUri,
           newCardsDue: newCount,
-          learningDueToday: learningDueToday + relearningDueToday,
+          learningDueToday: learningDueToday,
           reviewCardsDueToday: reviewDueToday,
           overdueCards: overdueCards,
           accuracy7d: accuracy7d,

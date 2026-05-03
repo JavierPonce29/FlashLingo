@@ -127,6 +127,86 @@ void main() {
       expect(points.skip(1).every((point) => point.newCards == 0), isTrue);
     });
 
+    test('hides new cards when review overflow blocking is enabled', () {
+      final settings = DeckSettings()
+        ..packName = 'Demo'
+        ..newCardsPerDay = 2
+        ..maxReviewsPerDay = 1
+        ..hideNewCardsOnReviewOverflow = true
+        ..dayCutoffHour = 4
+        ..dayCutoffMinute = 0;
+      final labelToday = DateTime(2026, 4, 12);
+      final cards = <Flashcard>[
+        Flashcard()
+          ..id = 1
+          ..originalId = 'new-1'
+          ..isoCode = 'en'
+          ..packName = 'Demo'
+          ..cardType = 'en_recog'
+          ..question = 'Q1'
+          ..answer = 'A1'
+          ..state = CardState.newCard,
+        Flashcard()
+          ..id = 2
+          ..originalId = 'review-1'
+          ..isoCode = 'en'
+          ..packName = 'Demo'
+          ..cardType = 'en_recog'
+          ..question = 'Q2'
+          ..answer = 'A2'
+          ..state = CardState.review
+          ..nextReview = DateTime(2026, 4, 11, 4),
+        Flashcard()
+          ..id = 3
+          ..originalId = 'review-2'
+          ..isoCode = 'en'
+          ..packName = 'Demo'
+          ..cardType = 'en_recog'
+          ..question = 'Q3'
+          ..answer = 'A3'
+          ..state = CardState.review
+          ..nextReview = DateTime(2026, 4, 12, 4),
+      ];
+
+      final data = DeckStatsData(
+        settings: settings,
+        labelToday: labelToday,
+        cardSnapshots: cards,
+        dailyStatsRows: const [],
+        totalCards: cards.length,
+        newAvailableToday: 0,
+        newCards: 1,
+        learningDueNow: 0,
+        learningCards: 0,
+        reviewDueNow: 2,
+        reviewCards: 2,
+        overdueCards: 1,
+        relearningCards: 0,
+        lifetimeReviewCount: 0,
+        lifetimeCorrectCount: 0,
+        lifetimeWrongCount: 0,
+        totalStudyTimeMs: 0,
+        averageAnswerTimeMs: 0,
+        reviewCount7d: 0,
+        correctCount7d: 0,
+        reviewCount30d: 0,
+        correctCount30d: 0,
+        studyTime7dMs: 0,
+        studyTime30dMs: 0,
+        sessionCount7d: 0,
+        sessionCount30d: 0,
+        activeDays7d: 0,
+        activeDays30d: 0,
+        hardestCards: const [],
+        problemCards: const [],
+        recentSessions: const [],
+      );
+
+      final points = buildForecastSeries(data, StatsRangeOption.days7);
+
+      expect(points[0].newCards, 0);
+    });
+
     test('async forecast builder matches the sync output', () async {
       final settings = DeckSettings()
         ..packName = 'Demo'

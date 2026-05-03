@@ -215,6 +215,8 @@ class SrsService {
     if (intervalDays < 1.0) {
       final minutes = max(1, (intervalDays * 1440).round());
       card.nextReview = now.add(Duration(minutes: minutes));
+      card.reviewPriorityAnchor = card.nextReview;
+      card.manualReviewOverrideDay = DateTime.fromMillisecondsSinceEpoch(0);
       return;
     }
     // Días (>= 1.0): relativo al "día de estudio" (cutoff) y normalizado al cutoff.
@@ -222,6 +224,8 @@ class SrsService {
     final base = StudyDay.start(now, settings);
     final target = base.add(Duration(days: days));
     card.nextReview = target; // ya está en cutoff exacto
+    card.reviewPriorityAnchor = card.nextReview;
+    card.manualReviewOverrideDay = DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   double _minutesToDays(int minutes) => minutes / 1440.0;

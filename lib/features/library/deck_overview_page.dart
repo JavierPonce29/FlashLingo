@@ -9,6 +9,7 @@ import 'package:flashcards_app/data/local/isar_provider.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session.dart';
+import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
@@ -195,25 +196,53 @@ class DeckOverviewPage extends ConsumerWidget {
       settings.newCardsPerDay - settings.newCardsSeenToday,
     );
 
-    final reviews = await isar.flashcards
+    final scheduledReviewCards = await isar.flashcards
         .filter()
         .packNameEqualTo(packName)
         .not()
         .stateEqualTo(CardState.newCard)
-        .and()
-        .nextReviewLessThan(now.add(const Duration(seconds: 1)))
-        .limit(settings.maxReviewsPerDay)
         .findAll();
-    reviews.shuffle();
+    final reviewSync = syncFlashcardReviewDailyLimit(
+      cards: scheduledReviewCards,
+      settings: settings,
+      now: now,
+    );
+    if (reviewSync.changedCards.isNotEmpty) {
+      await isar.writeTxn(() async {
+        await isar.flashcards.putAll(reviewSync.changedCards);
+      });
+    }
+    final reviews = reviewSync.plan.assignments
+        .where(
+          (assignment) =>
+              !assignment.assignedDay.isAfter(currentLabel) &&
+              !assignment.item.nextReview.isAfter(now),
+        )
+        .map((assignment) => assignment.item)
+        .toList()
+      ..sort((a, b) {
+        final priorityCompare = effectiveReviewPriorityAnchor(
+          a,
+        ).compareTo(effectiveReviewPriorityAnchor(b));
+        if (priorityCompare != 0) return priorityCompare;
+        final nextReviewCompare = a.nextReview.compareTo(b.nextReview);
+        if (nextReviewCompare != 0) return nextReviewCompare;
+        return a.id.compareTo(b.id);
+      });
+
+    final allowNewCardsToday =
+        !settings.hideNewCardsOnReviewOverflow ||
+        !reviewSync.plan.hasOverflowToday;
+    final effectiveRemainingQuota = allowNewCardsToday ? remainingQuota : 0;
 
     List<Flashcard> newCardsOrdered = [];
-    if (remainingQuota > 0) {
+    if (effectiveRemainingQuota > 0) {
       final newCardsRaw = await isar.flashcards
           .filter()
           .packNameEqualTo(packName)
           .stateEqualTo(CardState.newCard)
           .sortByOriginalId()
-          .limit(remainingQuota)
+          .limit(effectiveRemainingQuota)
           .findAll();
 
       final newRecog = newCardsRaw
@@ -233,7 +262,7 @@ class DeckOverviewPage extends ConsumerWidget {
     if (!context.mounted) return;
     if (sessionCards.isEmpty) {
       String message = l10n.tr('deck_overview_all_done');
-      if (remainingQuota == 0 && settings.newCardsPerDay > 0) {
+      if (effectiveRemainingQuota == 0 && settings.newCardsPerDay > 0) {
         message = l10n.tr('deck_overview_new_limit');
       }
       ScaffoldMessenger.of(context).showSnackBar(

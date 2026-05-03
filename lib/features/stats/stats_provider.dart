@@ -9,6 +9,7 @@ import 'package:flashcards_app/data/models/deck_daily_stats.dart';
 import 'package:flashcards_app/data/models/deck_settings.dart';
 import 'package:flashcards_app/data/models/flashcard.dart';
 import 'package:flashcards_app/data/models/study_session_history.dart';
+import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 
 class DeckCardInsight {
@@ -200,6 +201,17 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
       .filter()
       .packNameEqualTo(packName)
       .findAll();
+  final nonNewCards = cards
+      .where((card) => card.state != CardState.newCard)
+      .toList(growable: false);
+  final reviewPlan = planFlashcardReviewDailyLimit(
+    cards: nonNewCards,
+    settings: settings,
+    now: now,
+  );
+  final planByCardId = <int, ReviewDailyLimitAssignment<Flashcard>>{
+    for (final assignment in reviewPlan.assignments) assignment.item.id: assignment,
+  };
   final dailyStatsRows = await isar.deckDailyStats
       .filter()
       .packNameEqualTo(packName)
@@ -244,8 +256,16 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
       continue;
     }
 
-    final reviewLabel = StudyDay.label(card.nextReview, settings);
-    final isDueNow = !card.nextReview.isAfter(now);
+    final assignment = planByCardId[card.id];
+    final scheduledDay =
+        assignment?.scheduledDay ?? StudyDay.label(card.nextReview, settings);
+    final assignedDay = assignment?.assignedDay ?? scheduledDay;
+    final effectiveNextReview =
+        assignedDay.isAfter(scheduledDay)
+            ? reviewDayAnchor(assignedDay, settings)
+            : card.nextReview;
+    final isDueNow =
+        _sameDay(assignedDay, labelToday) && !card.nextReview.isAfter(now);
     final isLearningCard =
         card.state == CardState.learning || card.state == CardState.relearning;
     if (isDueNow) {
@@ -256,9 +276,10 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
       }
     }
 
-    final overdueDays = reviewLabel.isBefore(labelToday)
-        ? labelToday.difference(reviewLabel).inDays
-        : 0;
+    final overdueDays =
+        _sameDay(assignedDay, labelToday) && scheduledDay.isBefore(labelToday)
+            ? labelToday.difference(scheduledDay).inDays
+            : 0;
     if (overdueDays > 0) {
       overdueCards++;
     }
@@ -301,7 +322,7 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
         question: card.question,
         cardType: card.cardType,
         state: card.state,
-        nextReview: card.nextReview,
+        nextReview: effectiveNextReview,
         lastReview: card.lastReview,
         lifetimeReviewCount: card.lifetimeReviewCount,
         lifetimeCorrectCount: card.lifetimeCorrectCount,
@@ -395,7 +416,10 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
     cardSnapshots: cards,
     dailyStatsRows: dailyStatsRows,
     totalCards: cards.length,
-    newAvailableToday: math.min(newCards, remainingQuota),
+    newAvailableToday:
+        (settings.hideNewCardsOnReviewOverflow && reviewPlan.hasOverflowToday)
+            ? 0
+            : math.min(newCards, remainingQuota),
     newCards: newCards,
     learningDueNow: learningDueNow,
     learningCards: learningCards,
@@ -424,6 +448,10 @@ Future<DeckStatsData> _computeDeckStats(Isar isar, String packName) async {
     problemCards: sortedProblemCards.take(8).toList(),
     recentSessions: recentSessions,
   );
+}
+
+bool _sameDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 final deckStatsProvider = StreamProvider.family

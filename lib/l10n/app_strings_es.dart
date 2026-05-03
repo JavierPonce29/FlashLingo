@@ -322,6 +322,10 @@ const Map<String, String> appStringsEs = <String, String>{
   'deck_settings_daily_limits': 'Limites diarios',
   'deck_settings_new_per_day': 'Nuevas/dia',
   'deck_settings_reviews_per_day': 'Max. repasos/dia',
+  'deck_settings_hide_new_on_review_overflow':
+      'Ocultar nuevas si se supera el limite de repasos',
+  'deck_settings_hide_new_on_review_overflow_hint':
+      'Si esta activo, no se mostraran tarjetas nuevas en dias donde las tarjetas no nuevas superen el limite diario de repasos.',
   'deck_settings_day_cutoff': 'Day cutoff (inicio del dia de estudio)',
   'deck_settings_day_cutoff_help':
       'Define cuando empieza tu dia de estudio. Ejemplo: 04:00 => 02:00 cuenta como dia anterior.',
