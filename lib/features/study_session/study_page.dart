@@ -13,6 +13,7 @@ import 'package:flashcards_app/data/models/study_session_history.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/ads/app_ads.dart';
 import 'package:flashcards_app/features/ads/fixed_banner_ad_slot.dart';
+import 'package:flashcards_app/features/library/study_queue_logic.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
 import 'package:flashcards_app/features/study_session/html_generator.dart';
@@ -1179,8 +1180,14 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     }
 
     if (repeatToday) {
-      setState(() => studyQueue.add(card));
+      final insertedIndex = insertRepeatedStudyCard(
+        studyQueue,
+        card,
+        minimumIndex: currentIndex + 1,
+      );
+      setState(() {});
       undo.didAppendToQueue = true;
+      undo.appendedQueueIndex = insertedIndex;
     }
 
     ref.read(guidedTourProvider.notifier).onStudyRatedCard();
@@ -1203,10 +1210,18 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     if (!_undoEnabled) return;
     // Si se re-encolar por repeatToday, revertir UNA ocurrencia
     if (action.didAppendToQueue) {
-      for (int i = studyQueue.length - 1; i >= 0; i--) {
-        if (studyQueue[i].id == action.cardId && i != action.prevIndex) {
-          studyQueue.removeAt(i);
-          break;
+      final appendedIndex = action.appendedQueueIndex;
+      if (appendedIndex != null &&
+          appendedIndex >= 0 &&
+          appendedIndex < studyQueue.length &&
+          studyQueue[appendedIndex].id == action.cardId) {
+        studyQueue.removeAt(appendedIndex);
+      } else {
+        for (int i = studyQueue.length - 1; i >= 0; i--) {
+          if (studyQueue[i].id == action.cardId && i != action.prevIndex) {
+            studyQueue.removeAt(i);
+            break;
+          }
         }
       }
     }
@@ -1470,6 +1485,7 @@ class _UndoAction {
 
   int? reviewLogId;
   bool didAppendToQueue = false;
+  int? appendedQueueIndex;
   bool didIncrementNewCounter = false;
   int? deckSettingsId;
   late int prevNewCardsSeenToday;

@@ -13,6 +13,7 @@ import 'package:flashcards_app/data/utils/review_daily_limit.dart';
 import 'package:flashcards_app/data/utils/study_day.dart';
 import 'package:flashcards_app/features/onboarding/guided_tour_controller.dart';
 import 'package:flashcards_app/features/onboarding/tour_widgets.dart';
+import 'package:flashcards_app/features/library/study_queue_logic.dart';
 import 'package:flashcards_app/features/study_session/study_page.dart';
 import 'package:flashcards_app/l10n/app_localizations.dart';
 import 'package:flashcards_app/theme/app_ui_colors.dart';
@@ -254,10 +255,13 @@ class DeckOverviewPage extends ConsumerWidget {
       newCardsOrdered = [...newRecog, ...newProd];
     }
 
+    final guidedTourState = ref.read(guidedTourProvider);
     final sessionCards = _buildSessionCards(
       settings: settings,
       reviews: reviews,
       newCards: newCardsOrdered,
+      randomizeReviews: !guidedTourState.isTourActive,
+      avoidSiblingAdjacency: !guidedTourState.isTourActive,
     );
     if (!context.mounted) return;
     if (sessionCards.isEmpty) {
@@ -309,59 +313,16 @@ class DeckOverviewPage extends ConsumerWidget {
     required DeckSettings settings,
     required List<Flashcard> reviews,
     required List<Flashcard> newCards,
+    required bool randomizeReviews,
+    required bool avoidSiblingAdjacency,
   }) {
-    final mode = DeckStudyMixMode.values.contains(settings.studyMixMode)
-        ? settings.studyMixMode
-        : DeckStudyMixMode.reviewsFirst;
-
-    switch (mode) {
-      case DeckStudyMixMode.newFirst:
-        return [...newCards, ...reviews];
-      case DeckStudyMixMode.reviewsFirst:
-        return [...reviews, ...newCards];
-      case DeckStudyMixMode.interleaveReviewsThenNew:
-        return _interleaveChunks(
-          first: reviews,
-          firstChunkSize: settings.interleaveReviewsCount,
-          second: newCards,
-          secondChunkSize: settings.interleaveNewCardsCount,
-        );
-      case DeckStudyMixMode.interleaveNewThenReviews:
-        return _interleaveChunks(
-          first: newCards,
-          firstChunkSize: settings.interleaveNewCardsCount,
-          second: reviews,
-          secondChunkSize: settings.interleaveReviewsCount,
-        );
-      default:
-        return [...reviews, ...newCards];
-    }
-  }
-
-  List<Flashcard> _interleaveChunks({
-    required List<Flashcard> first,
-    required int firstChunkSize,
-    required List<Flashcard> second,
-    required int secondChunkSize,
-  }) {
-    final aChunk = max(1, firstChunkSize);
-    final bChunk = max(1, secondChunkSize);
-    final result = <Flashcard>[];
-    int i = 0;
-    int j = 0;
-    while (i < first.length || j < second.length) {
-      if (i < first.length) {
-        final endA = min(i + aChunk, first.length);
-        result.addAll(first.sublist(i, endA));
-        i = endA;
-      }
-      if (j < second.length) {
-        final endB = min(j + bChunk, second.length);
-        result.addAll(second.sublist(j, endB));
-        j = endB;
-      }
-    }
-    return result;
+    return buildStudySessionCards(
+      settings: settings,
+      reviews: reviews,
+      newCards: newCards,
+      randomizeReviews: randomizeReviews,
+      avoidSiblingAdjacency: avoidSiblingAdjacency,
+    );
   }
 
   bool _isSameDay(DateTime a, DateTime b) =>
